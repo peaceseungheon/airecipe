@@ -36,6 +36,25 @@
 
 ---
 
+## 세션 #2 — 2026-05-22
+
+### 변경
+- AI 모델 기본값 `claude-sonnet-4-6` → `claude-haiku-4-5-20251001` (비용 ~70% 절감).
+- 사유: F1·F2는 tool use로 출력 스키마가 강제되므로 모델 가중치 차이가 양식 안정성에 끼치는 영향이 작다. 동일 Anthropic family라 tool use·prompt caching 호환성 유지. Adapter 격리(ADR-002) 덕분에 1줄 변경.
+- 오버라이드: `ANTHROPIC_MODEL` 환경변수로 sonnet/opus 지정 가능 (품질 부족 시).
+
+### 수정 파일
+- `src/lib/ai/claude-recipe-provider.ts` — `DEFAULT_MODEL` 변경
+- `src/lib/ai/AGENTS.md`, `AGENTS.md` — 기본 모델 설명 갱신
+- `docs/adr/ADR-002-ai-adapter.md` — 개정 노트 추가
+- `_workspace/02_backend_summary.md` — 모델 기록 갱신
+- `.claude/skills/ai-recipe-integration/SKILL.md` — 기본 시작 모델 가이드 갱신
+
+### 다음 검증 필요
+- 실 Anthropic API로 한국어 레시피 생성 품질 비교 (haiku 결과가 충분한지). 부족하면 `ANTHROPIC_MODEL=claude-sonnet-4-6`로 즉시 롤백.
+
+---
+
 ## 다음 세션에서 할 일
 
 ### 🔴 즉시 필요 (환경 설정 — 개발 시작 전 필수)

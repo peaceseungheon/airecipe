@@ -27,7 +27,7 @@ import {
 import { parseGeneratedRecipe } from "@/lib/ai/recipe-schema";
 import type { GeneratedRecipe } from "@/types";
 
-const DEFAULT_MODEL = "claude-sonnet-4-6";
+const DEFAULT_MODEL = "claude-haiku-4-5-20251001";
 const MAX_TOKENS = 2048;
 const REQUEST_TIMEOUT_MS = 60_000;
 const MAX_RETRIES = 2; // 429/5xx 지수 백오프 (SDK 내장)
@@ -94,7 +94,9 @@ export class ClaudeRecipeProvider implements AIRecipeProvider {
   }
 
   /** tool_use 블록에서 emit_recipe 입력을 찾아 GeneratedRecipe로 검증·파싱한다. */
-  private extractRecipe(content: Anthropic.Messages.ContentBlock[]): GeneratedRecipe {
+  private extractRecipe(
+    content: Anthropic.Messages.ContentBlock[],
+  ): GeneratedRecipe {
     const toolUse = content.find(
       (block): block is Anthropic.Messages.ToolUseBlock =>
         block.type === "tool_use" && block.name === EMIT_RECIPE_TOOL_NAME,

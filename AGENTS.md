@@ -58,7 +58,7 @@ AI 기반 요리 레시피 안내 웹앱. Next.js 14+ (App Router) + TypeScript.
 ## 환경 변수 (.env.local — `.env.local.example` 참조)
 - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` — 브라우저 클라이언트도 사용(공개 anon key)
 - `SUPABASE_SERVICE_ROLE_KEY` — 서버 전용. 클라이언트 번들에 절대 노출 금지
-- `ANTHROPIC_API_KEY` — 서버 전용. 클라이언트 번들에 절대 노출 금지 (선택: `ANTHROPIC_MODEL` 기본 claude-sonnet-4-6)
+- `ANTHROPIC_API_KEY` — 서버 전용. 클라이언트 번들에 절대 노출 금지 (선택: `ANTHROPIC_MODEL` 기본 `claude-haiku-4-5-20251001` — 비용 최적화. 품질 부족 시 `claude-sonnet-4-6`/`claude-opus-4-7`로 오버라이드)
 
 ## 페이지 / API 맵
 | 경로 | 설명 |

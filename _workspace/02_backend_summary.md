@@ -46,7 +46,7 @@ Route(HTTP I/O·검증·인증) → Service(로직) → Repository(데이터) �
 
 ## 4. AI 통합 방식
 
-- 모델 `claude-sonnet-4-6` (`ANTHROPIC_MODEL`로 오버라이드).
+- 모델 기본값 `claude-haiku-4-5-20251001` (비용 최적화, 2026-05-22 변경). `ANTHROPIC_MODEL`로 sonnet/opus 오버라이드 가능.
 - tool use(`emit_recipe`) 강제 → 구조화 JSON. input_schema 필드명 = `GeneratedRecipe`.
 - AI 출력은 zod(`recipe-schema.ts`)로 경계 검증 — 스키마 불일치는 `AIProviderError(provider_error)`.
 - 시스템 프롬프트 고정부 `cache_control: ephemeral` (비용 절감).

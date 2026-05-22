@@ -35,3 +35,7 @@ F1(레시피 생성)·F2(영양 분석)는 Claude API(claude-sonnet-4-6)로 구�
 - 스트리밍: Provider가 청크 콜백을 노출하고 Route가 SSE(`StreamChunk`)로 변환한다. 스트리밍 에러는 HTTP 200 + `error` 청크로 전달(계약 1.3).
 - 재시도(429/5xx 지수 백오프)·타임아웃은 어댑터 계층 책임. API 키는 서버 환경변수 전용.
 - 관련: `ai-recipe-integration` 스킬, 계약서 1절.
+
+## 개정 (2026-05-22)
+
+기본 모델을 `claude-sonnet-4-6` → `claude-haiku-4-5-20251001`로 변경 (비용 ~70% 절감). 사유: F1·F2는 tool use로 출력 스키마가 강제되므로 모델 가중치 차이가 텍스트 자유도보다 양식 안정성에 끼치는 영향이 작다. Haiku도 Anthropic family라 tool use·prompt caching 호환성 동일. 품질이 부족하면 `ANTHROPIC_MODEL`로 sonnet/opus로 즉시 오버라이드 가능(Adapter 격리 덕분).

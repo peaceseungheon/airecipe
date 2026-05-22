@@ -22,6 +22,6 @@ Claude API를 도메인 인터페이스 뒤로 격리하는 계층 (Adapter 패�
 | `prompts/recipe-tool-schema.ts` | `emit_recipe` tool 스키마 |
 
 ## 주의
-- 모델 기본값 `claude-sonnet-4-6` (`ANTHROPIC_MODEL` 환경변수로 오버라이드 가능).
+- 모델 기본값 `claude-haiku-4-5-20251001` (비용 최적화). `ANTHROPIC_MODEL` 환경변수로 오버라이드 가능 (품질이 부족하면 `claude-sonnet-4-6` 또는 `claude-opus-4-7`).
 - API 키는 서버 환경변수(`ANTHROPIC_API_KEY`) 전용 — 클라이언트 노출 금지.
 - 확장 지점(YAGNI): 영양 계산 경로가 둘 이상이면 Strategy 도입(ADR-002). 현재는 LLM 추정 단일 경로.

@@ -5,7 +5,7 @@ description: "Claude API(Anthropic SDK)를 레시피 앱에 통합하는 가이�
 
 # AI 레시피 통합 가이드 (Claude API)
 
-레시피 생성/추천과 영양/식단 분석을 Claude API로 구현한다. 최신 모델 ID는 `claude-opus-4-7`(고품질), 비용/속도 균형은 `claude-sonnet-4-6`, 경량은 `claude-haiku-4-5-20251001`. 레시피 생성/영양 분석 같은 구조화 작업은 sonnet으로 시작하고 품질이 부족하면 opus로 올린다.
+레시피 생성/추천과 영양/식단 분석을 Claude API로 구현한다. 최신 모델 ID는 `claude-opus-4-7`(고품질), 비용/속도 균형은 `claude-sonnet-4-6`, 경량은 `claude-haiku-4-5-20251001`. 레시피 생성/영양 분석은 tool use로 출력 스키마가 강제되므로 **`claude-haiku-4-5-20251001`을 기본으로 시작**(비용 최적화)하고, 사용자 평가에서 품질 부족이 드러나면 sonnet → opus 순서로 올린다.
 
 ## 핵심 원칙: AI는 어댑터 뒤에 격리한다
 
