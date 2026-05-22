@@ -1,0 +1,180 @@
+/**
+ * GeminiRecipeProvider — AIRecipeProvider의 Google Gen AI(@google/genai) 구현 (Adapter, ADR-002).
+ *
+ * 책임:
+ * - responseMimeType: "application/json" + responseSchema 로 구조화 JSON 출력 강제
+ *   → GeneratedRecipe(zod)로 파싱·검증.
+ * - 스트리밍: generateContentStream의 chunk.text 델타를 handlers.onText로 흘려보내고,
+ *   누적된 최종 텍스트를 1회 JSON.parse → parseGeneratedRecipe.
+ * - 타임아웃(60s): SDK 옵션 미사용, AbortController로 일관 처리.
+ * - 에러 매핑: ApiError.status === 429 → rate_limited, 그 외 SDK/네트워크 → provider_error.
+ *
+ * 캐싱 미사용: Gemini는 cachedContents가 별도 API라 본 스프린트 범위 밖(YAGNI).
+ * 시스템 지침은 평문(buildSystemText)으로 매 호출 전달한다.
+ *
+ * 어댑터 격리: `@google/genai` import는 본 파일에만 존재한다 — 외부 계층은 AIRecipeProvider만 안다(DIP).
+ */
+import { ApiError, GoogleGenAI } from "@google/genai";
+import type {
+  AIRecipeProvider,
+  GenerateParams,
+  StreamHandlers,
+} from "@/lib/ai/ai-recipe-provider";
+import { AIProviderError } from "@/lib/ai/ai-recipe-provider";
+import {
+  buildSystemText,
+  buildUserPrompt,
+} from "@/lib/ai/prompts/prompt-factory";
+import { RECIPE_RESPONSE_SCHEMA } from "@/lib/ai/prompts/recipe-response-schema";
+import { parseGeneratedRecipe } from "@/lib/ai/recipe-schema";
+import type { GeneratedRecipe } from "@/types";
+
+const DEFAULT_MODEL = "gemini-3.1-flash-lite";
+const MAX_OUTPUT_TOKENS = 2048;
+const REQUEST_TIMEOUT_MS = 60_000;
+
+export class GeminiRecipeProvider implements AIRecipeProvider {
+  private readonly client: GoogleGenAI;
+  private readonly model: string;
+
+  constructor(apiKey = process.env.GEMINI_API_KEY, model?: string) {
+    if (!apiKey) {
+      throw new AIProviderError(
+        "provider_error",
+        "GEMINI_API_KEY가 설정되지 않았습니다.",
+      );
+    }
+    this.client = new GoogleGenAI({ apiKey });
+    this.model = model ?? process.env.GEMINI_MODEL ?? DEFAULT_MODEL;
+  }
+
+  async generateRecipe(params: GenerateParams): Promise<GeneratedRecipe> {
+    const { signal, cleanup } = createTimeoutSignal(REQUEST_TIMEOUT_MS);
+    try {
+      const response = await this.client.models.generateContent({
+        model: this.model,
+        contents: buildUserPrompt(params),
+        config: {
+          systemInstruction: buildSystemText(),
+          responseMimeType: "application/json",
+          responseSchema: RECIPE_RESPONSE_SCHEMA,
+          maxOutputTokens: MAX_OUTPUT_TOKENS,
+          abortSignal: signal,
+        },
+      });
+      // responseSchema 모드에서 response.text는 스키마와 일치하는 JSON 문자열이 보장된다.
+      const text = response.text ?? "";
+      return this.parseFinal(text);
+    } catch (err) {
+      throw this.toProviderError(err);
+    } finally {
+      cleanup();
+    }
+  }
+
+  async generateRecipeStream(
+    params: GenerateParams,
+    handlers: StreamHandlers,
+  ): Promise<GeneratedRecipe> {
+    const { signal, cleanup } = createTimeoutSignal(REQUEST_TIMEOUT_MS);
+    try {
+      const stream = await this.client.models.generateContentStream({
+        model: this.model,
+        contents: buildUserPrompt(params),
+        config: {
+          systemInstruction: buildSystemText(),
+          responseMimeType: "application/json",
+          responseSchema: RECIPE_RESPONSE_SCHEMA,
+          maxOutputTokens: MAX_OUTPUT_TOKENS,
+          abortSignal: signal,
+        },
+      });
+
+      // 누적 텍스트 — responseSchema 모드에서는 chunk.text가 부분 JSON 문자열로 흐른다.
+      // 안전을 위해 onText는 raw 델타를 그대로 전달하고, 최종 파싱은 누적 후 1회만 수행한다.
+      let accumulated = "";
+      for await (const chunk of stream) {
+        const delta = chunk.text ?? "";
+        if (delta) {
+          accumulated += delta;
+          handlers.onText?.(delta);
+        }
+      }
+      return this.parseFinal(accumulated);
+    } catch (err) {
+      throw this.toProviderError(err);
+    } finally {
+      cleanup();
+    }
+  }
+
+  /** 누적된 JSON 문자열을 GeneratedRecipe로 파싱·검증. */
+  private parseFinal(text: string): GeneratedRecipe {
+    if (!text.trim()) {
+      throw new AIProviderError(
+        "provider_error",
+        "AI가 빈 응답을 반환했습니다.",
+      );
+    }
+    let raw: unknown;
+    try {
+      raw = JSON.parse(text);
+    } catch (cause) {
+      throw new AIProviderError(
+        "provider_error",
+        "AI 응답을 JSON으로 파싱할 수 없습니다.",
+        cause,
+      );
+    }
+    try {
+      return parseGeneratedRecipe(raw);
+    } catch (cause) {
+      throw new AIProviderError(
+        "provider_error",
+        "AI 응답이 레시피 스키마와 일치하지 않습니다.",
+        cause,
+      );
+    }
+  }
+
+  /** SDK 오류를 도메인 AIProviderError로 변환한다. */
+  private toProviderError(err: unknown): AIProviderError {
+    if (err instanceof AIProviderError) return err;
+    if (err instanceof ApiError) {
+      if (err.status === 429) {
+        return new AIProviderError(
+          "rate_limited",
+          "AI 요청이 일시적으로 많습니다. 잠시 후 다시 시도해 주세요.",
+          err,
+        );
+      }
+      return new AIProviderError(
+        "provider_error",
+        "AI 레시피 생성에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+        err,
+      );
+    }
+    // AbortController 타임아웃(AbortError) 포함 — 일반 provider_error로 수렴.
+    return new AIProviderError(
+      "provider_error",
+      "AI 레시피 생성 중 알 수 없는 오류가 발생했습니다.",
+      err,
+    );
+  }
+}
+
+/**
+ * 60s 타임아웃용 AbortSignal 헬퍼.
+ * SDK가 abortSignal을 받으므로 이를 통해 일관된 취소를 보장한다.
+ */
+function createTimeoutSignal(timeoutMs: number): {
+  signal: AbortSignal;
+  cleanup: () => void;
+} {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  return {
+    signal: controller.signal,
+    cleanup: () => clearTimeout(timer),
+  };
+}

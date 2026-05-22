@@ -78,3 +78,62 @@ Route(HTTP I/O·검증·인증) → Service(로직) → Repository(데이터) �
 - `.env.local.example` 제공 — 실제 값은 `.env.local`(NEXT_PUBLIC_SUPABASE_URL/ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, ANTHROPIC_API_KEY).
 - DB 적용: `supabase/schema.sql`을 Supabase SQL Editor에 실행(또는 migrations).
 - `npm run build` 완전 통과는 프론트의 swr/clsx/tailwind-merge 설치 후 가능(현재 백엔드 파일은 tsc clean).
+
+---
+
+## 8. AI Provider 전환 (세션 #3, 2026-05-22)
+
+**변경 요약**: 기본 AI Provider를 Claude → Gemini로 전환. Claude는 비활성 보존(코드·SDK·환경변수 유지)하여 `AI_PROVIDER=claude`로 즉시 롤백 가능.
+
+### 8.1 패턴
+- **Factory(ADR-002 확장, ADR-008)**: `AI_PROVIDER` 환경변수로 구현체 선택 (`gemini` 기본 / `claude` 롤백). 그 외 값 → 명시적 `AIProviderError` throw.
+- **DIP 유지**: Service는 여전히 `AIRecipeProvider` 추상에만 의존. Factory 도입은 composition 한 줄만 교체.
+- **OCP**: 새 Provider 추가 시 Factory에 분기 한 줄만 추가.
+- **SDK 격리**: `@google/genai` 런타임 import는 `gemini-recipe-provider.ts`(+ Gemini용 Schema 정의 `prompts/recipe-response-schema.ts`)에만. `@anthropic-ai/sdk` 런타임 import는 `claude-recipe-provider.ts`에만. `prompts/prompt-factory.ts`, `prompts/recipe-tool-schema.ts`의 Anthropic 참조는 `import type` (타입 전용, 런타임 영향 없음 — Claude 롤백 경로 보전).
+
+### 8.2 신규 파일
+| 파일 | 역할 |
+|------|------|
+| `src/lib/ai/gemini-recipe-provider.ts` | `AIRecipeProvider`의 `@google/genai` Adapter. responseMimeType+responseSchema로 JSON 강제, AbortController 60s 타임아웃, ApiError.status=429→`rate_limited`. |
+| `src/lib/ai/prompts/recipe-response-schema.ts` | Gemini `responseSchema` (Type enum 기반 Schema). `GeneratedRecipe`/zod와 1:1 일치. |
+| `src/lib/ai/ai-recipe-provider.factory.ts` | `AI_PROVIDER` 환경변수→Provider 인스턴스화. composition.ts에서만 호출. |
+
+### 8.3 수정 파일
+| 파일 | 변경 |
+|------|------|
+| `src/lib/composition.ts` | `new ClaudeRecipeProvider()` → `createAIRecipeProvider()`. 지연 싱글턴 게이트 유지. |
+| `src/lib/ai/prompts/prompt-factory.ts` | `buildSystemText()` 추가 (Gemini용 평문). `RECIPE_SYSTEM_INSTRUCTIONS`는 두 Provider 공유 SSOT. `buildSystemBlocks()`(Claude 캐싱 블록)·`buildUserPrompt()` 그대로 유지. |
+| `src/lib/ai/ai-recipe-provider.ts` | 헤더 주석 갱신 — 두 구현체와 Factory 위치 명시. 인터페이스 시그니처 불변. |
+| `package.json` / `package-lock.json` | `@google/genai ^2.6.0` 추가. `@anthropic-ai/sdk ^0.97.1` 유지(롤백 경로). |
+
+### 8.4 비변경 (의도적)
+- `src/lib/ai/claude-recipe-provider.ts`, `src/lib/ai/prompts/recipe-tool-schema.ts`, `src/lib/ai/recipe-schema.ts` — Claude 롤백 경로 보전.
+- `src/services/recipe-generation.service.ts`, Route Handlers, `service-error.ts` — Provider 추상에만 의존, 변경 불필요(DIP 검증).
+
+### 8.5 환경변수 매트릭스
+| 변수 | Gemini 모드 (기본) | Claude 모드 (롤백) |
+|------|--------------------|---------------------|
+| `AI_PROVIDER` | `gemini` 또는 미설정 | `claude` |
+| `GEMINI_API_KEY` | **필수** | (불필요) |
+| `GEMINI_MODEL` | 선택 (기본 `gemini-3.1-flash-lite`) | (무시) |
+| `ANTHROPIC_API_KEY` | (불필요) | **필수** |
+| `ANTHROPIC_MODEL` | (무시) | 선택 (기본 `claude-haiku-4-5-20251001`) |
+
+### 8.6 진입점 / 롤백
+- **Factory 진입점**: `src/lib/ai/ai-recipe-provider.factory.ts::createAIRecipeProvider()` — `composition.ts`에서만 호출.
+- **롤백 절차**: 배포 환경의 `AI_PROVIDER=claude` 설정 + `ANTHROPIC_API_KEY` 존재 확인 → 재배포. 코드·SDK 변경 불필요.
+
+### 8.7 AI 동작 차이 (운영 주의)
+- **구조화 출력 강제 메커니즘 상이**: Claude는 tool use(`emit_recipe`) 강제, Gemini는 `responseMimeType:"application/json"` + `responseSchema`. 두 경로 모두 zod(`recipe-schema.ts`)로 동일 도메인 타입 검증 → 후처리 동일.
+- **시스템 지침 SSOT 공유**: `RECIPE_SYSTEM_INSTRUCTIONS` 본문 1개를 두 빌더(`buildSystemBlocks`/`buildSystemText`)가 공유. 본문 변경은 두 Provider 행동을 동시에 바꿈.
+- **스트리밍 텍스트 델타**: Gemini는 responseSchema 모드에서 부분 JSON 조각이 텍스트 델타로 흐른다. `onText`에 raw 전달, 최종 1회 파싱으로 안전성 확보. Route SSE 변환 로직은 기존(`text` 청크 그대로 전달) 변경 없음 — 단, 프론트 UX는 부분 JSON 표시가 어색할 수 있어 QA 관찰 필요(아래 8.8 참조).
+- **캐싱**: Claude만 ephemeral 캐싱 적용 중. Gemini cachedContents 도입은 YAGNI 유보.
+- **재시도**: Claude는 SDK 내장 maxRetries=2 사용. Gemini는 SDK 기본 동작에 의존(명시적 재시도 미설정).
+
+### 8.8 QA 검증 포인트 (다음 단계)
+1. `AI_PROVIDER` 미설정 / `gemini` / `claude` / `invalid` 4분기 동작: Factory 분기 + 잘못된 값에서 명시적 `AIProviderError("provider_error")` throw 확인.
+2. `GEMINI_API_KEY` 미설정 시 Provider 인스턴스화 단계 throw → `getRecipeGenerationService` 첫 호출 시점에서만 발생(빌드·import는 통과).
+3. `/api/recipes/generate` 비스트리밍: Gemini 응답이 `GeneratedRecipe` 필드명·타입과 정확히 일치하는지(zod parse 성공률), 응답 shape 래핑(`{data:...}`)이 기존과 동일한지.
+4. `/api/recipes/generate?stream=1` SSE: Gemini 스트리밍 시 `text` 청크가 부분 JSON 조각으로 흐를 때 프론트 표시 UX(현재 Route는 raw 전달). 필요 시 후속 스프린트에서 onText 억제 토글 검토.
+5. 에러 매핑: Gemini ApiError.status=429 → `AI_RATE_LIMITED`(429), 기타 SDK 오류 → `AI_PROVIDER_ERROR`(502), AbortController 타임아웃(60s 초과) → `AI_PROVIDER_ERROR`로 수렴되는지.
+

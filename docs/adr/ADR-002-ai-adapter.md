@@ -39,3 +39,14 @@ F1(레시피 생성)·F2(영양 분석)는 Claude API(claude-sonnet-4-6)로 구�
 ## 개정 (2026-05-22)
 
 기본 모델을 `claude-sonnet-4-6` → `claude-haiku-4-5-20251001`로 변경 (비용 ~70% 절감). 사유: F1·F2는 tool use로 출력 스키마가 강제되므로 모델 가중치 차이가 텍스트 자유도보다 양식 안정성에 끼치는 영향이 작다. Haiku도 Anthropic family라 tool use·prompt caching 호환성 동일. 품질이 부족하면 `ANTHROPIC_MODEL`로 sonnet/opus로 즉시 오버라이드 가능(Adapter 격리 덕분).
+
+## Revision (2026-05-22, 후속)
+
+본 ADR의 Adapter 격리를 유지한 채 AI Provider 기본값을 Gemini로 전환했다. 변경 사항:
+
+- **Adapter 인터페이스(`AIRecipeProvider`)는 그대로 유지** — Service·Route·UI 코드 영향 없음(LSP/DIP).
+- **구현체가 두 개로 확장**: `GeminiRecipeProvider`(기본, `@google/genai`, 모델 `gemini-3.1-flash-lite`) + `ClaudeRecipeProvider`(비활성 보존, 즉시 롤백용).
+- **선택은 Factory에서**: `src/lib/ai/ai-recipe-provider.factory.ts`가 `AI_PROVIDER` 환경변수(`"gemini"` 기본 \| `"claude"`)를 읽어 구현체를 반환. Composition Root만 Factory를 호출하고, Service는 주입된 추상에만 의존.
+- **구조화 출력 방식 차이는 어댑터 내부에 격리**: Claude는 tool use(`input_schema`), Gemini는 `responseSchema`. 두 스키마 모두 동일한 `GeneratedRecipe`(`src/types/recipe.ts`)와 zod 검증(`recipe-schema.ts`)에 1:1 정합.
+
+상세 결정·근거·결과·롤백 절차는 [ADR-008](ADR-008-gemini-default-with-claude-fallback.md) 참조.

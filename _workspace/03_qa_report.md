@@ -104,3 +104,141 @@
 ## 미검증 (런타임 — 환경 의존)
 - 실제 Supabase 연결·RLS 정책 적용 하의 소유권 격리(404 수렴) 동작은 실 DB 없이는 정적 검증만 수행. 키 확보 후 통합 테스트 권장.
 - 실제 Anthropic API 응답의 tool output이 recipe-schema zod를 통과하는지(AI 출력 변동성)는 실 호출로만 확인 가능. 어댑터의 스키마 재검증·재시도 경로는 정적 PASS.
+
+---
+
+# 세션 #3 검증 — 2026-05-22 (AI Provider 기본 Gemini 전환 + Factory 도입)
+
+## 검증 범위 (세션 #3)
+- 신규/수정 코드: `src/lib/ai/{gemini-recipe-provider.ts, ai-recipe-provider.factory.ts, ai-recipe-provider.ts, claude-recipe-provider.ts}`, `src/lib/ai/prompts/{recipe-response-schema.ts, prompt-factory.ts, recipe-tool-schema.ts}`, `src/lib/composition.ts`, `package.json`.
+- 문서: `docs/adr/ADR-008-...md`, `docs/adr/ADR-002-...md`(Revision), `src/lib/ai/AGENTS.md`, 루트 `AGENTS.md`, `README.md`, `docs/SESSION_NOTES.md`, `.env.local.example`, `.claude/skills/ai-recipe-integration/SKILL.md`.
+- 빌드: `npx tsc --noEmit` (0 errors), `npm run lint` (0 errors), `npm run build` (성공, 정적 페이지 10개 생성).
+
+## 결과 요약 — PASS (Blocker 0건, Major 0건)
+경계면 정합 전체 PASS. 발견된 minor/info는 모두 문서 톤·다이어그램 부정합으로 런타임/타입 안전성에 영향 없음.
+
+## 통과 (PASS)
+
+### [A] 계약·인터페이스 정합성 — OK
+- A1. `AIRecipeProvider` 시그니처 불변 확인 (`ai-recipe-provider.ts:13-43`): `GenerateParams{dishName,servings}`, `StreamHandlers{onText?}`, `generateRecipe→Promise<GeneratedRecipe>`, `generateRecipeStream→Promise<GeneratedRecipe>`. 세션 #1·#2 검증 시점과 동일.
+- A2. 두 구현체 모두 `implements AIRecipeProvider` 명시: `gemini-recipe-provider.ts:36`, `claude-recipe-provider.ts:35`. 반환 타입·파라미터 동일(LSP 만족). tsc 0 errors.
+- A3. `StreamHandlers.onText` 양쪽 Provider에서 호출 확인:
+  - Claude: `claude-recipe-provider.ts:86` `stream.on("text", (delta) => handlers.onText!(delta))` — SDK 이벤트 기반.
+  - Gemini: `gemini-recipe-provider.ts:96-101` `for await (const chunk of stream) ... handlers.onText?.(delta)` — async iterator, undefined-safe.
+- A4. `AIErrorKind = "rate_limited" | "provider_error"` 양쪽 의미 동일:
+  - 429 → rate_limited (`gemini:144`, `claude:125`)
+  - 그 외 SDK/네트워크 → provider_error (`gemini:151,158`, `claude:132,138`)
+  - 추가 매핑: Gemini는 AbortError(타임아웃) → provider_error 수렴(`gemini:157` 주석). 의도된 단순화.
+
+### [B] Factory 분기 정합성 — OK
+- B1. 4가지 경로 매트릭스 (`ai-recipe-provider.factory.ts:26-41`):
+  - 미설정/공문자열 → `kind = DEFAULT_PROVIDER = "gemini"` → Gemini (line 28).
+  - `"gemini"` → Gemini (line 31-32).
+  - `"claude"` → Claude (line 33-34).
+  - 그 외 → `AIProviderError("provider_error", \`지원하지 않는 AI_PROVIDER: ${kind}. "gemini" 또는 "claude"만 허용됩니다.\`)` (line 36-39). **받은 값을 에러 메시지에 노출** → 디버깅 가능.
+- B2. `composition.ts:10,24` Factory 일원화 확인. `new ClaudeRecipeProvider()` / `new GeminiRecipeProvider()` 직접 호출은 Factory(`factory.ts:32,34`)에만 존재 — 다른 곳 0건(grep 전수).
+- B3. Singleton 패턴 확인 (`composition.ts:20-27`): `_generationService` 모듈 변수에 첫 호출 시점 1회 조립, 이후 재사용. **`AI_PROVIDER` 런타임 변경은 재배포 없이 반영되지 않는다** — 운영 롤백 시 재배포 필요. 이 의미는 ADR-008 line 62 "재배포" 표현 + AGENTS.md line 43 "재배포"에 명시되어 정합. SESSION_NOTES도 동일 톤. **별도 issue 불필요.**
+
+### [C] SDK 격리 — OK (어댑터 경계 엄격)
+- C1. `@google/genai` runtime import 2곳만:
+  - `gemini-recipe-provider.ts:17` `import { ApiError, GoogleGenAI }` (어댑터 본체)
+  - `prompts/recipe-response-schema.ts:12` `import { Type, type Schema }` (Provider 전용 스키마 정의)
+- C2. `@anthropic-ai/sdk` runtime import 1곳만 + import type 2곳:
+  - Runtime: `claude-recipe-provider.ts:12` `import Anthropic`
+  - import type only: `prompts/prompt-factory.ts:12`, `prompts/recipe-tool-schema.ts:7` (런타임 영향 없음, 트리쉐이킹 대상)
+- C3. Service/Route/Repository/Component/Hook 계층에 SDK import 0건 (grep 전수: `services/, app/, repositories/, components/, hooks/, mappers/` 깨끗).
+- C4. `factory.ts`는 SDK 미참조 — Provider 클래스만 import (`:15-16`).
+
+### [D] 스키마 정합성 (4자 동기화) — OK
+- D1. 핵심 9개 최상위 필드 4자 일치 (`responseSchema:87-97 ↔ tool input_schema:77-87 ↔ zod:31-41 ↔ type:36-46`):
+  `dishName, description, servings, cookTimeMinutes, difficulty(easy|medium|hard), ingredients[], steps[], tips[], nutrition`.
+- D2. 중첩 객체 검증:
+  - `ingredients[]`: `{name(string), quantity(number), unit(string)}` 모두 required — 4자 일치.
+  - `steps[]`: `{order(int), instruction(string)}` 모두 required — 4자 일치.
+  - `nutrition`: `{calories, carbohydrates, protein, fat, fiber}` 모두 number + `healthNote(string)` 모두 required — 4자 일치. zod는 number로 통일(Gemini는 NUMBER/INTEGER 혼합, JSON Schema도 number/integer 혼합 — JSON 파싱 후 zod number는 정수도 수용).
+- D3. 파싱 단일 게이트 확인:
+  - Gemini: `gemini-recipe-provider.ts:67,103,130` → `parseFinal → parseGeneratedRecipe`
+  - Claude: `claude-recipe-provider.ts:64,90,111` → `extractRecipe → parseGeneratedRecipe`
+  두 Provider 모두 `recipe-schema.ts`의 `parseGeneratedRecipe(zod)`를 단일 검증점으로 사용.
+- D4. `difficulty` enum 값 ["easy","medium","hard"] 4자 일치(Gemini `Type.STRING+enum`, Claude `string+enum`, zod `z.enum`, type `Difficulty` union).
+
+### [E] 환경변수 일관성 — OK
+- E1. 코드에서 실제 읽는 환경변수 (`grep process.env`):
+  - `AI_PROVIDER` (`factory.ts:27`)
+  - `GEMINI_API_KEY`, `GEMINI_MODEL` (`gemini-recipe-provider.ts:40,48`)
+  - `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` (`claude-recipe-provider.ts:39,51`)
+  - Supabase 3종(`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`)
+- E2. 문서 6곳 표기 일치 검증:
+  - `.env.local.example:13,17,19,23,25` ✓ 5종 + 기본값 표기
+  - `README.md:85-98` ✓ 5종 + 기본값 + 롤백 절차
+  - 루트 `AGENTS.md:63-65` ✓ 5종 + 기본값
+  - `src/lib/ai/AGENTS.md:32-38` ✓ 5종 표 + 기본값
+  - `ADR-008:54-60` ✓ 5종 표 + 기본값
+  - `SESSION_NOTES.md:106-108` ✓ AI 관련 변수 표기
+  - `.claude/skills/ai-recipe-integration/SKILL.md:96-100` ✓ 5종 + 기본값
+- E3. 기본값 동일성:
+  - `AI_PROVIDER` 기본 = `gemini` — 6곳 일치.
+  - `GEMINI_MODEL` 기본 = `gemini-3.1-flash-lite` — 6곳 일치 + 코드(`gemini-recipe-provider.ts:32` `DEFAULT_MODEL`).
+  - `ANTHROPIC_MODEL` 기본 = `claude-haiku-4-5-20251001` — 6곳 일치 + 코드(`claude-recipe-provider.ts:30` `DEFAULT_MODEL`).
+
+### [F] 빌드·타입·런타임 안전성 — OK
+- F1. `npx tsc --noEmit`: **0 errors** (백그라운드 실행 exit 0).
+- F2. `npm run lint`: **0 errors** (백그라운드 실행 exit 0).
+- F3. `npm run build`: **성공** (Compiled 4.4s, TypeScript 2.3s, 정적 페이지 10/10 생성). 환경변수 없이도 정적 페이지(`/`, `/auth/login`, `/auth/signup`, `/my-recipes`, `/recipe/generate`)가 정상 생성됨 → **import-only 단계 throw 없음, 지연 초기화 패턴 유지 확인**.
+- F4. `composition.ts:20-27` 지연 게이트 확인: 모듈 import 시점에는 `_generationService=null`만 선언, 첫 `getRecipeGenerationService()` 호출 시 `createAIRecipeProvider()`(→ Provider 생성자 → key 검증). 빌드 타임에는 호출되지 않음 → 키 없이 빌드 통과.
+- F5. AI 계층 타입 안전성 우회 0건 (grep `any|as unknown|@ts-ignore|@ts-expect-error` on `src/lib/ai/` — 매치 없음). `tool_use.input`은 `unknown`→`parseGeneratedRecipe(zod)`로 안전 파싱.
+
+### [G] 문서·코드 ADR 정합성 — OK
+- G1. ADR-008 Decision 3줄 ↔ 실제 코드:
+  - Factory(`AI_PROVIDER` 분기) → `factory.ts:26-41` ✓
+  - SDK 격리(Adapter 2개) → `gemini-/claude-recipe-provider.ts` + import 격리 ✓
+  - Default Provider=gemini → `factory.ts:20 DEFAULT_PROVIDER="gemini"` + `gemini-recipe-provider.ts:32 DEFAULT_MODEL="gemini-3.1-flash-lite"` ✓
+- G2. ADR-002 Revision (line 43-52) ADR-008을 line 52 "[ADR-008]..." 명시 참조 ✓.
+- G3. `src/lib/ai/AGENTS.md:20-30` 파일 테이블에 8개 파일 등재:
+  - `ai-recipe-provider.ts`, `ai-recipe-provider.factory.ts`, `gemini-recipe-provider.ts`, `claude-recipe-provider.ts`, `recipe-schema.ts`, `prompts/prompt-factory.ts`, `prompts/recipe-response-schema.ts`, `prompts/recipe-tool-schema.ts` — **요청 5개 포함 빠짐없이 모두 등재** ✓.
+- G4. `SESSION_NOTES.md` 세션 #3(line 58-93) 변경사항이 실제 코드 변동과 일치. 단, line 72 "수정 예정: Composition Root" 표현은 이미 적용됨(`composition.ts` 변경 확인) — 문구만 "수정 완료"로 갱신하면 깔끔하나 정합성 영향 없음(아래 minor-#3 참조).
+- G5. README의 환경변수 예시(line 84-98) ↔ `.env.local.example`(line 6-25) 키 5종·기본값·서버 전용 주의문구 1:1 일치.
+
+### [H] 잔여 Claude 디폴트 흔적 — OK
+- H1. `composition.ts`·Route·Service·기타 어떤 코드에도 `"claude"`·`Claude` 기본값 하드코딩 0건.
+  - `services/recipe-generation.service.ts:4` 헤더 주석에 "구체 Claude SDK를 모른다"는 표현은 **롤백용 import이자 ADR-002 문맥 설명** — 기본값 강제 아님(코드는 `AIRecipeProvider`만 의존). 다만 Provider-agnostic 톤과는 어긋남 → 아래 minor-#1.
+- H2. AGENTS.md/README/SKILL.md/AGENTS.md(ai) 인트로 모두 "Gemini 기본 (Claude 롤백)" 톤 ✓.
+
+### [I] 회귀 회피 — OK (세션 #1·#2 PASS 항목 재검증)
+- I1. SSE 청크 종류 4종 의미 불변 (`route.ts:61,65,68,72,74` meta/text/recipe/error/done). Provider의 `onText` 시그니처 불변(`StreamHandlers.onText?: (delta:string)=>void`)이므로 SSE 매핑 영향 없음.
+- I2. F2 영양 정보가 단일 호출로 반환 — `AIRecipeProvider` 계약 불변, 두 Provider의 응답이 모두 `GeneratedRecipe.nutrition` 포함 (D2 확인). Service Facade(`recipe-generation.service.ts:28-37`)도 단일 호출만 수행.
+- I3. 에러 매핑 매트릭스 ↔ Route:
+  - `AIProviderError(rate_limited)` → `recipe-generation.service.ts:60` → `ServiceError("AI_RATE_LIMITED")` → `api-response.ts:21` HTTP 429 ✓
+  - `AIProviderError(provider_error)` → 동 line 60 → `ServiceError("AI_PROVIDER_ERROR")` → `api-response.ts:23` HTTP 502 ✓
+  - 스트리밍 경로(`generate/route.ts:69-72`)는 HTTP 200 + error 청크로 동일 코드 노출(계약 1.3) ✓
+  - 두 Provider 모두 동일한 `AIProviderError(kind, message, cause)`를 던지므로 매핑 분기 불필요(LSP 충족).
+
+## Minor / Info (위반 아님, 권장 갱신)
+
+다음 발견은 모두 **문서 표현/다이어그램**에 국한되며 런타임·타입·계약 정합성에 영향 없음. 카운트 4건:
+
+- **minor-#1** [G/H] `src/services/recipe-generation.service.ts:4` 헤더 주석이 "구체 Claude SDK를 모른다"로 표기 — Provider-agnostic 톤과 어긋남. **수정 권고(backend)**: "구체 AI SDK(Gemini/Claude)를 모른다" 또는 "구체 Provider 구현(Gemini/Claude SDK)을 모른다"로 갱신.
+- **minor-#2** [G] `README.md:31` 아키텍처 다이어그램이 `[AIRecipeProvider] ← [ClaudeRecipeProvider]`만 표기 — 루트 `AGENTS.md:10-12`에 이미 Gemini(기본)+Claude(롤백) 둘 다 그린 것과 비대칭. **수정 권고(architect)**: AGENTS.md와 동일하게 두 Provider를 Factory 분기로 표기.
+- **minor-#3** [G] `docs/SESSION_NOTES.md:148` 파일 구조 트리의 `src/lib/ai/` 설명이 `# ClaudeRecipeProvider (Adapter)`만 표기 — 세션 #3의 본문(line 60-66, Gemini 기본 전환 명시)과 트리 표기가 불일치. **수정 권고(architect)**: 트리 주석을 `# Gemini/Claude Adapter + Factory (ADR-008)` 또는 동등 표현으로 갱신. 동 파일 line 72의 "수정 예정: Composition Root"도 실제 적용됨 → "수정 완료"로 어조 정정 권장.
+- **info-#4** [B] `composition.ts:20` 싱글턴 모듈 변수는 `AI_PROVIDER` 변경이 **재배포 없이 반영되지 않음**(첫 호출 캐시). ADR-008 line 62 / AGENTS.md line 43 / README line 103이 모두 "재배포"로 명시하여 정합 — issue 아님, 운영자 인지용 정보로만 기록.
+
+## 세션 #3 검증 매트릭스 요약
+
+| 항목 | 상태 | 비고 |
+|------|------|------|
+| A 계약·인터페이스 | PASS | AIRecipeProvider 시그니처 불변, LSP·DIP 유지, 두 Provider 동일 계약 |
+| B Factory 분기 | PASS | 4경로 매트릭스 정확, 미설정·"gemini"·"claude"·그외 모두 의도대로 동작 |
+| C SDK 격리 | PASS | @google/genai 2곳·@anthropic-ai/sdk 1곳(+ type 2곳), 다른 계층 누출 0건 |
+| D 스키마 4자 정합 | PASS | responseSchema↔input_schema↔zod↔GeneratedRecipe 9필드 + 중첩 완전 일치 |
+| E 환경변수 일관성 | PASS | 코드 5종 ↔ 문서 6곳 표기·기본값 모두 일치 |
+| F 빌드·타입 | PASS | tsc/lint/build 0 errors, 환경변수 없이도 정적 빌드 통과(지연 초기화) |
+| G 문서·ADR 정합 | PASS | ADR-008·002·AGENTS·SESSION_NOTES·README 정합 (minor 3건 별도) |
+| H Claude 디폴트 흔적 | PASS | 기본값 강제 0건, 인트로 톤 모두 Provider-agnostic |
+| I 회귀 회피 | PASS | SSE/F2/에러 매핑 영향 없음, 세션 #1·#2 PASS 항목 유지 |
+
+**최종 결론 — PASS.** Blocker 0건, Major 0건, Minor 3건(문서 표현/다이어그램, 비기능), Info 1건(운영자 인지용). 세션 #3 변경(AI Provider Gemini 전환 + Factory 도입 + Claude 비활성 보존)은 ADR-002의 Adapter 격리 가치를 실증하며, Service·Route·UI 계약에 영향 없이 안전하게 통합됨.
+
+## 미검증 (런타임 — 실제 환경 의존, 세션 #3 신규)
+- 실제 `GEMINI_API_KEY`로 한국어 레시피 생성 시 `responseSchema` 출력이 zod(`recipe-schema.ts`)를 통과하는지 — 정적 정합(D)만 확인. AI 출력 변동성에 따른 누락 필드/타입 오류 가능성은 어댑터의 `provider_error` 변환 경로로 수렴됨.
+- `AI_PROVIDER=claude` 롤백 시 재배포 한 번에 Claude 경로로 복귀하는지(`ANTHROPIC_API_KEY` 활성화 + 싱글턴 캐시 리셋이 재배포로 보장됨).
+- Gemini 스트리밍에서 `chunk.text`가 부분 JSON 문자열로 흐를 때 UI 점진 렌더링 체감(`useRecipeGenerate.ts:100` `progressText` 누적) — Claude의 자연어 델타와 텍스트 형식이 달라 UX 검증 필요. 기능적 throw는 없음(`gemini:103` 누적 후 1회 파싱).

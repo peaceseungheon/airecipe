@@ -1,13 +1,24 @@
 /**
- * Prompt Factory (ADR-002) — 시스템 프롬프트 고정부(캐싱 대상)와 사용자 변수부를 분리 생성.
- * 고정부에 cache_control: ephemeral 을 붙여 반복 호출 비용을 절감한다(5분 TTL).
+ * Prompt Factory (ADR-002) — 시스템 프롬프트 고정부와 사용자 변수부를 분리 생성.
+ *
+ * Provider 매트릭스:
+ * - Claude (`buildSystemBlocks`): 고정부에 cache_control: ephemeral 부여 → 반복 호출 비용 절감(5분 TTL).
+ *   구조화 출력은 tool use(emit_recipe)로 강제.
+ * - Gemini (`buildSystemText`): 동일한 지침을 평문으로 반환. 구조화 출력은 responseSchema로 강제.
+ *   Gemini cachedContents는 별도 API이며 YAGNI로 보류(세션 #3).
+ *
+ * 시스템 지침 본문(RECIPE_SYSTEM_INSTRUCTIONS)은 SSOT — 두 빌더가 공유하여 행동 일치를 보장한다.
  */
 import type Anthropic from "@anthropic-ai/sdk";
 import type { GenerateParams } from "@/lib/ai/ai-recipe-provider";
 
 /**
- * 고정 시스템 지침 — 요리 도메인 규칙 + 출력 정책. 호출마다 동일하므로 캐싱한다.
+ * 고정 시스템 지침 — 요리 도메인 규칙 + 출력 정책. 호출마다 동일하므로 Claude에서 캐싱한다.
  * 한국어 레시피를 기본으로 한다.
+ *
+ * SSOT 주의: 본문 변경은 양쪽 Provider 행동을 동시에 바꾼다. 출력 강제 문구(emit_recipe 도구
+ * 호출 / JSON 응답)는 Provider별 어댑터에서 보강되며, 공통 본문은 의도적으로 도구명에 종속되지
+ * 않게 유지한다.
  */
 export const RECIPE_SYSTEM_INSTRUCTIONS = `당신은 전문 요리사이자 영양사입니다. 사용자가 입력한 요리 이름에 대해 정확하고 실용적인 레시피와 1인분 기준 영양 정보를 생성합니다.
 
@@ -23,7 +34,7 @@ export const RECIPE_SYSTEM_INSTRUCTIONS = `당신은 전문 요리사이자 영�
 - 반드시 emit_recipe 도구를 호출하여 구조화된 형태로만 응답합니다. 자유 텍스트로 레시피를 쓰지 마십시오.`;
 
 /**
- * 시스템 블록 — 고정부에 cache_control 부여.
+ * Claude 시스템 블록 — 고정부에 cache_control 부여.
  * Anthropic SDK의 system 파라미터(text 블록 배열) 형태로 반환한다.
  */
 export function buildSystemBlocks(): Anthropic.Messages.TextBlockParam[] {
@@ -36,7 +47,15 @@ export function buildSystemBlocks(): Anthropic.Messages.TextBlockParam[] {
   ];
 }
 
-/** 사용자 변수부 — 요리 이름·인분. 캐싱하지 않는다. */
+/**
+ * Gemini 시스템 지침 평문.
+ * Gemini는 cachedContents가 별도 API이며 본 스프린트 범위 밖이므로 평문 한 덩어리로 사용한다.
+ */
+export function buildSystemText(): string {
+  return RECIPE_SYSTEM_INSTRUCTIONS;
+}
+
+/** 사용자 변수부 — 요리 이름·인분. 캐싱하지 않는다. Provider 공통. */
 export function buildUserPrompt(params: GenerateParams): string {
   return `요리 이름: ${params.dishName}\n인분: ${params.servings}인분\n\n위 요리의 레시피와 ${params.servings}인분을 기준으로 한 1인분 영양 정보를 생성해 emit_recipe 도구로 반환하세요.`;
 }

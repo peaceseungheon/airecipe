@@ -7,10 +7,11 @@ AI 기반 요리 레시피 안내 웹앱. Next.js 14+ (App Router) + TypeScript.
 ```
 [UI 컴포넌트] → [훅] → (HTTP) → [Route Handler] → [Service] → [Repository] → [Supabase]
                                                        │
-                                                       └→ [AIRecipeProvider 추상] ← [ClaudeRecipeProvider]
+                                                       └→ [AIRecipeProvider 추상] ← Factory ─┬→ [GeminiRecipeProvider] (기본)
+                                                                                              └→ [ClaudeRecipeProvider] (비활성 보존, 롤백용)
 ```
 
-의존성은 항상 안쪽(도메인)을 향한다. Service는 구체 Supabase 클라이언트·Anthropic SDK가 아니라 **추상 인터페이스**에 의존한다(DIP). 외부 SDK는 어댑터로 격리한다.
+의존성은 항상 안쪽(도메인)을 향한다. Service는 구체 Supabase 클라이언트·AI SDK가 아니라 **추상 인터페이스**에 의존한다(DIP). 외부 SDK(`@google/genai`, `@anthropic-ai/sdk`)는 어댑터로 격리되며, Factory(`src/lib/ai/ai-recipe-provider.factory.ts`)가 `AI_PROVIDER` 환경변수로 구현체를 선택한다(ADR-008).
 
 ## 디렉토리 지도
 
@@ -20,7 +21,7 @@ AI 기반 요리 레시피 안내 웹앱. Next.js 14+ (App Router) + TypeScript.
 | `src/app/api/` | Route Handler — HTTP I/O·검증·인증만 (얇게) | 백엔드 작성 |
 | `src/services/` | 비즈니스 로직·유스케이스 조합 (프레임워크 독립) | 백엔드 작성 |
 | `src/repositories/` | 데이터 접근 (Supabase CRUD) | 백엔드 작성 |
-| `src/lib/ai/` | Claude 어댑터 (생성/영양 분석, 프롬프트, 파싱) | 백엔드 작성 |
+| `src/lib/ai/` | AI 어댑터 (Gemini 기본 + Claude 롤백, 생성/영양 분석, 프롬프트, 파싱, Factory) | 백엔드 작성 |
 | `src/lib/supabase/` | Supabase 클라이언트 팩토리 (server/client) | 백엔드 작성 |
 | `src/mappers/` | DB row(snake) ↔ DTO(camel) 변환 단일 위치 | 백엔드 작성 |
 | `src/hooks/` | 데이터 페칭/상태 훅 (use*.ts) | 프론트 작성 |
@@ -40,12 +41,13 @@ AI 기반 요리 레시피 안내 웹앱. Next.js 14+ (App Router) + TypeScript.
 
 ## 설계 결정 (ADR)
 - [ADR-001](docs/adr/ADR-001-supabase.md) — Supabase + Repository/Mapper 패턴
-- [ADR-002](docs/adr/ADR-002-ai-adapter.md) — Claude AI Adapter + Facade + Factory
+- [ADR-002](docs/adr/ADR-002-ai-adapter.md) — AI Adapter + Facade + Factory (Provider-agnostic 격리)
 - [ADR-003](docs/adr/ADR-003-state-management.md) — SWR + React 로컬 상태
 - [ADR-004](docs/adr/ADR-004-single-recipe-fetch.md) — 단건 조회 GET /api/recipes/[id] 추가
 - [ADR-005](docs/adr/ADR-005-ownership-violation-404.md) — 소유권 위반 404 수렴 (403 미사용)
 - [ADR-006](docs/adr/ADR-006-pagesize-clamp.md) — pageSize 상한 초과 clamp (400 거부 아님)
 - [ADR-007](docs/adr/ADR-007-proxy-file-convention.md) — 페이지 보호 proxy.ts 전환 (Next 16, 구 middleware.ts)
+- [ADR-008](docs/adr/ADR-008-gemini-default-with-claude-fallback.md) — AI Provider 기본 Gemini 전환, Claude 비활성 보존(롤백용)
 
 ## 개발 명령
 - 개발 서버: `npm run dev`
@@ -58,7 +60,9 @@ AI 기반 요리 레시피 안내 웹앱. Next.js 14+ (App Router) + TypeScript.
 ## 환경 변수 (.env.local — `.env.local.example` 참조)
 - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` — 브라우저 클라이언트도 사용(공개 anon key)
 - `SUPABASE_SERVICE_ROLE_KEY` — 서버 전용. 클라이언트 번들에 절대 노출 금지
-- `ANTHROPIC_API_KEY` — 서버 전용. 클라이언트 번들에 절대 노출 금지 (선택: `ANTHROPIC_MODEL` 기본 `claude-haiku-4-5-20251001` — 비용 최적화. 품질 부족 시 `claude-sonnet-4-6`/`claude-opus-4-7`로 오버라이드)
+- `AI_PROVIDER` — `"gemini"`(기본) \| `"claude"`(롤백). Factory가 이 값으로 Provider 선택 (ADR-008)
+- `GEMINI_API_KEY` — 서버 전용. `AI_PROVIDER=gemini`일 때 필수 (선택: `GEMINI_MODEL` 기본 `gemini-3.1-flash-lite`)
+- `ANTHROPIC_API_KEY` — 서버 전용. `AI_PROVIDER=claude`일 때 필수 (선택: `ANTHROPIC_MODEL` 기본 `claude-haiku-4-5-20251001`)
 
 ## 페이지 / API 맵
 | 경로 | 설명 |

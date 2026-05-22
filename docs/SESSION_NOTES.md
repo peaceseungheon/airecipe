@@ -55,6 +55,45 @@
 
 ---
 
+## 세션 #3 — 2026-05-22
+
+### 변경
+- AI 기본 Provider **Claude → Gemini** (`gemini-3.1-flash-lite`, SDK `@google/genai`). 사용자 결정.
+- **Factory 도입**: `src/lib/ai/ai-recipe-provider.factory.ts` 신규 — `AI_PROVIDER` 환경변수로 런타임 선택, 기본 `gemini`.
+- **Claude 코드·SDK·env 비활성 보존** — 삭제하지 않음. `AI_PROVIDER=claude`로 즉시 롤백 가능 (운영 안전망).
+- **구조화 출력 방식 분기**: Gemini는 `responseSchema`, Claude는 tool use. 두 스키마 모두 동일한 `GeneratedRecipe`로 수렴. zod 검증은 Provider-agnostic 단일 경로.
+- `AIRecipeProvider` 인터페이스 불변 — Service·Route·UI 영향 없음 (ADR-002의 격리가 가치 실증).
+
+### 수정/신규 파일 (역할별)
+
+**코드 (backend 영역 — 본 세션에서는 문서만 처리)**
+- 신규: `src/lib/ai/gemini-recipe-provider.ts`, `src/lib/ai/ai-recipe-provider.factory.ts`, `src/lib/ai/prompts/recipe-response-schema.ts`
+- 보존: `src/lib/ai/claude-recipe-provider.ts`, `src/lib/ai/prompts/recipe-tool-schema.ts`
+- 수정 예정: Composition Root(`composition.ts`) — Factory 호출로 변경, `package.json` — `@google/genai` 추가
+
+**문서 (본 세션 산출물)**
+- 신규: `docs/adr/ADR-008-gemini-default-with-claude-fallback.md`
+- 신규: `.env.local.example`
+- 수정: `docs/adr/ADR-002-ai-adapter.md` (Revision 2026-05-22 후속 추가)
+- 수정: `src/lib/ai/AGENTS.md` (Provider-agnostic 재작성)
+- 수정: `AGENTS.md` (다이어그램·디렉토리 책임·ADR 목록·환경변수)
+- 수정: `README.md` (인트로·기술 스택·아키텍처 요약·환경변수)
+- 수정: `docs/SESSION_NOTES.md` (이 파일)
+- 수정: `.claude/skills/ai-recipe-integration/SKILL.md` (Provider-agnostic 일반화)
+
+### 다음 검증 필요
+- 실 `GEMINI_API_KEY`로 한국어 레시피 생성 품질을 기존 Claude haiku 대비 비교 (양식 안정성·조리 단계 디테일·영양 추정 정확도).
+- Gemini `responseSchema` 출력이 zod 스키마(`recipe-schema.ts`)를 통과하는지 E2E 검증.
+- 스트리밍 텍스트 델타가 UI에서 자연스러운지 확인 (Gemini는 부분 JSON이 흐를 수 있어 점진 렌더링 체감이 Claude와 다를 수 있음).
+- `AI_PROVIDER=claude` 롤백 동작 확인 (환경변수 한 줄 변경만으로 Claude 경로 복귀하는지).
+
+### 기술 부채에 추가
+- [ ] 두 Provider의 응답 스키마(`recipe-response-schema.ts` ↔ `recipe-tool-schema.ts`) ↔ zod(`recipe-schema.ts`) ↔ 도메인 타입(`src/types/recipe.ts`) **4자 동기화 자동 검증 테스트** — 현재 수동 유지.
+- [ ] Gemini `cachedContents` API 도입 평가 (현재 Gemini 캐싱 미사용; Claude는 `cache_control: ephemeral` 적용 중).
+- [ ] **2026-11(6개월 후) Claude 비활성 코드 제거 평가** — Gemini 운영 안정성이 확인되면 별도 ADR로 제거 결정.
+
+---
+
 ## 다음 세션에서 할 일
 
 ### 🔴 즉시 필요 (환경 설정 — 개발 시작 전 필수)
@@ -64,7 +103,9 @@ cp .env.local.example .env.local
 # NEXT_PUBLIC_SUPABASE_URL=
 # NEXT_PUBLIC_SUPABASE_ANON_KEY=
 # SUPABASE_SERVICE_ROLE_KEY=
-# ANTHROPIC_API_KEY=
+# AI_PROVIDER=gemini           # 기본 (ADR-008)
+# GEMINI_API_KEY=              # AI_PROVIDER=gemini일 때 필수
+# ANTHROPIC_API_KEY=           # AI_PROVIDER=claude(롤백) 모드에서만 필수
 ```
 Supabase 대시보드에서 `supabase/schema.sql` 실행 (테이블 생성)
 

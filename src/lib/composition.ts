@@ -7,17 +7,21 @@
  * 요청 시점에 생성한다. AI Provider는 무상태이므로 모듈 싱글턴으로 재사용한다.
  */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { ClaudeRecipeProvider } from "@/lib/ai/claude-recipe-provider";
+import { createAIRecipeProvider } from "@/lib/ai/ai-recipe-provider.factory";
 import { SupabaseRecipeRepository } from "@/repositories/supabase-recipe.repository";
 import { RecipeGenerationService } from "@/services/recipe-generation.service";
 import { RecipeService } from "@/services/recipe.service";
 
-/** AI Provider는 무상태 → 싱글턴. (지연 생성: 키 없을 때 import만으로 throw 방지) */
+/**
+ * AI Provider는 무상태 → 싱글턴.
+ * - 지연 생성: 키/환경변수 없을 때 import만으로 throw하지 않도록 첫 호출 시 조립.
+ * - Provider 선택은 Factory(AI_PROVIDER) — composition은 추상에만 의존(DIP).
+ */
 let _generationService: RecipeGenerationService | null = null;
 
 export function getRecipeGenerationService(): RecipeGenerationService {
   if (!_generationService) {
-    _generationService = new RecipeGenerationService(new ClaudeRecipeProvider());
+    _generationService = new RecipeGenerationService(createAIRecipeProvider());
   }
   return _generationService;
 }

@@ -1,7 +1,12 @@
 /**
  * AIRecipeProvider — AI 레시피 생성/영양 분석의 도메인 추상 (Adapter 패턴, ADR-002).
- * Service는 이 인터페이스에만 의존하고 구체 SDK(Anthropic)를 모른다 (DIP).
- * 구현체: ClaudeRecipeProvider. 테스트에서는 Fake 주입.
+ * Service는 이 인터페이스에만 의존하고 구체 SDK(Anthropic/Google Gen AI)를 모른다 (DIP).
+ *
+ * 구현체:
+ * - GeminiRecipeProvider (기본, 세션 #3부터): @google/genai 어댑터
+ * - ClaudeRecipeProvider (롤백, 비활성 보존): @anthropic-ai/sdk 어댑터
+ * Provider 선택은 Factory(`ai-recipe-provider.factory.ts`)가 `AI_PROVIDER` 환경변수로 한다.
+ * 테스트에서는 Fake 주입.
  */
 import type { GeneratedRecipe } from "@/types";
 
