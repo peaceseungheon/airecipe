@@ -28,7 +28,8 @@ AI 기반 요리 레시피 안내 웹앱. 요리 이름을 입력하면 AI(기�
 ```
 [UI 컴포넌트] → [훅] → (HTTP) → [Route Handler] → [Service] → [Repository] → [Supabase]
                                                        │
-                                                       └→ [AIRecipeProvider] ← [ClaudeRecipeProvider]
+                                                       └→ [AIRecipeProvider 추상] ← Factory ─┬→ [GeminiRecipeProvider] (기본)
+                                                                                              └→ [ClaudeRecipeProvider] (비활성 보존, 롤백용)
 ```
 
 - **Repository / Mapper** (ADR-001) — Supabase 격리, snake↔camel 단일 변환점.

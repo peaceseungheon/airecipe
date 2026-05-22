@@ -1,7 +1,7 @@
 /**
  * RecipeGenerationService — "레시피 생성" 유스케이스 Facade (ADR-002).
  * F1(레시피 생성) + F2(영양 분석)를 단일 진입점으로 묶는다.
- * AIRecipeProvider 추상에만 의존(DIP) — 구체 Claude SDK를 모른다.
+ * AIRecipeProvider 추상에만 의존(DIP) — 구체 AI SDK(Gemini/Claude)를 모른다.
  *
  * 영양 분석은 현재 AI 생성과 한 번에 이뤄진다(GeneratedRecipe.nutrition).
  * 확장 지점(YAGNI): 영양 계산이 별도 경로가 되면 여기서 Strategy로 조합(ADR-002).

@@ -242,3 +242,6 @@
 - 실제 `GEMINI_API_KEY`로 한국어 레시피 생성 시 `responseSchema` 출력이 zod(`recipe-schema.ts`)를 통과하는지 — 정적 정합(D)만 확인. AI 출력 변동성에 따른 누락 필드/타입 오류 가능성은 어댑터의 `provider_error` 변환 경로로 수렴됨.
 - `AI_PROVIDER=claude` 롤백 시 재배포 한 번에 Claude 경로로 복귀하는지(`ANTHROPIC_API_KEY` 활성화 + 싱글턴 캐시 리셋이 재배포로 보장됨).
 - Gemini 스트리밍에서 `chunk.text`가 부분 JSON 문자열로 흐를 때 UI 점진 렌더링 체감(`useRecipeGenerate.ts:100` `progressText` 누적) — Claude의 자연어 델타와 텍스트 형식이 달라 UX 검증 필요. 기능적 throw는 없음(`gemini:103` 누적 후 1회 파싱).
+
+## Minor 후속 조치
+- 2026-05-22 — minor-#1/#2/#3 모두 해소(주석/문서 표현 갱신). 코드 로직·계약 변경 없음.

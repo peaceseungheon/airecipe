@@ -69,7 +69,7 @@
 **코드 (backend 영역 — 본 세션에서는 문서만 처리)**
 - 신규: `src/lib/ai/gemini-recipe-provider.ts`, `src/lib/ai/ai-recipe-provider.factory.ts`, `src/lib/ai/prompts/recipe-response-schema.ts`
 - 보존: `src/lib/ai/claude-recipe-provider.ts`, `src/lib/ai/prompts/recipe-tool-schema.ts`
-- 수정 예정: Composition Root(`composition.ts`) — Factory 호출로 변경, `package.json` — `@google/genai` 추가
+- 수정 완료: Composition Root(`composition.ts`) — Factory 호출로 변경, `package.json` — `@google/genai` 추가
 
 **문서 (본 세션 산출물)**
 - 신규: `docs/adr/ADR-008-gemini-default-with-claude-fallback.md`
@@ -145,7 +145,7 @@ AIReceipe/
 │   ├── components/               # 14개 (RecipeCard, NutritionPanel 등)
 │   ├── hooks/                    # 5개 (useRecipeGenerate, useMyRecipes, useRecipe, useAuth, api-client)
 │   ├── lib/
-│   │   ├── ai/                   # ClaudeRecipeProvider (Adapter)
+│   │   ├── ai/                   # AI Providers (Gemini 기본 / Claude 보존, Factory) — ADR-008
 │   │   └── supabase/             # client, server, middleware
 │   ├── mappers/                  # snake_case ↔ camelCase
 │   ├── repositories/             # RecipeRepository (추상) + SupabaseRecipeRepository
