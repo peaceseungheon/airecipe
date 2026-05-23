@@ -70,9 +70,25 @@ AI 레시피 안내 — 앱인토스 미니앱 (React Native + Granite + TDS).
 
 ## 현재 단계
 
-**Phase 0 (스캐폴딩) 진행 중** — 부트스트랩 완료 후 Phase 1(공유 타입·API 클라이언트·식별자 훅)로 진입.
+**Phase 1 완료 → Phase 2 진입 준비** (2026-05-23).
 
-Phase별 수용 기준은 `docs/appsintoss-port/10-SPRINT-PLAN.md`.
+Phase 1(공유 타입·API 클라이언트·식별자 훅) ALL PASS — QA 매트릭스 FAIL 0건 (`_workspace/03_qa_report.md`). 산출물·결정은 ADR-010 + AGENTS.md 4종(`src/types|lib/zod|services|hooks/AGENTS.md`)에 동결. 세션 전체 흐름은 `_workspace/04_session_log.md`.
+
+코드 산출 (Phase 1 동결):
+- `src/types/{api,recipe,user,env.d,index}.ts` — 6 엔드포인트 요청·응답·도메인·식별자 타입, ambient env.
+- `src/lib/zod/{api,recipe,index}.ts` — 응답 검증 스키마 + factory.
+- `src/services/{api-client,recipes,index}.ts` — 단일 fetch 호출점(`apiFetch`) + 6 도메인 함수 + `ApiClientError`.
+- `src/hooks/useTossUserId.tsx` — Toss SDK 단일 격리·메모리 캐싱·Provider·마스킹 헬퍼.
+- `src/_app.tsx` — `TossUserIdProvider` 마운트.
+- `src/pages/index.tsx` — Phase 2 진입 시 일괄 제거할 dev-only AC1.5 트리거.
+- 의존성: `zod@^4.4.3` (deps).
+- 인프라: `tsconfig.json`에 `"module": "ESNext"` 추가.
+
+잔여 미해결(Phase 2 인계):
+- `@apps-in-toss/web-framework` 패키지 경로 — `useTossUserId.tsx:21` `@ts-expect-error` 1줄로 한시 통과. 첫 `granite dev` 실행 시 검증 (ADR-010 D7 + §롤백 R1).
+- AC1.2/1.3 실호출 검증 — 별 저장소 `AIReceipe`의 옵션 P 후속 마이그레이션(profiles 테이블·`resolveInternalUserId`·CORS preflight) 배포 후 가능.
+
+Phase 2(레시피 생성 화면 + 스트리밍, 기능 a·b)는 `docs/appsintoss-port/10-SPRINT-PLAN.md` §10.3 참조. Phase별 수용 기준은 동 문서.
 
 ---
 

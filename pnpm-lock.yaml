@@ -32,6 +32,9 @@ importers:
       react-native:
         specifier: 0.84.0
         version: 0.84.0(@babel/core@7.28.5)(@react-native-community/cli@11.3.7(@babel/core@7.28.5))(@types/react@19.2.0)(react@19.2.3)
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
     dependenciesMeta:
       hermes-compiler:
         unplugged: true
@@ -6718,6 +6721,9 @@ packages:
   zod@4.0.10:
     resolution: {integrity: sha512-3vB+UU3/VmLL2lvwcY/4RV2i9z/YU0DTV/tDuYjrwmx5WeJ7hwy+rGEEx8glHp6Yxw7ibRbKSaIFBgReRPe5KA==}
 
+  zod@4.4.3:
+    resolution: {integrity: sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ==}
+
 snapshots:
 
   '@ampproject/remapping@2.3.0':
@@ -7000,7 +7006,7 @@ snapshots:
 
   '@babel/generator@7.28.5':
     dependencies:
-      '@babel/parser': 7.28.5
+      '@babel/parser': 7.29.3
       '@babel/types': 7.28.5
       '@jridgewell/gen-mapping': 0.3.13
       '@jridgewell/trace-mapping': 0.3.31
@@ -7908,7 +7914,7 @@ snapshots:
   '@babel/template@7.27.2':
     dependencies:
       '@babel/code-frame': 7.27.1
-      '@babel/parser': 7.28.5
+      '@babel/parser': 7.29.3
       '@babel/types': 7.28.5
 
   '@babel/template@7.28.6':
@@ -7922,7 +7928,7 @@ snapshots:
       '@babel/code-frame': 7.27.1
       '@babel/generator': 7.28.5
       '@babel/helper-globals': 7.28.0
-      '@babel/parser': 7.28.5
+      '@babel/parser': 7.29.3
       '@babel/template': 7.27.2
       '@babel/types': 7.28.5
       debug: 4.4.3
@@ -8504,7 +8510,7 @@ snapshots:
       es-toolkit: 1.46.1
       esbuild: 0.25.8
       fastify: 4.14.0
-      zod: 4.0.10
+      zod: 4.4.3
     transitivePeerDependencies:
       - '@swc/helpers'
       - '@types/node'
@@ -15092,3 +15098,5 @@ snapshots:
   zod@3.24.4: {}
 
   zod@4.0.10: {}
+
+  zod@4.4.3: {}

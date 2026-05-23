@@ -162,6 +162,7 @@ DATA-MODEL(02장)에서 두 옵션을 비교한 결과:
 - ADR-005 (소유권 위반 404 수렴) — 미니앱에서도 404 UI를 동일 적용.
 - ADR-007 (proxy 파일 컨벤션) — 미니앱은 proxy 없이 Granite 라우팅, 별도 처리.
 - ADR-008 (Gemini 기본 + Claude 비활성 보존) — 미니앱은 Provider 선택을 인지하지 않음.
+- [ADR-010 (미니앱 Phase 1 공유 인프라 코드 규약)](./ADR-010-miniapp-phase1-conventions.md) — 본 ADR D1·D2(백엔드 분리·헤더 인증)·D5(옵션 P)를 미니앱 코드(zod=deps·메모리 캐싱·401 1회 재시도·SDK 단일 격리·raw 응답 검증·tsconfig ESNext)로 옮긴 첫 결정. 2026-05-23 채택.
 
 ## 참고 SSOT
 
