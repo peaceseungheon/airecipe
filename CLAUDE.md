@@ -1,0 +1,83 @@
+# airecipe-miniapp
+
+AI 레시피 안내 — 앱인토스 미니앱 (React Native + Granite + TDS).
+
+본 저장소는 **별 저장소 `AIReceipe`**(Next.js 웹앱, 백엔드 SSOT)의 자매 프로젝트로, 백엔드는 그대로 두고 미니앱 클라이언트만 별 코드베이스로 개발한다.
+
+---
+
+## 세션 시작 규칙 — 반드시 먼저 읽을 것
+
+신규 LLM 세션이 이 저장소에서 작업을 시작할 때 다음 순서로 읽는다:
+
+1. **`docs/appsintoss-port/00-OVERVIEW.md`** — 챕터 인덱스·재사용 자산·읽기 순서.
+2. **`docs/adr/ADR-009-appsintoss-port-architecture.md`** — 본 미니앱의 모든 핵심 결정.
+3. **`docs/appsintoss-port/10-SPRINT-PLAN.md`** — 현재 어느 Phase에서 무엇을 해야 하는지.
+
+그 후 작업 영역에 따라 챕터별로 진입:
+
+| 작업 | 읽을 챕터 |
+|------|----------|
+| 기능·수용 기준 확인 | 01-FEATURES |
+| Supabase 스키마·user 매핑 이해 | 02-DATA-MODEL |
+| 백엔드 호출 (요청·응답·CORS·인증 헤더) | 03-API-CONTRACT |
+| Gemini/Claude 응답 형식·zod 이해 | 04-AI-PROVIDER |
+| Toss 인증·`getAnonymousKey()` | 05-AUTH |
+| UI 컴포넌트 매핑 (TDS) | 06-UI-MAPPING |
+| 라우팅 (Granite + 파일 기반) | 07-ROUTING |
+| SSE → fetch stream | 08-STREAMING |
+| 환경변수·granite.config.ts | 09-ENV-CONFIG |
+| 단계별 구현 순서 | 10-SPRINT-PLAN |
+
+---
+
+## 핵심 결정 (ADR-009 요약)
+
+- **백엔드 분리**: 본 저장소는 미니앱 클라이언트만. 백엔드는 별 저장소(`AIReceipe`)의 Next.js API Routes를 Vercel에 배포하여 그대로 호출 (`API_BASE_URL`).
+- **인증**: Toss 인증(`getAnonymousKey()`) → `X-Toss-User-Id` 헤더로 백엔드 전달. 회원가입/로그인 폼 없음.
+- **사용자 식별**: 옵션 P — 백엔드의 `profiles` 테이블이 Toss userId hash ↔ internal uuid 매핑. 미니앱은 헤더만 알면 됨.
+- **TDS 의무**: 비게임 미니앱은 `@toss/tds-react-native` 사용 필수 (검수 통과 조건).
+- **MVP 범위**: Sprint 1 6기능 — 레시피 생성 / 영양 분석 / 저장 / 목록 / 즐겨찾기 / 삭제.
+
+---
+
+## 기술 스택
+
+| 영역 | 값 |
+|------|---|
+| 프레임워크 | `@apps-in-toss/framework@^2.6.0`, `@granite-js/react-native@1.0.28` |
+| React Native | `0.84.0` |
+| React | `19.2.x` |
+| TDS | `@toss/tds-react-native` (비게임 필수) |
+| 환경변수 | `@granite-js/plugin-env` (빌드 시점 주입, `import.meta.env`) |
+| 라우팅 | 파일 기반 (`pages/` 디렉터리 = `intoss://airecipe-miniapp/<path>`) |
+| 패키지 매니저 | pnpm |
+| 린트/포맷 | eslint + prettier |
+| 테스트 | jest + `@testing-library/react-native` |
+
+---
+
+## 코드 규칙
+
+1. **API 키·시크릿은 절대 미니앱에 두지 않는다**. `GEMINI_API_KEY`, `ANTHROPIC_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, DB URL 모두 백엔드 전용. 09-ENV-CONFIG §9.1.1 금지 항목 참조.
+2. **UI는 TDS 우선**. 커스텀 색상·폰트는 TDS 토큰 활용. 직접 `View/Text` 스타일링 최소화.
+3. **백엔드 호출은 `src/services/api-client.ts`만 통과** (Phase 1에서 작성). 직접 `fetch` 호출 금지.
+4. **응답은 zod 검증** 후 사용. 03-API-CONTRACT의 응답 shape이 SSOT.
+5. **에러 메시지는 한국어 사용자 친화적**으로. HTTP 상태 그대로 노출 금지.
+6. **`X-Toss-User-Id`는 노출 금지** — UI에 표시·로깅에 평문 포함 금지.
+
+---
+
+## 현재 단계
+
+**Phase 0 (스캐폴딩) 진행 중** — 부트스트랩 완료 후 Phase 1(공유 타입·API 클라이언트·식별자 훅)로 진입.
+
+Phase별 수용 기준은 `docs/appsintoss-port/10-SPRINT-PLAN.md`.
+
+---
+
+## 관련 저장소
+
+- **백엔드 (Next.js)**: `AIReceipe` — https://github.com/peaceseungheon/AIReceipe
+  - 6개 API 엔드포인트 + Supabase + AI Provider(Gemini/Claude) + RLS 정책 SSOT.
+  - 본 저장소의 `docs/appsintoss-port/` 챕터는 그곳에서 작성된 SSOT 사본.
