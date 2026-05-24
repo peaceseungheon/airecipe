@@ -1,83 +1,93 @@
-# Phase 2 — 레시피 생성 화면 + 스트리밍 (기능 a, b)
+# Phase 3 — 저장·목록·상세 (기능 c, d)
 
-> 출처: 사용자 요청 "Phase 2 진입"
-> SSOT: `docs/appsintoss-port/10-SPRINT-PLAN.md` §10.3
+> 출처: 사용자 요청 "Phase 2 끝났으면 Phase 3 작업 시작해"
+> SSOT: `docs/appsintoss-port/10-SPRINT-PLAN.md` §10.4
 
 ## 목적
 
-요리명 입력 → AI 스트리밍 응답을 점진 표시 → 최종 레시피·영양 정보가 완성된 상태로 화면에 노출. **저장 전**(`GeneratedRecipe`) 단계까지.
+생성된 레시피를 백엔드에 저장하고, 마이 레시피 목록에서 조회/페이지네이션/필터, 상세 화면 진입까지.
 
-## 입력 전제 (Phase 1 완료)
+## 입력 전제 (Phase 2 완료)
 
-- ADR-010 동결 + AGENTS.md 4종 + zod@^4.4.3.
-- `src/types/{recipe,api,user,env.d,index}.ts` — 6 엔드포인트 타입·`GeneratedRecipe`·`StreamChunk` 유니온 정의됨.
-- `src/lib/zod/{api,recipe,index}.ts` — `generatedRecipeSchema`, `apiResponseSchema` factory 등 응답 검증.
-- `src/services/{api-client,recipes,index}.ts` — `apiFetch`(401 1회 재시도) + 6 도메인 함수. `generateRecipe`는 현재 **stream:false 강제** (Phase 2에서 스트리밍 지원 추가 필요).
-- `src/hooks/useTossUserId.tsx` — Toss SDK 단일 격리, Provider, `refresh: () => Promise<TossUserId>`.
-- `src/_app.tsx` — `TossUserIdProvider` 마운트.
-- `src/pages/index.tsx` — Phase 1 dev-only 트리거 잔존 → **Phase 2 진입 시 일괄 제거**.
-- TDS RN `@toss/tds-react-native@^2.0.3` 설치됨, 사용 0건.
+- ADR-011 동결 — D8~D13 (SSE 어댑터 분리, AsyncGenerator, error 청크 단일 매핑, text 청크 미표시, PageNavbar, AbortSignal cast).
+- Phase 2 산출: `src/services/sse-client.ts`, `src/hooks/useRecipeGenerate.ts`, `src/lib/zod/stream.ts`, `src/components/{SearchForm,RecipeDisplay,NutritionPanel,recipe-format}.tsx`, `src/pages/{index,recipe/generate}.tsx`.
+- Phase 1 산출(공유 타입·api-client·useTossUserId·zod) 동결 그대로.
+- `pnpm typecheck`/`lint` PASS, FAIL 0건.
+- AGENTS.md: `src/{types,lib/zod,services,hooks,components,pages}/`.
 
-## 산출물 (10-SPRINT-PLAN §10.3 출력)
+## 산출물 (10-SPRINT-PLAN §10.4 출력)
 
-### 화면 (Granite 파일 라우팅)
-- **홈 화면** (`src/pages/index.tsx`) — TDS Navbar + 생성 화면 진입 버튼 + 마이 레시피 진입(Phase 3 자리표시는 disabled OK). Phase 1 dev 트리거 제거.
-- **레시피 생성 화면** (`src/pages/generate.tsx` 또는 동등 경로) — `SearchForm` 대응 (TextField/NumericSpinner/Button).
-- **결과 표시 화면** (생성 화면 내 결과 영역 또는 별 라우트) — `RecipeDisplay` + `NutritionPanel` 대응. 진행 중 점진 표시 + 완성 시 최종 노출.
+### 결과 화면의 "저장" 버튼
+- `src/pages/recipe/generate.tsx`(또는 동등)에 "저장" 버튼 추가. 클릭 → `apiFetch('/api/recipes', { method: 'POST', body: { recipe: GeneratedRecipe }, tossUserId })`.
+- 저장 성공 시: 마이 레시피 캐시 무효화 + 상세 화면(`/recipe/[id]`) 또는 마이 탭으로 이동.
+- 저장 중 disabled + 한국어 에러 처리.
 
-### 컴포넌트 (TDS 매핑 — 06 §6.4.1~3)
-- `src/components/SearchForm.tsx` — TDS `TextField` + `NumericSpinner` + `Button`. 콜백 시그니처 `(dishName: string, servings: number) => void`. 클라이언트 측 zod 검증(공백·1~100자·1~20인분).
-- `src/components/RecipeDisplay.tsx` — `View`+`Txt`+`Badge`+`List/ListRow`+actions slot. **공통 필드만 사용** (`id` 미참조, 불변식 2).
-- `src/components/NutritionPanel.tsx` — 칼로리 강조 + 4 매크로 + healthNote.
-- `src/components/recipe-format.ts` — `difficultyLabel`/`difficultyVariant`/`formatCookTime` 순수 함수.
-- (필요 시) `src/components/AppNavbar.tsx` — 화면별 TDS `Navbar` 공통 래퍼. 06 §6.4.6 가이드에 따라.
+### 마이 레시피 목록 화면 (신규 라우트)
+- `src/pages/recipes/index.tsx` (또는 baseline 확정 경로) — `GET /api/recipes?page=&pageSize=&favorite=` 호출.
+- `RecipeCard` 컴포넌트(06 §6.4.4) — TDS `View`+`Pressable`+`Txt`+`Badge`+`IconButton`(즐겨찾기 자리표시는 Phase 4)+`Button`(삭제 Phase 4).
+- 페이지네이션 또는 무한 스크롤 — baseline 결정.
+- 즐겨찾기 필터 자리표시 (실제 토글은 Phase 4).
+- 빈 목록 시 빈 상태 UI(`EmptyState` 신규 — 06 §6.5 추가 컴포넌트).
+- `meta.pageSize` 신뢰 (clamp 50 — 03 §3.3.2).
 
-### 인프라
-- `src/services/api-client.ts` 또는 신규 `src/services/sse-client.ts` — SSE → fetch stream 어댑터. `Response.body` ReadableStream 파싱(`event:` + `data:`), `StreamChunk` discriminated union 분기(meta/text/recipe/error/done), `AbortController` 취소.
-- `src/services/recipes.ts` — `generateRecipe` 스트리밍 모드 추가 (또는 별 `generateRecipeStream`). signal 전달.
-- `src/hooks/useRecipeGeneration.ts` (또는 동등) — 입력→호출→점진 상태→최종 결과→에러→취소를 React 상태로 캡슐화. unmount/뒤로가기에서 abort.
-- `src/lib/zod/stream.ts` — `StreamChunk` zod 스키마(이미 `src/types/api.ts`에 타입 있으면 zod로 보강).
+### 레시피 상세 화면 (신규 라우트)
+- `src/pages/recipe/[id].tsx` — `GET /api/recipes/[id]` 호출, `RecipeDisplay`+`NutritionPanel` 재사용.
+- 직접 진입(딥링크) 지원 — 목록 캐시 의존 제거 (ADR-004).
+- 404 시 "레시피를 찾을 수 없어요" UI (`NotFoundScreen` 신규 — 06 §6.5, ADR-005 통일).
+- 새로고침(라우트 재진입)에도 정상 표시.
+- 401 시 식별자 재발급 재시도 (api-client 기본 동작).
 
-### 라우팅 (Granite 파일 기반 — 07-ROUTING)
-- `src/pages/index.tsx` 재작성 + `src/pages/generate.tsx` 신규. `useNavigation`으로 진입.
-- `src/router.gen.ts` 자동 갱신 확인.
+### 데이터 흐름 (api-client 또는 훅)
+- `useMyRecipes(options)` — 목록 fetch + 페이지네이션 상태 + 캐시 무효화 트리거.
+- `useRecipeDetail(id)` — 단건 fetch + 로딩/404/에러 상태.
+- `useSaveRecipe()` — 저장 mutation + 성공 콜백(캐시 무효화·라우팅).
+- 캐시 전략 결정 (baseline) — SWR/React Query 미도입 가정 시 자체 invalidation 패턴.
+- AbortController unmount 처리.
 
-## 수용 기준 (10-SPRINT-PLAN §10.3 AC2.*)
+### 라우팅 (07-ROUTING)
+- `/recipes` (목록), `/recipe/[id]` (상세). `useNavigation`으로 진입. `Route.useParams<{ id: string }>()`.
+- 생성 화면에서 저장 후 상세로 이동: `navigation.navigate('/recipe/[id]', { id })` 또는 마이 탭.
 
-- **AC2.1**: "김치찌개" 입력 → 생성 버튼 → 텍스트 점진 표시 → 최종 레시피·영양 정보 완성.
-- **AC2.2**: 뒤로가기 시 in-flight 요청 abort, UI 일관 상태.
-- **AC2.3**: 빈/공백 요리명 시 클라이언트에서 차단(zod min(1) + trim).
-- **AC2.4**: 백엔드 502/429 응답을 청크 또는 HTTP 상태로 받아 사용자 친화적 한국어 메시지.
-- **AC2.5**: 응답이 `GeneratedRecipe` 타입 (id 없음) — 저장 전 임을 확실히 (TS·런타임 가드).
-- **AC2.6**: 비로그인 상태(헤더 없이)에서도 생성 정상 동작 (`generate`는 공개 — 03 §3.2.1).
+## 수용 기준 (10-SPRINT-PLAN §10.4 AC3.*)
+
+- **AC3.1**: Phase 2에서 생성한 레시피 저장 → 201 + `Recipe`(id 포함) 응답.
+- **AC3.2**: 마이 레시피 진입 시 방금 저장한 레시피가 첫 페이지에 보임.
+- **AC3.3**: 카드 탭 → 상세 화면 진입 → 새로고침(라우트 재진입)에도 정상 표시.
+- **AC3.4**: `pageSize=100` 요청 시 백엔드가 50으로 clamp, 응답 `meta.pageSize=50` 미니앱이 신뢰.
+- **AC3.5**: 두 명의 다른 식별자로 저장 → 서로 보이지 않음 (소유자 격리).
+- **AC3.6**: `?favorite=true` 필터 동작 (Phase 4 즐겨찾기 이후 실증).
 
 ## SSOT 인용 경로
 
 | 영역 | 챕터 |
 |------|------|
-| 생성 엔드포인트 (요청·SSE 청크·에러) | `docs/appsintoss-port/03-API-CONTRACT.md` §3.2 |
-| 스트리밍 wire 형식 + 미니앱 소비 규칙 | `docs/appsintoss-port/03-API-CONTRACT.md` §3.2.4 + `08-STREAMING.md` |
-| AI Provider 응답 차이 (Gemini 부분 JSON / Claude tool 강제) | `docs/appsintoss-port/04-AI-PROVIDER.md` §4.5 |
-| TDS 컴포넌트 매핑 (SearchForm/RecipeDisplay/NutritionPanel) | `docs/appsintoss-port/06-UI-MAPPING.md` §6.4.1, §6.4.2, §6.4.3 |
-| TDS UI primitives (Button/TextField/Badge/Card/etc) | `docs/appsintoss-port/06-UI-MAPPING.md` §6.3 |
-| Granite 파일 라우팅 + useNavigation | `docs/appsintoss-port/07-ROUTING.md` |
-| 백엔드 호출 헤더(공개 generate는 헤더 생략 가능) | `docs/appsintoss-port/05-AUTH.md` §5.3 |
-| Phase 1 동결 규약 | `docs/adr/ADR-010-miniapp-phase1-conventions.md` |
-| 디렉터리 책임 | `src/{types,lib/zod,services,hooks}/AGENTS.md` |
+| 목록 엔드포인트(쿼리·페이지네이션·clamp·정렬) | `docs/appsintoss-port/03-API-CONTRACT.md` §3.3 |
+| 단건 엔드포인트(404 수렴) | `03-API-CONTRACT.md` §3.4 |
+| 저장 엔드포인트(201·zod) | `03-API-CONTRACT.md` §3.5 |
+| RecipeCard 매핑 | `06-UI-MAPPING.md` §6.4.4 |
+| EmptyState/NotFoundScreen 신규 컴포넌트 | `06-UI-MAPPING.md` §6.5 |
+| 라우트(/recipes, /recipe/[id]), Route.useParams | `07-ROUTING.md` (관련 절) |
+| 401 자동 재시도(Phase 1 로직) | `05-AUTH.md` §5.4 |
+| 404 UI 통일 | `ADR-005-ownership-violation-404.md` |
+| 페이지네이션 clamp | `ADR-006-pagesize-clamp.md` |
+| 상세 라우트 딥링크 정책 | `ADR-004-get-recipe-by-id.md` |
+| Phase 1·2 동결 규약 | `ADR-010`, `ADR-011` |
+| 디렉터리 책임 | `src/{types,lib/zod,services,hooks,components,pages}/AGENTS.md` |
 
 ## 비범위
 
-- Phase 3 이후 기능 — 저장(`POST /api/recipes`)·목록·상세·즐겨찾기·삭제. 결과 화면의 "저장" 버튼은 Phase 3에서 추가.
-- 백엔드 옵션 P 후속 ADR 배포(별 저장소 AIReceipe) — AC2.6은 공개 엔드포인트라 독립적이므로 영향 없음.
-- 마이 레시피·상세 라우트 — Phase 3.
+- Phase 4 — 즐겨찾기 토글 PATCH, 삭제 DELETE, 404 UI 일원화 마무리.
+- 디자인 토큰 일괄 교체(Phase 2 §13.1 인계 — 별 ADR).
+- 백엔드 옵션 P 후속 ADR 배포 — 본 저장소 외부 작업.
 
 ## 위험·완화
 
 | 위험 | 완화 |
 |------|------|
-| TDS 컴포넌트(NumericSpinner/Badge/Navbar 등) 실제 패키지 미존재 또는 props 차이 | 06-UI-MAPPING의 매핑을 실 import로 검증. 차이 시 architect에게 통지 → 06 §6.5 갱신 + 합성/대안 결정. |
-| `@apps-in-toss/web-framework` 패키지 경로 미해결(ADR-010 D7) | Phase 2 첫 `granite dev` 실행 시 검증. 실패 시 ADR-010 §롤백 R1 적용. |
-| Gemini 부분 JSON 점진 렌더링 시 깜빡임 | 08-STREAMING의 누적/디바운싱 전략 적용. 본 Phase에서 가시적 UX 차이 측정. |
-| `recipe` 청크 zod 검증 실패 (백엔드 응답 미세 차이) | 검증 실패 시 사용자 친화적 한국어 에러(`AI 응답을 이해하지 못했어요`). 디버그 로그는 stack에만(평문 hash·body 평문 노출 금지). |
-| RN `fetch` ReadableStream 지원 검증 | 첫 호출 시 검증. 미지원이면 `Response.text()` 폴백 — 08-STREAMING 대안 절 인용. |
-| 라우팅 가드(뒤로가기 시 abort)에서 `useEffect` cleanup 누락 | useEffect cleanup + AbortController.abort() 단위 테스트로 보장. |
+| Phase 2 인계 #1 — `@apps-in-toss/web-framework` SDK 경로 미해결 | Phase 3 첫 보호 endpoint 호출이 useTossUserId의 SDK 실호출 트리거. dev server 시점에 검증. 실패 시 ADR-010 §롤백 R1 적용 + baseline 갱신. |
+| 새로고침(라우트 재진입) 시 useTossUserId 캐시 휘발 | 메모리 캐싱 정책(ADR-010 D2) 그대로. 재진입 시 1회 발급 동일. |
+| 페이지네이션 상태와 캐시 무효화 충돌 | 단순 invalidation(다음 fetch에서 재호출) 패턴 채택 권장. SWR 도입은 별 ADR. |
+| `/recipe/[id]` 동적 라우트 Granite 패턴 차이 | 07-ROUTING `Route.useParams<{ id: string }>()` 패턴 확정. id 형식(uuid) zod 검증. |
+| 404 UI 분기가 3개 엔드포인트(GET[id]·PATCH·DELETE)에 동일 적용 | Phase 3은 GET[id]만, Phase 4에서 PATCH·DELETE 추가 시 동일 컴포넌트 재사용 보장. `NotFoundScreen` 컴포넌트 SRP 유지. |
+| AC3.5 격리 검증 — 백엔드 옵션 P 미배포 시 실호출 불가 | 코드 경로 + curl 시뮬레이션 + 두 토큰 헤더로 별 요청 시퀀스 검증. |
+| 빈 목록 vs 에러 분기 혼동 | `data: []` + `meta.total: 0` = 빈 상태(200), 503/401 = 에러 분기 별도. zod 검증 통과 응답은 항상 빈 배열을 정상 처리. |
