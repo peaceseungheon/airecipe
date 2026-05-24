@@ -18,8 +18,7 @@
 // 사양(05 §5.2.1 라인 73)은 `@apps-in-toss/web-framework`. 현 package.json은
 // `@apps-in-toss/framework@^2.6.0`만 보유 — 첫 실 호출 검증 단계에서 미해결 시
 // architect에게 SendMessage하고 baseline §B.2 갱신(추측 변경 금지).
-// @ts-expect-error — Phase 1 baseline §B.2: 패키지 경로 미확정. 실행 단계에서 검증.
-import { getAnonymousKey } from '@apps-in-toss/web-framework';
+import { getAnonymousKey } from '@apps-in-toss/framework';
 
 import React, {
   createContext,
@@ -112,10 +111,7 @@ export function TossUserIdProvider({ children }: PropsWithChildren) {
     };
   }, []);
 
-  const value = useMemo<TossUserIdContextValue>(
-    () => ({ tossUserId, refresh }),
-    [tossUserId, refresh],
-  );
+  const value = useMemo<TossUserIdContextValue>(() => ({ tossUserId, refresh }), [tossUserId, refresh]);
 
   return <TossUserIdContext.Provider value={value}>{children}</TossUserIdContext.Provider>;
 }
