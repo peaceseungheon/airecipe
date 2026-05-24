@@ -1,10 +1,13 @@
 /**
- * 6 엔드포인트 호출 함수 — baseline §A.5 / 03-API-CONTRACT §3.2~3.7.
+ * 6 엔드포인트 호출 함수 — Phase 1 baseline §A.5 / Phase 2 baseline §A.2 / 03 §3.2~3.7.
  *
- * 각 함수는 apiFetch를 한 번 호출하고 응답 zod 스키마를 적용한 뒤 .data를 unwrap한다 (baseline §C.4).
+ * 각 함수는 apiFetch를 한 번 호출하고 응답 zod 스키마를 적용한 뒤 .data를 unwrap한다 (Phase 1 baseline §C.4).
  * tossUserId는 보호 5개 엔드포인트에 필수. POST /api/recipes/generate는 공개로 생략 가능 (03 §3.2.1).
  *
  * 401 자동 재시도가 필요하면 refreshTossUserId를 함께 전달한다 (05 §5.4).
+ *
+ * Phase 2: generateRecipeStream 신규 (SSE) + GenerateOptions에 signal 옵션 추가.
+ * SSE 어댑터는 src/services/sse-client.ts에 단일 격리 (apiFetch 우회 — ADR-010 D5 비스트리밍 한정).
  */
 
 import {
@@ -19,11 +22,13 @@ import type {
   RecipeListQuery,
   RecipeListResponse,
   SaveRecipeRequest,
+  StreamChunk,
   ToggleFavoriteRequest,
 } from '../types/api';
 import type { GeneratedRecipe, Recipe } from '../types/recipe';
 
 import { apiFetch } from './api-client';
+import { streamRecipe } from './sse-client';
 import { z } from 'zod';
 
 export interface AuthedCallOptions {
@@ -34,12 +39,16 @@ export interface AuthedCallOptions {
 export interface GenerateOptions {
   /** 보내도 무시되지만, 미니앱 측 호출 형식 통일을 위해 옵션 수용. */
   tossUserId?: string;
+  /** 호출 측이 주입. abort 시 fetch가 throw → 호출 측 catch에서 signal.aborted로 식별. */
+  signal?: AbortSignal;
 }
 
 const deleteResponseSchema = apiResponseSchema(z.object({ id: z.string() }));
 
 /**
- * POST /api/recipes/generate — 공개. baseline은 Phase 1에서 비스트리밍(stream:false)만 구현 (§A.5 주석).
+ * POST /api/recipes/generate (stream:false) — 공개, 단일 JSON 응답.
+ * Phase 2 baseline §A.2 — 비스트리밍 경로 유지 (08 §8.6 폴백·테스트용).
+ * signal 옵션 전달 — apiFetch가 fetch에 그대로 주입.
  */
 export async function generateRecipe(
   req: GenerateRecipeRequest,
@@ -53,9 +62,39 @@ export async function generateRecipe(
       method: 'POST',
       body,
       tossUserId: options.tossUserId,
+      signal: options.signal,
     },
   );
   return wrapped.data;
+}
+
+/**
+ * POST /api/recipes/generate (stream:true) — 공개, SSE 스트림.
+ * Phase 2 baseline §A.2 / §C.1~C.4 — sse-client.ts의 streamRecipe Facade.
+ *
+ * AsyncGenerator<StreamChunk>로 노출 — 호출 측은 `for await`로 소비.
+ * error 청크는 sse-client에서 ApiClientError로 변환 throw (단일 에러 경로).
+ *
+ * 호출 패턴(useRecipeGenerate 훅):
+ * ```ts
+ * try {
+ *   for await (const chunk of generateRecipeStream(req, { signal })) {
+ *     handleChunk(chunk);
+ *   }
+ * } catch (err) {
+ *   if (signal.aborted) return;
+ *   // ApiClientError → 사용자 메시지 매핑
+ * }
+ * ```
+ */
+export function generateRecipeStream(
+  req: GenerateRecipeRequest,
+  options: GenerateOptions = {},
+): AsyncGenerator<StreamChunk> {
+  return streamRecipe(req, {
+    signal: options.signal,
+    tossUserId: options.tossUserId,
+  });
 }
 
 /**

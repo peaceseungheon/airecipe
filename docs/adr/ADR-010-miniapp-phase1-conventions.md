@@ -185,8 +185,10 @@
 |------|-----------|----------|
 | D2 메모리 캐싱 | 콜드 스타트 SDK 지연이 UX 측정으로 문제로 확인 / 검수 정책이 hash 영구 보관 권고 | SecureStore 도입 (별 ADR) |
 | D3 401 1회 재시도 | Phase 3 캐싱·낙관적 업데이트 도입 | 429/5xx 지수 백오프 옵션 분리 |
-| D5 raw 응답 반환 | Phase 2 SSE 도입 (08-STREAMING의 chunk 파서 + `apiFetch` 우회) | 본 ADR D5는 비스트리밍 한정 — SSE는 별 경로 |
-| D7 SDK 미해결 | Phase 2 첫 `granite dev` 실행 / 백엔드 후속 ADR-X(별 저장소)에서 SDK 가이드 갱신 | baseline §B.2 갱신 + 본 ADR Decision Trail 추가 또는 superseded |
+| D5 raw 응답 반환 | Phase 2 SSE 도입 (08-STREAMING의 chunk 파서 + `apiFetch` 우회) | 본 ADR D5는 비스트리밍 한정 — SSE는 별 경로. **2026-05-24 [ADR-011](./ADR-011-miniapp-phase2-streaming-ui.md) D8로 실현** (`src/services/sse-client.ts` 신규 모듈로 분리, apiFetch 우회). D5 정책 유효 유지 |
+| D6 tsconfig `module: "ESNext"` + `lib: ["ESNext"]` + `types: ["react-native"]` | RN/ESNext lib `AbortSignal` 타입 충돌 발견 (2026-05-24) | **[ADR-011](./ADR-011-miniapp-phase2-streaming-ui.md) D13으로 한시 통과** (cast 2곳 격리 + tsconfig 동결 유지). 본 ADR D6 정책 유효 유지. Phase 3 또는 ADR-011 D13 해소 조건 충족 시 tsconfig 정리 검토 |
+| D7 SDK 미해결 | Phase 2 첫 `granite dev` 실행 / 백엔드 후속 ADR-X(별 저장소)에서 SDK 가이드 갱신 | baseline §B.2 갱신 + 본 ADR Decision Trail 추가 또는 superseded. **2026-05-24 Phase 2 종료 시점에는 한시 통과 유지** — Phase 2 산출은 SDK 미사용 경로(공개 generate endpoint)라 진행 가능. dev server 첫 실행 검증은 Phase 3 진입 시 또는 별도 트리거 |
+| **신규 — Phase 2 결정 일괄** | Phase 2 진입 (2026-05-24) | **[ADR-011](./ADR-011-miniapp-phase2-streaming-ui.md) D8~D13** — SSE 어댑터 분리·AsyncGenerator·에러 청크 단일 매핑·text 청크 미표시·PageNavbar 채택·AbortSignal cast 2곳 한시 통과. 본 ADR D1~D7과 누적 동결 |
 
 ### 미니앱이 알 필요가 없는 것 (재차 단언, baseline §D)
 

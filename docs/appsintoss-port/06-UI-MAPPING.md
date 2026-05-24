@@ -122,6 +122,8 @@ TDS Badge 표준 props: `size: 'tiny'|'small'|'medium'|'large'`, `badgeStyle: 'f
 
 > TDS Badge의 정확한 `type` 팔레트는 [Badge 문서](https://tossmini-docs.toss.im/tds-react-native/components/badge/)에서 v1 구현 시 최종 확정. 본 챕터는 **의미 매핑**만 정의: easy=긍정(green), hard=경고(red), medium=중립, default=강조, muted=보조. 색 토큰이 정확히 일치하지 않으면 디자인 검토.
 
+> **Phase 2 frontend 발견 (2026-05-24 — qa 인계)**: `Badge` 컴포넌트는 `ParagraphBadgeProps` 상속이라 `children`이 **string 또는 number만 허용**(내부적으로 `<Paragraph>` 렌더). `<Badge><Txt>...</Txt></Badge>` 같은 nested element는 컴파일 또는 런타임 실패 가능. 라벨 텍스트는 단순 문자열 직접 전달(`<Badge size="small">{difficultyLabel[recipe.difficulty]}</Badge>`). 다국어/포맷팅이 필요한 경우 호출 측에서 미리 문자열 가공.
+
 ### 6.3.5 `ui/alert.tsx` → 분기
 
 TDS에 직접 `Alert` 박스는 없다. 두 가지로 분기:
@@ -238,20 +240,55 @@ TDS RN에 별도 Spinner 컴포넌트는 검색 결과 부재. 두 가지 선택
 
 **props 시그니처는 변경 없음**: `(target: boolean) => Promise<void> | void`.
 
-### 6.4.6 `NavBar.tsx` → TDS [`Navbar`](https://tossmini-docs.toss.im/tds-react-native/components/navbar/)
+### 6.4.6 `NavBar.tsx` → TDS [`PageNavbar`](https://tossmini-docs.toss.im/tds-react-native/components/page-navbar/) (2026-05-24 갱신 — Phase 2 baseline §B.2 결정)
 
-현재 웹의 NavBar는 sticky 상단 헤더 + 로고 + 메뉴 링크 + `useAuth`로 로그인/로그아웃 분기. 미니앱에선 TDS `Navbar`로 대체하되 **`useAuth` 의존을 제거**한다(ADR-009 D2: 미니앱은 `getAnonymousKey()` 자동 식별).
+현재 웹의 NavBar는 sticky 상단 헤더 + 로고 + 메뉴 링크 + `useAuth`로 로그인/로그아웃 분기. 미니앱에선 TDS `PageNavbar`로 대체하되 **`useAuth` 의존을 제거**한다(ADR-009 D2: 미니앱은 `getAnonymousKey()` 자동 식별).
+
+> **명칭 갱신 사실**: `@toss/tds-react-native@2.0.3` root export에는 단일 명칭 `Navbar`가 **없다**. 대신 `extensions/page-navbar`에서 `PageNavbar`(compound: `.Title`/`.AccessoryButtons`/`.AccessoryTextButton`/`.AccessoryIconButton`/`.TransparentScrollView`)와 `components/navbar/ReactNavigationHelper`의 `ReactNavigationNavbar`(React Navigation `screenOptions`용)가 별개로 export된다. 본 미니앱은 Granite `createRoute`/`useNavigation` 위에서 컴포넌트 본문에 navbar를 직접 렌더하는 패턴이라 **`PageNavbar`를 채택** (ADR-011 D12, baseline §B.2).
+
+**import**:
+```tsx
+import { PageNavbar } from '@toss/tds-react-native';
+```
+
+**핵심 props** (`node_modules/@toss/tds-react-native/dist/esm/extensions/page-navbar/PageNavbar.d.ts` 인용):
+
+| prop | 타입 | 기본 | 설명 |
+|------|------|------|------|
+| `preference` | `{ type: 'showAlways' } \| { type: 'transparent' } \| { type: 'none' }` | `{ type: 'showAlways' }` | navbar 표시 모드. `transparent` 사용 시 `PageNavbar.TransparentScrollView` 함께 사용 필수. `none`은 헤더 자체 숨김. |
+| `children` | `ReactNode` | — | 타이틀·액세서리 버튼. compound API 사용. |
+
+**compound API** (root에서 직접 import 불가, `PageNavbar.X` 형태로만):
+
+| compound | 용도 |
+|----------|------|
+| `PageNavbar.Title` | 타이틀 텍스트 슬롯 |
+| `PageNavbar.AccessoryButtons` | 우측 액세서리 영역 컨테이너 |
+| `PageNavbar.AccessoryTextButton` | 텍스트 액세서리 버튼 (`children`: 한국어) |
+| `PageNavbar.AccessoryIconButton` | 아이콘 액세서리 버튼 (`name: string` — TDS icon 카탈로그) |
+| `PageNavbar.TransparentScrollView` | `preference: 'transparent'`일 때 함께 쓰는 ScrollView |
+
+**현재 매핑 (Granite + Toss 식별 컨텍스트)**:
 
 | 현재 요소 | 미니앱 매핑 |
 |----------|-------------|
-| `<header className="sticky top-0">` | TDS `<Navbar>` (각 화면 상단에 화면별 주입 — Granite는 글로벌 NavBar 대신 화면별 Navbar 사용이 자연스러움) |
-| 로고 `<Link href="/">` | `<Navbar.BackButton onPress={() => navigation.canGoBack() && navigation.goBack()} />` (홈 진입은 NavBar 좌측이 보통 뒤로가기) — 홈 화면에선 `left={null}` 또는 닫기 버튼 |
-| `title` (앱명) | `<Navbar title="AI 레시피" />` |
-| 우측 액션 — "레시피 생성" 링크 | `right={<Navbar.TextButton onPress={() => navigation.navigate('/generate')}>레시피 생성</Navbar.TextButton>}` |
-| "마이 레시피" 링크 (로그인 시) | 미니앱은 항상 식별자 보유 → 조건부 분기 없이 항상 표시. 그러나 글로벌 NavBar가 아니라 **탭(하단 탭바) 또는 화면별 Navbar에서 분기 권장** — 07-ROUTING에서 결정 |
+| `<header className="sticky top-0">` | 각 화면(`pages/*.tsx`) 컴포넌트 본문에서 `<PageNavbar>...</PageNavbar>` 직접 렌더. 글로벌 layout 없음 (07-ROUTING §7.8) |
+| 로고 `<Link href="/">` | 홈 화면에선 navbar 좌측 액션 없음(필요 시 close 버튼). 보호 화면에선 Granite `useNavigation().goBack()` 호출 액세서리 버튼 |
+| `title` (앱명) | `<PageNavbar.Title>AI 레시피</PageNavbar.Title>` |
+| 우측 액션 — "레시피 생성" 링크 | `<PageNavbar.AccessoryButtons><PageNavbar.AccessoryTextButton onPress={() => navigation.navigate('/recipe/generate', {})}>레시피 만들기</PageNavbar.AccessoryTextButton></PageNavbar.AccessoryButtons>` |
+| "마이 레시피" 링크 (로그인 시) | 미니앱은 항상 식별자 보유 → 조건부 분기 없이 항상 표시 (Phase 3 진입 시 적용) |
 | "로그인"/"로그아웃" 버튼 | **제거** (ADR-009 D2) — Toss 식별이 자동이라 로그인/로그아웃 개념 없음 |
 
-> NavBar는 단일 컴포넌트로 옮기지 않고, **각 화면의 layout에서 TDS Navbar를 직접 사용**하는 것이 RN 패턴이다. 본 컴포넌트는 미니앱에선 사실상 **삭제**되고 화면별 Navbar로 분산된다.
+**Phase 2 실 사용 위치 (frontend 산출 인용 — qa report §13.5 인계)**:
+
+| 파일 | 사용 형태 |
+|------|----------|
+| `src/pages/index.tsx:36-38` | `<PageNavbar><PageNavbar.Title>AI 레시피</PageNavbar.Title></PageNavbar>` |
+| `src/pages/recipe/generate.tsx:108-110` | 동일 패턴 + 화면 타이틀 |
+
+**공통 래퍼(`AppNavbar.tsx`)는 만들지 않는다** (Phase 2 baseline §B.2 — YAGNI). Phase 3에서 화면이 늘면 그때 추출 검토.
+
+> 본 컴포넌트는 미니앱에선 글로벌 `NavBar.tsx`로 옮기지 않고 각 화면이 `PageNavbar`를 직접 사용한다. **`ReactNavigationNavbar`는 채택 안 함** — React Navigation `screenOptions` 슬롯용으로 본 미니앱의 Granite `createRoute` 추상화 위에서 부적합.
 
 ### 6.4.7 `AuthForm.tsx` — **제외** (ADR-009 D2)
 
@@ -283,7 +320,7 @@ export const difficultyLabel: Record<Difficulty, string> = {
 | 3 | `NutritionPanel` | 영양 카드 | `View` + `Txt`(typography 토큰) | TableRow 대안 가능 |
 | 4 | `RecipeCard` | 목록 카드 | `View` + `Pressable` + `Txt` + `Badge` + `IconButton`(즐겨찾기) + `Button`(삭제) | `Link` → navigation.navigate |
 | 5 | `FavoriteButton` | 별 토글 | `IconButton name="icon-star-..."` | 멱등 목표값 콜백 유지 |
-| 6 | `NavBar` | 글로벌 헤더 | TDS `Navbar`로 화면별 분산 | `useAuth` 제거 |
+| 6 | `NavBar` | 글로벌 헤더 | TDS `PageNavbar`(extensions) compound로 화면별 분산 — `.Title`/`.AccessoryButtons`/`.AccessoryTextButton`/`.AccessoryIconButton` | `useAuth` 제거 + 단일 `Navbar` 명칭 부재 → `PageNavbar` 채택 (Phase 2 baseline §B.2, ADR-011 D12). 공통 래퍼 미작성 (YAGNI) |
 | 7 | `AuthForm` | 인증 폼 | **제외** | ADR-009 D2 |
 | 8 | `recipe-format.ts` | 포맷 유틸 | 그대로 이식 | 순수 함수 |
 | 9 | `ui/button` | 버튼 primitive | TDS `Button` (`display`/`size`) + `TextButton`/`IconButton` 보조 | variant 매핑표 6.3.1 |
@@ -345,3 +382,4 @@ QA(`integration-coherence-qa` 스킬)가 본 챕터 검증 시 확인:
 | 날짜 | 변경 | 사유 |
 |------|------|------|
 | 2026-05-22 | 초기 작성 (세션 #4) | 14개 컴포넌트 → TDS RN 1:1 매핑 + AuthForm 제외 명시 |
+| 2026-05-24 | §6.4.6 / §6.5 #6 행 갱신 — `Navbar` → `PageNavbar` 대체 (compound API + import 경로 + 핵심 props + Phase 2 실 사용 위치) | Phase 2 baseline §B.2 결정 + ADR-011 D12 — `@toss/tds-react-native@2.0.3` root에 `Navbar` 단일 명칭 부재 확인 후 `PageNavbar`(extensions) 채택. frontend 실 사용(`pages/index.tsx:36-38`, `pages/recipe/generate.tsx:108-110`) 검증 PASS. `ReactNavigationNavbar`는 본 미니앱 Granite 컨텍스트에 부적합으로 기각 |

@@ -70,25 +70,32 @@ AI 레시피 안내 — 앱인토스 미니앱 (React Native + Granite + TDS).
 
 ## 현재 단계
 
-**Phase 1 완료 → Phase 2 진입 준비** (2026-05-23).
+**Phase 2 완료 → Phase 3 진입 준비** (2026-05-24).
 
-Phase 1(공유 타입·API 클라이언트·식별자 훅) ALL PASS — QA 매트릭스 FAIL 0건 (`_workspace/03_qa_report.md`). 산출물·결정은 ADR-010 + AGENTS.md 4종(`src/types|lib/zod|services|hooks/AGENTS.md`)에 동결. 세션 전체 흐름은 `_workspace/04_session_log.md`.
+Phase 2(레시피 생성 화면 + SSE 스트리밍, 기능 a·b) **코드 경로 ALL PASS** — QA 매트릭스 FAIL 0건 누적 (`_workspace/03_qa_report.md`). Phase 1 동결(ADR-010 D1~D7) 그대로 유지. 산출물·결정은 ADR-011 + AGENTS.md 6종(Phase 1의 4종 + Phase 2 신규 `src/components|pages/AGENTS.md` 2종)에 동결. 06-UI-MAPPING §6.4.6은 `PageNavbar` 채택 갱신. 세션 전체 흐름은 `_workspace_phase1/04_session_log.md`(Phase 1) + `_workspace/04_session_log.md`(Phase 2 — 본 차).
 
-코드 산출 (Phase 1 동결):
-- `src/types/{api,recipe,user,env.d,index}.ts` — 6 엔드포인트 요청·응답·도메인·식별자 타입, ambient env.
-- `src/lib/zod/{api,recipe,index}.ts` — 응답 검증 스키마 + factory.
-- `src/services/{api-client,recipes,index}.ts` — 단일 fetch 호출점(`apiFetch`) + 6 도메인 함수 + `ApiClientError`.
-- `src/hooks/useTossUserId.tsx` — Toss SDK 단일 격리·메모리 캐싱·Provider·마스킹 헬퍼.
-- `src/_app.tsx` — `TossUserIdProvider` 마운트.
-- `src/pages/index.tsx` — Phase 2 진입 시 일괄 제거할 dev-only AC1.5 트리거.
-- 의존성: `zod@^4.4.3` (deps).
-- 인프라: `tsconfig.json`에 `"module": "ESNext"` 추가.
+코드 산출 (Phase 2 동결 — Phase 1 누적 위에 추가):
+- `src/services/sse-client.ts` (신규) — SSE → fetch+ReadableStream 어댑터. `streamRecipe(req, options): AsyncGenerator<StreamChunk>`. wire 파싱 + `streamChunkSchema` zod + `error` 청크 → `ApiClientError` throw + `!res.body` 폴백 신호.
+- `src/services/recipes.ts` (확장) — `generateRecipeStream` Facade 추가 + 기존 6 함수에 `signal?: AbortSignal` 옵션 추가. 기존 호출 호환.
+- `src/services/api-client.ts` (Phase 2 §A.2 허용 확장) — `ApiFetchInit.signal?: AbortSignal` 옵션 추가 + fetch 호출에 §D.3 cast 적용. 본질(에러 매핑·401 재시도·zod·raw unwrap) 변경 0건.
+- `src/lib/zod/stream.ts` (신규) — `streamChunkSchema` discriminated union 5종 (`recipe` 청크는 Phase 1 `generatedRecipeSchema` 재사용).
+- `src/hooks/useRecipeGenerate.ts` (신규) — 외부 인터페이스(08 §8.3.2), 청크 분기, AbortController(명시 cancel + unmount cleanup), 비스트리밍 자동 폴백, 첫 청크 15s / 전체 90s 타임아웃.
+- `src/components/{SearchForm,RecipeDisplay,NutritionPanel}.tsx + recipe-format.ts` (신규) — TDS primitives(Button/TextField/NumericSpinner/Badge/Txt/List/ListRow) 위 도메인 컴포넌트 + 순수 포맷 유틸.
+- `src/pages/index.tsx` (재작성) — Phase 1 dev 트리거 일괄 제거 + PageNavbar + SearchForm.
+- `src/pages/recipe/generate.tsx` (신규) — PageNavbar + SearchForm + 진행 인디케이터 + 에러 박스 + RecipeDisplay/NutritionPanel.
+- `src/pages/about.tsx` — 정리 완료 (router.gen.ts에서 자동 제외 확인).
+- 의존성·인프라 변경 0건 — Phase 1 그대로.
 
-잔여 미해결(Phase 2 인계):
-- `@apps-in-toss/web-framework` 패키지 경로 — `useTossUserId.tsx:21` `@ts-expect-error` 1줄로 한시 통과. 첫 `granite dev` 실행 시 검증 (ADR-010 D7 + §롤백 R1).
-- AC1.2/1.3 실호출 검증 — 별 저장소 `AIReceipe`의 옵션 P 후속 마이그레이션(profiles 테이블·`resolveInternalUserId`·CORS preflight) 배포 후 가능.
+잔여 미해결 (Phase 3 인계):
+- **ADR-010 D7 SDK 패키지 경로** — `useTossUserId.tsx:21` `@ts-expect-error` 한시 통과 유지. Phase 2 산출은 공개 generate endpoint라 SDK 미사용 경로로 진행 가능했음. dev server 첫 실행 검증은 Phase 3 진입 시 (보호 endpoint 호출 시점).
+- **ADR-011 D13 AbortSignal cast 2곳** — `src/services/sse-client.ts:76` + `api-client.ts:100` 한시 통과 유지. RN/ESNext lib `AbortSignal` nominal 충돌. 해소 조건 (a)/(b)/(c) 충족 시 2곳 동시 제거.
+- **AC2.1/2.2/2.4/2.6 실호출 검증** — 백엔드 옵션 P 배포 대기 (별 저장소 `AIReceipe`).
+- **RN `Response.body` / `TextDecoder` 미지원 환경 검증** — Phase 2 baseline §C.6, dev server 첫 실행 시점. 미지원 확정 시 ADR-011 R1 트리거 (옵션 B `react-native-sse` 전환).
+- **`useBackEvent` 하드웨어 백 가드** — Phase 2 선택 비범위 (07 §7.7.2). Phase 3 진입 시 결정 권장.
+- **청크 간 30초 무응답 타임아웃** — Phase 2는 첫 청크 15s + 전체 90s만 적용. 08 §8.5.1 청크 간 30s는 Phase 3 후속 결정.
+- **디자인 토큰 결정** — 현재 hex 직접 사용(`#191F28` 등). adaptive 토큰으로 일괄 교체 (별 ADR — qa report §13.1).
 
-Phase 2(레시피 생성 화면 + 스트리밍, 기능 a·b)는 `docs/appsintoss-port/10-SPRINT-PLAN.md` §10.3 참조. Phase별 수용 기준은 동 문서.
+Phase 3(저장·목록·상세·즐겨찾기·삭제, 기능 c~f)는 `docs/appsintoss-port/10-SPRINT-PLAN.md` §10.4 참조. Phase별 수용 기준은 동 문서.
 
 ---
 

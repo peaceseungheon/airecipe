@@ -32,6 +32,11 @@ export interface ApiFetchInit {
    * 미제공 시 401 재시도하지 않음 (05 §5.4 경계 조건 #3).
    */
   refreshTossUserId?: () => Promise<string>;
+  /**
+   * Phase 2 baseline §A.2 — 호출 측 abort를 fetch로 전달.
+   * abort 시 fetch가 throw → catch 분류는 호출 측이 signal.aborted로 식별 (08 §8.4.1).
+   */
+  signal?: AbortSignal;
 }
 
 /**
@@ -86,12 +91,19 @@ async function apiFetchInternal<T>(
 
   let res: Response;
   try {
-    res = await fetch(url, {
+    const fetchInit: RequestInit = {
       method: init.method ?? 'GET',
       headers,
       body: bodyString,
-    });
-  } catch {
+      // baseline §D.3 — RN globals.d.ts AbortSignal vs ESNext lib union TS2769.
+      // 런타임 동일 객체, TS nominal만 차이. Phase 3 또는 ADR-011 시 정식 해소.
+      signal: init.signal as RequestInit['signal'],
+    };
+    res = await fetch(url, fetchInit);
+  } catch (err) {
+    if ((err as { name?: string })?.name === 'AbortError') {
+      throw err;
+    }
     throw new ApiClientError('INTERNAL_ERROR', '네트워크에 연결할 수 없어요.');
   }
 
