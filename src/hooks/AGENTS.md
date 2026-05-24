@@ -45,11 +45,36 @@ export function formatTossUserIdMask(hash: TossUserId | undefined): string;  // 
 - SecureStore 도입 결정 → 별 ADR로 ADR-010 D2 superseded. 캐시 구현부만 교체, 인터페이스(`{ tossUserId, refresh }`) 유지.
 - `getAnonymousKey()` 가 콜드 스타트마다 다른 hash 반환 → ADR-010 §롤백 R2 발동. 백엔드 측 식별자 갱신 정책 재검토 (별 저장소 ADR).
 
-## 비범위 (Phase 2 이후)
+## Phase 2·3 화면 흐름 훅 (Phase 1 위에 누적)
 
-- 화면별 사용자 흐름 훅 (`useRecipeGenerate`/`useMyRecipes` 등) — Phase 2~4에서 추가. 각각 단일 책임, 본 디렉터리에 위치.
+| 파일 | 역할 | SSOT |
+|------|------|------|
+| `useRecipeGenerate.ts` (Phase 2) | SSE 소비 — `{ status, progressText, recipe, error, generate, cancel, reset }`. AbortController 3곳(명시 cancel + unmount + 폴백). text 청크 사용자 표시 금지 | 08 §8.3, ADR-011 D11·D13, Phase 2 baseline §A.4 |
+| `useRecipeCache.tsx` (Phase 3) | 마이 레시피 캐시 무효화 — `RecipeCacheProvider` + `useRecipeCacheTrigger()` (`{ trigger, invalidate }`). Context + bump trigger 패턴 (SWR/RQ 미도입) | ADR-012 D15, Phase 3 baseline §D.1·D.2 |
+| `useMyRecipes.ts` (Phase 3) | 마이 목록 조회 — `listRecipes` raw `{data, meta}` 보존 (ADR-010 D5 예외). `trigger`를 useEffect dep에 포함. 401 자동 재시도(refresh 주입) | 03 §3.3, ADR-006(meta.pageSize 신뢰), Phase 3 baseline §A.1 |
+| `useRecipeDetail.ts` (Phase 3) | 단건 조회 — `getRecipe` + **404 정규화**(ApiClientError code NOT_FOUND → `notFound:true`, error null). trigger dep 미포함(상세는 id 단건) | 03 §3.4, ADR-004·005, ADR-012 D16, Phase 3 baseline §A.1·§D.5 |
+| `useSaveRecipe.ts` (Phase 3) | 저장 mutation — `save(recipe): Promise<Recipe \| null>`. 성공 시 `invalidate()` 정확 1회. 실패 시 0건(stale 마이 유지). AbortController unmount + cancelled 플래그 | 03 §3.5, ADR-012 D15·D17, Phase 3 baseline §A.1·§A.4·§D.3 |
+
+## Phase 2·3 추가 규약 (Phase 1 규약 위에 누적)
+
+- **외부 인터페이스 안정성** — Phase 2 `useRecipeGenerate`의 7-tuple, Phase 3 4 훅의 시그니처는 Phase 4 이후도 유지. 변경 시 본 AGENTS.md + ADR-012 결과 표 갱신.
+- **AbortController unmount cleanup + cancelled 플래그 의무** — Phase 3 4 훅 모두 useEffect cleanup에서 둘 다 적용 (Phase 2 패턴 답습, Phase 3 baseline §H.2 #17).
+- **401 재시도는 api-client 단일 위치(`apiFetch`)** — 본 디렉터리 훅은 `refreshTossUserId: refresh` 주입만 책임 (ADR-010 D3).
+- **`RecipeCacheProvider`는 `TossUserIdProvider` 안쪽 마운트** — 식별자가 있어야 캐시도 의미. `_app.tsx`에 두 Provider 순서 동결 (ADR-012 D15).
+- **id 정규화 책임** — `useRecipeDetail`이 catch 첫 분기에서 NOT_FOUND를 `notFound: true` state로 변환. 화면 측은 try/catch 없이 `notFound` 분기만 (ADR-005·ADR-012 D16).
+- **사용자 친화 한국어 에러 매핑** — `ApiErrorCode` 8종 모두 매핑 (4 훅 모두 동일 표). NOT_FOUND는 useRecipeDetail에서 notFound state로 분기되므로 메시지 표는 완전성 유지용.
+- **`useSaveRecipe.save` 성공 시 invalidate 정확 1회** — Phase 3 baseline §H.2 #15. 실패 catch는 setError만. Phase 4 mutation 훅도 동일 패턴 답습.
+
+## 비범위 (Phase 3)
+
+- Phase 4 mutation 훅 (`useToggleFavorite`, `useDeleteRecipe`) — 동일 invalidate 패턴 답습. Phase 4 baseline에서 정의.
+- 키별 부분 무효화 — Phase 3 단일 trigger 충분. Phase 4·5에서 별 ADR 검토.
+- 무한 스크롤 / focus refetch — ADR-012 §대안 D·H 기각. Phase 5에서 재검토.
+- 단위 테스트(jest + @testing-library/react-native) — Phase 1~3 비범위. qa의 정적 검증으로 대체.
 
 ## 관련 ADR
 
 - [ADR-009](../../docs/adr/ADR-009-appsintoss-port-architecture.md) — D2 Toss 식별자 전환.
-- [ADR-010](../../docs/adr/ADR-010-miniapp-phase1-conventions.md) — D2 메모리 캐싱·D4 SDK 단일 격리·D7 패키지 경로 한시 통과.
+- [ADR-010](../../docs/adr/ADR-010-miniapp-phase1-conventions.md) — D2 메모리 캐싱·D3 401 1회 재시도·D4 SDK 단일 격리·D5 raw 응답 정책·D7 패키지 경로 한시 통과.
+- [ADR-011](../../docs/adr/ADR-011-miniapp-phase2-streaming-ui.md) — D9·D10 SSE 어댑터·D11 text 청크 미표시·D13 AbortSignal cast 격리.
+- [ADR-012](../../docs/adr/ADR-012-miniapp-phase3-routing-cache-404.md) — D14 라우트 경로·D15 Context+bump trigger·D16 404 단일 컴포넌트·D17 저장 후 상세 직진·D18 단순 페이지네이션.

@@ -333,12 +333,13 @@ export const difficultyLabel: Record<Difficulty, string> = {
 
 (추가) **새 미니앱 전용 컴포넌트(현재 웹에 없음, 신규 추가)**:
 
-| 새 컴포넌트 | 책임 | TDS 매핑 |
-|-------------|------|---------|
-| `FilterTabs` (현 my-recipes의 인라인 FilterTab을 추출) | 전체/즐겨찾기 필터 | TDS `SegmentedControl` 또는 `Tab` |
-| `DeleteConfirmDialog` | 삭제 확인 다이얼로그 (수용 기준 1.6 AC1) | TDS [`Dialog`](https://tossmini-docs.toss.im/tds-react-native/components/dialog/) (`ConfirmDialog`) |
-| `NotFoundScreen` | 404 화면 (ADR-005) | TDS [`ErrorPage`](https://tossmini-docs.toss.im/tds-react-native/components/error-page/) `statusCode={404}` |
-| `EmptyState` | 빈 목록 안내 (마이 레시피 0건) | `View` + `Txt` + `Button`(생성하러 가기) |
+| 새 컴포넌트 | 책임 | TDS 매핑 | 본 미니앱 실 구현 |
+|-------------|------|---------|----------------|
+| `FilterTabs` (현 my-recipes의 인라인 FilterTab을 추출) | 전체/즐겨찾기 필터 | TDS `SegmentedControl` 또는 `Tab` | Phase 4 |
+| `DeleteConfirmDialog` | 삭제 확인 다이얼로그 (수용 기준 1.6 AC1) | TDS [`Dialog`](https://tossmini-docs.toss.im/tds-react-native/components/dialog/) (`ConfirmDialog`) | Phase 4 |
+| `NotFoundScreen` | **단일 404 화면** (ADR-005). Phase 4 PATCH/DELETE 404 재사용 보장 | TDS [`ErrorPage`](https://tossmini-docs.toss.im/tds-react-native/components/error-page/) `statusCode={404}` | **Phase 3 완료 (2026-05-24)** — `src/components/NotFoundScreen.tsx`. `import { ErrorPage } from '@toss/tds-react-native'`. props `{ onBack: () => void }`. 합성: `<ErrorPage statusCode={404} title="레시피를 찾을 수 없어요" subtitle="삭제되었거나 다른 사용자의 레시피일 수 있어요." onPressLeftButton={onBack} />`. ADR-012 D16. **단일 사용 위치 정책** — `pages/`에서 `<ErrorPage statusCode={404}>` 직접 렌더 + 인라인 "찾을 수 없" 텍스트 금지 |
+| `EmptyState` | 빈 목록 안내 (마이 0건 + Phase 4 즐겨찾기 0건 등) | `View` + `Txt` + `Button`(생성하러 가기) | **Phase 3 완료 (2026-05-24)** — `src/components/EmptyState.tsx`. props 4종 `{ title, description, actionLabel, onAction }`으로 다양 빈 상태 재사용. presentational only. ADR-012 D18 |
+| `RecipeCard` (06 §6.4.4 신규 구현) | 저장된 Recipe 카드 (마이 목록 아이템) | `View` + `Pressable` + `Txt` + `Badge` + `IconButton`(Phase 4 즐겨찾기) + `Button`(Phase 4 삭제) | **Phase 3 완료 (2026-05-24)** — `src/components/RecipeCard.tsx`. props `{ recipe: Recipe, onPress: () => void, onToggleFavorite?, onDelete? }`. Phase 4 자리표시 prop만 받고 미렌더. `recipe.id` 사용 OK (저장된 Recipe 한정 — Phase 3 baseline §H.2 #11) |
 
 ## 6.6 접근성·국제화 체크리스트
 
@@ -383,3 +384,4 @@ QA(`integration-coherence-qa` 스킬)가 본 챕터 검증 시 확인:
 |------|------|------|
 | 2026-05-22 | 초기 작성 (세션 #4) | 14개 컴포넌트 → TDS RN 1:1 매핑 + AuthForm 제외 명시 |
 | 2026-05-24 | §6.4.6 / §6.5 #6 행 갱신 — `Navbar` → `PageNavbar` 대체 (compound API + import 경로 + 핵심 props + Phase 2 실 사용 위치) | Phase 2 baseline §B.2 결정 + ADR-011 D12 — `@toss/tds-react-native@2.0.3` root에 `Navbar` 단일 명칭 부재 확인 후 `PageNavbar`(extensions) 채택. frontend 실 사용(`pages/index.tsx:36-38`, `pages/recipe/generate.tsx:108-110`) 검증 PASS. `ReactNavigationNavbar`는 본 미니앱 Granite 컨텍스트에 부적합으로 기각 |
+| 2026-05-24 | §6.5 추가 컴포넌트 표 — NotFoundScreen·EmptyState·RecipeCard 행에 Phase 3 실 구현 시그니처 추가 (props·import 경로·합성 패턴·단일 사용 위치 정책) | Phase 3 baseline §A.2·§B.2·§B.3·§H.2 #13 + ADR-012 D16·D18 — `src/components/{NotFoundScreen,EmptyState,RecipeCard}.tsx` 완료. `NotFoundScreen`은 단일 컴포넌트 정책으로 Phase 4 PATCH/DELETE 404 재사용 보장. `EmptyState`는 props 4종으로 다양 빈 상태 재사용. `RecipeCard`는 저장된 Recipe 한정 `recipe.id` 사용. frontend 실 사용(`pages/recipe/[id].tsx:75`, `pages/my-recipes.tsx:124-130,131-139`) 검증 PASS |

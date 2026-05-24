@@ -193,6 +193,7 @@
 | D11 text 청크 미표시 | 백엔드가 text 청크에 완성된 문장을 보내는 새 정책 (별 저장소 후속 ADR) | 표시 정책 재검토 (선택적 표시 옵션) |
 | D12 PageNavbar + 공통 래퍼 미작성 | Phase 3에서 화면 4~5개 도달 | 공통 래퍼 추출 결정 |
 | D13 cast 2곳 한시 통과 | (a) `lib` 제거 + ESNext built-in 검증 PASS / (b) RN types 갱신 / (c) 다른 정식 해법 발견 | 2곳 동시 cast 제거 + tsconfig 정리 |
+| **신규 — Phase 3 결정 일괄** | Phase 3 진입 (2026-05-24) | **[ADR-012](./ADR-012-miniapp-phase3-routing-cache-404.md) D14~D18** — Phase 2 동결(D8~D13) 위에 저장·목록·상세 라우팅 + 캐시 무효화 + 404 단일 컴포넌트 + 단순 페이지네이션 누적. 본 ADR D11(text 청크 미표시)·D12(PageNavbar)·D13(cast 2곳) 모두 Phase 3에서 유지(추가 cast 0건 검증 PASS). Phase 3 신규 코드는 SSE 0건 — D8~D10 직접 의존 0 |
 
 ### 미니앱이 알 필요가 없는 것 (재차 단언, Phase 2 baseline §D.2 격리)
 

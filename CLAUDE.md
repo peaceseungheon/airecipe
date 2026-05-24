@@ -70,32 +70,43 @@ AI 레시피 안내 — 앱인토스 미니앱 (React Native + Granite + TDS).
 
 ## 현재 단계
 
-**Phase 2 완료 → Phase 3 진입 준비** (2026-05-24).
+**Phase 3 완료 → Phase 4 진입 준비** (2026-05-24).
 
-Phase 2(레시피 생성 화면 + SSE 스트리밍, 기능 a·b) **코드 경로 ALL PASS** — QA 매트릭스 FAIL 0건 누적 (`_workspace/03_qa_report.md`). Phase 1 동결(ADR-010 D1~D7) 그대로 유지. 산출물·결정은 ADR-011 + AGENTS.md 6종(Phase 1의 4종 + Phase 2 신규 `src/components|pages/AGENTS.md` 2종)에 동결. 06-UI-MAPPING §6.4.6은 `PageNavbar` 채택 갱신. 세션 전체 흐름은 `_workspace_phase1/04_session_log.md`(Phase 1) + `_workspace/04_session_log.md`(Phase 2 — 본 차).
+Phase 3(저장·목록·상세, 기능 c·d) **코드 경로 ALL PASS** — QA 매트릭스 76+ PASS / FAIL 0건 누적 (`_workspace/03_qa_report.md`). Phase 1·2 동결(ADR-010·011) 그대로 유지(수정 0건). 본 Phase 결정은 ADR-012(D14~D18) + AGENTS.md 3종(`src/hooks|components|pages/AGENTS.md`) 보강에 동결. 06-UI-MAPPING §6.5 추가 컴포넌트 표는 NotFoundScreen·EmptyState·RecipeCard 실 구현 시그니처 반영. 세션 전체 흐름은 `_workspace_phase1/04_session_log.md`(Phase 1) + `_workspace_phase2/04_session_log.md`(Phase 2) + `_workspace/04_session_log.md`(Phase 3 — 본 차).
 
-코드 산출 (Phase 2 동결 — Phase 1 누적 위에 추가):
-- `src/services/sse-client.ts` (신규) — SSE → fetch+ReadableStream 어댑터. `streamRecipe(req, options): AsyncGenerator<StreamChunk>`. wire 파싱 + `streamChunkSchema` zod + `error` 청크 → `ApiClientError` throw + `!res.body` 폴백 신호.
-- `src/services/recipes.ts` (확장) — `generateRecipeStream` Facade 추가 + 기존 6 함수에 `signal?: AbortSignal` 옵션 추가. 기존 호출 호환.
-- `src/services/api-client.ts` (Phase 2 §A.2 허용 확장) — `ApiFetchInit.signal?: AbortSignal` 옵션 추가 + fetch 호출에 §D.3 cast 적용. 본질(에러 매핑·401 재시도·zod·raw unwrap) 변경 0건.
-- `src/lib/zod/stream.ts` (신규) — `streamChunkSchema` discriminated union 5종 (`recipe` 청크는 Phase 1 `generatedRecipeSchema` 재사용).
-- `src/hooks/useRecipeGenerate.ts` (신규) — 외부 인터페이스(08 §8.3.2), 청크 분기, AbortController(명시 cancel + unmount cleanup), 비스트리밍 자동 폴백, 첫 청크 15s / 전체 90s 타임아웃.
-- `src/components/{SearchForm,RecipeDisplay,NutritionPanel}.tsx + recipe-format.ts` (신규) — TDS primitives(Button/TextField/NumericSpinner/Badge/Txt/List/ListRow) 위 도메인 컴포넌트 + 순수 포맷 유틸.
-- `src/pages/index.tsx` (재작성) — Phase 1 dev 트리거 일괄 제거 + PageNavbar + SearchForm.
-- `src/pages/recipe/generate.tsx` (신규) — PageNavbar + SearchForm + 진행 인디케이터 + 에러 박스 + RecipeDisplay/NutritionPanel.
-- `src/pages/about.tsx` — 정리 완료 (router.gen.ts에서 자동 제외 확인).
-- 의존성·인프라 변경 0건 — Phase 1 그대로.
+코드 산출 (Phase 3 동결 — Phase 1·2 누적 위에 추가):
+- `src/hooks/useRecipeCache.tsx` (신규) — Context + bump trigger 캐시 무효화 (ADR-012 D15).
+- `src/hooks/useMyRecipes.ts` (신규) — listRecipes raw `{data, meta}` 보존 (ADR-010 D5 예외) + trigger dep + 401 자동 재시도.
+- `src/hooks/useRecipeDetail.ts` (신규) — getRecipe + 404 정규화(notFound state, ADR-005 통일).
+- `src/hooks/useSaveRecipe.ts` (신규) — saveRecipe + 성공 시 invalidate() 정확 1회 + AbortController cleanup.
+- `src/components/RecipeCard.tsx` (신규) — Pressable + Txt + Badge 3종. recipe.id 사용 OK(저장된 Recipe 한정). Phase 4 즐겨찾기/삭제 prop 자리표시.
+- `src/components/EmptyState.tsx` (신규) — props 4종 재사용 컴포넌트.
+- `src/components/NotFoundScreen.tsx` (신규) — TDS `ErrorPage statusCode={404}` 합성. **단일 컴포넌트 정책** — Phase 4 PATCH/DELETE 404 재사용 (ADR-012 D16).
+- `src/pages/my-recipes.tsx` (신규) — `/my-recipes` 라우트. 식별자 가드 + useMyRecipes + EmptyState/RecipeCard 4-way 분기 + 단순 페이지네이션 (meta.pageSize 신뢰).
+- `src/pages/recipe/[id].tsx` (신규) — `/recipe/[id]` 라우트. Granite 동적 세그먼트 + validateParams + useRecipeDetail + 4-way 분기(로딩/404/에러/정상).
+- `src/pages/recipe/generate.tsx` (확장) — useSaveRecipe 결합 + 저장 버튼 + `/recipe/[id]` 직진 (ADR-012 D17).
+- `src/pages/index.tsx` (확장) — PageNavbar.AccessoryButtons 마이 진입 활성화.
+- `src/_app.tsx` (확장) — RecipeCacheProvider를 TossUserIdProvider 안쪽 래핑.
+- `src/router.gen.ts` (자동) — 4 라우트 등록 (`/`, `/recipe/generate`, `/my-recipes`, `/recipe/[id]`).
 
-잔여 미해결 (Phase 3 인계):
-- **ADR-010 D7 SDK 패키지 경로** — `useTossUserId.tsx:21` `@ts-expect-error` 한시 통과 유지. Phase 2 산출은 공개 generate endpoint라 SDK 미사용 경로로 진행 가능했음. dev server 첫 실행 검증은 Phase 3 진입 시 (보호 endpoint 호출 시점).
-- **ADR-011 D13 AbortSignal cast 2곳** — `src/services/sse-client.ts:76` + `api-client.ts:100` 한시 통과 유지. RN/ESNext lib `AbortSignal` nominal 충돌. 해소 조건 (a)/(b)/(c) 충족 시 2곳 동시 제거.
-- **AC2.1/2.2/2.4/2.6 실호출 검증** — 백엔드 옵션 P 배포 대기 (별 저장소 `AIReceipe`).
-- **RN `Response.body` / `TextDecoder` 미지원 환경 검증** — Phase 2 baseline §C.6, dev server 첫 실행 시점. 미지원 확정 시 ADR-011 R1 트리거 (옵션 B `react-native-sse` 전환).
-- **`useBackEvent` 하드웨어 백 가드** — Phase 2 선택 비범위 (07 §7.7.2). Phase 3 진입 시 결정 권장.
-- **청크 간 30초 무응답 타임아웃** — Phase 2는 첫 청크 15s + 전체 90s만 적용. 08 §8.5.1 청크 간 30s는 Phase 3 후속 결정.
-- **디자인 토큰 결정** — 현재 hex 직접 사용(`#191F28` 등). adaptive 토큰으로 일괄 교체 (별 ADR — qa report §13.1).
+### Phase 4 진입 인계
+- 즐겨찾기 토글(PATCH `/api/recipes/[id]/favorite` 멱등) → `useToggleFavorite` + `FavoriteButton` 또는 `RecipeCard.onToggleFavorite` 활성화.
+- 삭제(DELETE `/api/recipes/[id]`) → `useDeleteRecipe` + `DeleteConfirmDialog` (TDS `ConfirmDialog`).
+- 즐겨찾기 필터(`?favorite=true`) → `FilterTabs` (TDS `SegmentedControl`/`Tab`) + `useMyRecipes(query.favorite)`.
+- 404 UI는 Phase 3 산출 `<NotFoundScreen />` 그대로 재사용(ADR-012 D16).
+- 캐시 무효화는 Phase 3 산출 `useRecipeCacheTrigger.invalidate()` 그대로 재사용(ADR-012 D15).
 
-Phase 3(저장·목록·상세·즐겨찾기·삭제, 기능 c~f)는 `docs/appsintoss-port/10-SPRINT-PLAN.md` §10.4 참조. Phase별 수용 기준은 동 문서.
+### Phase 2·3 누적 미해결 (Phase 4 또는 별 ADR)
+- **SDK 패키지 경로** (`@apps-in-toss/web-framework` 미해결) — Phase 4 첫 보호 endpoint 호출 dev server 시점에서 검증, 실패 시 ADR-010 §R1.
+- **AbortSignal cast 2곳** — ADR-011 D13 해소 조건 (a)/(b)/(c) Phase 4·5 재평가.
+- **`useBackEvent` 하드웨어 백** — Phase 4 PATCH/DELETE 낙관적 업데이트 도입 시 결정.
+- **디자인 토큰 hex 직접 사용** — Phase 4 진입 전 별 ADR 권장(adaptive 토큰 일괄 교체).
+- **백엔드 옵션 P 배포** — 별 저장소 AIReceipe의 후속 ADR. 미배포 상태에서는 모든 보호 호출이 401.
+- **무한 스크롤** — Phase 5 출시 직전 별 ADR.
+
+> 본 절은 Phase 3 갱신 — 이전 Phase(0~2)의 상세 산출은 각 phase의 session log(`_workspace_phase1/04_session_log.md`, `_workspace_phase2/04_session_log.md`) 참조.
+
+Phase별 수용 기준은 `docs/appsintoss-port/10-SPRINT-PLAN.md`. 결정 트리는 `docs/adr/ADR-009·010·011·012`.
 
 ---
 
@@ -111,6 +122,7 @@ Phase 3(저장·목록·상세·즐겨찾기·삭제, 기능 c~f)는 `docs/appsi
 | 날짜 | 변경 내용 | 대상 | 사유 |
 |------|----------|------|------|
 | 2026-05-23 | 초기 구성 (4인 팀 + miniapp-orchestrator + 워커 5: technical-documentation, software-design-principles, integration-coherence-qa, granite-rn-development, appsintoss-publish-checklist) | 전체 | RN+Granite+TDS 미니앱 도메인. 별 저장소 AIReceipe의 하네스를 백엔드 분리·TDS 의무·검수 컨텍스트로 재설계 이식. `ai-recipe-integration`·`nextjs-fullstack` 제거, `granite-rn-development`·`appsintoss-publish-checklist` 신규. backend 에이전트 → api-client로 재정의 |
+| 2026-05-24 | Phase 3 완료 갱신 — "현재 단계" 절 재작성 (Phase 2 완료 → Phase 3 완료), Phase 4 진입 인계 + 누적 미해결 6항 명시 | CLAUDE.md | Phase 3 마무리(T5) — ADR-012 동결 + AGENTS.md 3종 보강 + 06 §6.5 갱신과 함께 본 문서도 동기 갱신 |
 
 ---
 
