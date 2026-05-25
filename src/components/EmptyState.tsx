@@ -14,7 +14,7 @@
 
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
-import { Button, Txt } from '@toss/tds-react-native';
+import { Button, Txt, colors } from '@toss/tds-react-native';
 
 export interface EmptyStateProps {
   title: string;
@@ -26,10 +26,10 @@ export interface EmptyStateProps {
 export function EmptyState({ title, description, actionLabel, onAction }: EmptyStateProps) {
   return (
     <View style={styles.container} accessibilityLabel={title}>
-      <Txt typography="t3" color="#191F28" style={styles.title}>
+      <Txt typography="t3" color={colors.grey900} style={styles.title}>
         {title}
       </Txt>
-      <Txt typography="st9" color="#4E5968" style={styles.description}>
+      <Txt typography="st9" color={colors.grey700} style={styles.description}>
         {description}
       </Txt>
       <View style={styles.action}>

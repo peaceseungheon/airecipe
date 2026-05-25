@@ -20,7 +20,7 @@
 import React, { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { createRoute, useNavigation } from '@granite-js/react-native';
-import { Button, PageNavbar, Txt } from '@toss/tds-react-native';
+import { Button, PageNavbar, Txt, colors } from '@toss/tds-react-native';
 
 import { DeleteConfirmDialog } from '../../components/DeleteConfirmDialog';
 import { FavoriteButton } from '../../components/FavoriteButton';
@@ -117,7 +117,7 @@ function RecipeDetailPage() {
           <PageNavbar.Title>레시피</PageNavbar.Title>
         </PageNavbar>
         <View style={styles.center}>
-          <Txt typography="st9" color="#4E5968">
+          <Txt typography="st9" color={colors.grey700}>
             식별자를 확인하는 중이에요…
           </Txt>
         </View>
@@ -151,16 +151,16 @@ function RecipeDetailPage() {
       >
         {isLoading ? (
           <View style={styles.center}>
-            <Txt typography="st9" color="#4E5968">
+            <Txt typography="st9" color={colors.grey700}>
               레시피를 불러오고 있어요…
             </Txt>
           </View>
         ) : error ? (
           <View style={styles.errorBox} accessibilityLabel="레시피 조회 실패">
-            <Txt typography="t5" color="#C0392B">
+            <Txt typography="t5" color={colors.red700}>
               레시피를 불러오지 못했어요
             </Txt>
-            <Txt typography="st9" color="#4E5968">
+            <Txt typography="st9" color={colors.grey700}>
               {error}
             </Txt>
             <View style={styles.errorActions}>
@@ -182,7 +182,7 @@ function RecipeDetailPage() {
 
             {favoriteError ? (
               <View style={styles.toastBox} accessibilityLabel="즐겨찾기 변경 실패">
-                <Txt typography="st9" color="#C0392B">
+                <Txt typography="st9" color={colors.red700}>
                   {favoriteError}
                 </Txt>
               </View>
@@ -190,7 +190,7 @@ function RecipeDetailPage() {
 
             {deleteError ? (
               <View style={styles.toastBox} accessibilityLabel="삭제 실패">
-                <Txt typography="st9" color="#C0392B">
+                <Txt typography="st9" color={colors.red700}>
                   {deleteError}
                 </Txt>
               </View>
@@ -228,7 +228,7 @@ function RecipeDetailPage() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.white,
   },
   scrollContent: {
     padding: 20,
@@ -241,7 +241,7 @@ const styles = StyleSheet.create({
   errorBox: {
     padding: 20,
     borderRadius: 12,
-    backgroundColor: '#FBE9E9',
+    backgroundColor: colors.red50,
     gap: 8,
   },
   errorActions: {
@@ -253,7 +253,7 @@ const styles = StyleSheet.create({
   toastBox: {
     padding: 12,
     borderRadius: 8,
-    backgroundColor: '#FBE9E9',
+    backgroundColor: colors.red50,
   },
   deleteActions: {
     marginTop: 8,

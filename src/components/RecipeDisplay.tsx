@@ -15,7 +15,7 @@
 
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
-import { Badge, List, ListRow, Txt } from '@toss/tds-react-native';
+import { Badge, List, ListRow, Txt, colors } from '@toss/tds-react-native';
 
 import {
   difficultyLabel,
@@ -36,11 +36,11 @@ export function RecipeDisplay({ recipe, actions }: RecipeDisplayProps) {
   return (
     <View style={styles.container} accessibilityLabel={`${recipe.dishName} 레시피`}>
       <View style={styles.header}>
-        <Txt typography="t1" color="#191F28">
+        <Txt typography="t1" color={colors.grey900}>
           {recipe.dishName}
         </Txt>
         {recipe.description ? (
-          <Txt typography="st9" color="#4E5968">
+          <Txt typography="st9" color={colors.grey700}>
             {recipe.description}
           </Txt>
         ) : null}
@@ -58,12 +58,12 @@ export function RecipeDisplay({ recipe, actions }: RecipeDisplayProps) {
             <ListRow
               key={`${ing.name}-${index}`}
               contents={
-                <Txt typography="t5" color="#191F28">
+                <Txt typography="t5" color={colors.grey900}>
                   {ing.name}
                 </Txt>
               }
               right={
-                <Txt typography="st9" color="#4E5968">
+                <Txt typography="st9" color={colors.grey700}>
                   {formatQuantity(ing.quantity, ing.unit)}
                 </Txt>
               }
@@ -78,11 +78,11 @@ export function RecipeDisplay({ recipe, actions }: RecipeDisplayProps) {
           {recipe.steps.map((step) => (
             <View key={step.order} style={styles.stepRow}>
               <View style={styles.stepBadge}>
-                <Txt typography="st9" color="#FFFFFF">
+                <Txt typography="st9" color={colors.white}>
                   {step.order}
                 </Txt>
               </View>
-              <Txt typography="st9" color="#191F28" style={styles.stepText}>
+              <Txt typography="st9" color={colors.grey900} style={styles.stepText}>
                 {step.instruction}
               </Txt>
             </View>
@@ -95,10 +95,10 @@ export function RecipeDisplay({ recipe, actions }: RecipeDisplayProps) {
           <View style={styles.tips}>
             {recipe.tips.map((tip, index) => (
               <View key={`tip-${index}`} style={styles.tipRow}>
-                <Txt typography="st9" color="#4E5968" style={styles.tipBullet}>
+                <Txt typography="st9" color={colors.grey700} style={styles.tipBullet}>
                   •
                 </Txt>
-                <Txt typography="st9" color="#4E5968" style={styles.tipText}>
+                <Txt typography="st9" color={colors.grey700} style={styles.tipText}>
                   {tip}
                 </Txt>
               </View>
@@ -120,7 +120,7 @@ interface SectionProps {
 function Section({ title, children }: SectionProps) {
   return (
     <View style={styles.section}>
-      <Txt typography="t5" color="#191F28">
+      <Txt typography="t5" color={colors.grey900}>
         {title}
       </Txt>
       {children}
@@ -200,7 +200,7 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: '#3182F6',
+    backgroundColor: colors.blue500,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 2,

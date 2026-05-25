@@ -8,14 +8,14 @@
 
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
-import { Txt } from '@toss/tds-react-native';
+import { Txt, colors } from '@toss/tds-react-native';
 
 import type { AdsAdapter, InlineAdSlotProps } from './types';
 
 function NoopInlineAdSlot({ slot, variant = 'expanded' }: InlineAdSlotProps) {
   return (
     <View style={[styles.placeholder, variant === 'card' && styles.placeholderCard]}>
-      <Txt typography="st9" color="#8B95A1">
+      <Txt typography="st9" color={colors.grey500}>
         광고 영역 (dev · {slot})
       </Txt>
     </View>
@@ -44,9 +44,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E5E8EB',
+    borderColor: colors.grey200,
     borderStyle: 'dashed',
-    backgroundColor: '#F9FAFB',
+    backgroundColor: colors.grey50,
     alignItems: 'center',
     justifyContent: 'center',
   },

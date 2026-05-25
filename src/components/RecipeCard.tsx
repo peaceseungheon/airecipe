@@ -16,7 +16,7 @@
 
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import { Badge, Txt } from '@toss/tds-react-native';
+import { Badge, Txt, colors } from '@toss/tds-react-native';
 
 import { FavoriteButton } from './FavoriteButton';
 import {
@@ -55,7 +55,7 @@ export function RecipeCard({
       style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
     >
       <View style={styles.header}>
-        <Txt typography="t5" color="#191F28" numberOfLines={1} style={styles.title}>
+        <Txt typography="t5" color={colors.grey900} numberOfLines={1} style={styles.title}>
           {recipe.dishName}
         </Txt>
         {onToggleFavorite ? (
@@ -68,7 +68,7 @@ export function RecipeCard({
       </View>
 
       {recipe.description ? (
-        <Txt typography="st9" color="#4E5968" numberOfLines={2}>
+        <Txt typography="st9" color={colors.grey700} numberOfLines={2}>
           {recipe.description}
         </Txt>
       ) : null}
@@ -117,13 +117,13 @@ const styles = StyleSheet.create({
   card: {
     padding: 16,
     borderRadius: 12,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.white,
     borderWidth: 1,
-    borderColor: '#E5E8EB',
+    borderColor: colors.grey200,
     gap: 10,
   },
   cardPressed: {
-    backgroundColor: '#F2F4F6',
+    backgroundColor: colors.grey100,
   },
   header: {
     flexDirection: 'row',

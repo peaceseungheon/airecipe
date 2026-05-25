@@ -40,9 +40,9 @@ Phase 2의 레시피 생성 화면(`/recipe/generate`)과 홈(`/`)이 사용하�
 
 ## 스타일링 규약
 
-- **TDS 토큰 우선 (지향)** — adaptive 컬러 토큰(`colors.adaptive.grey900` 등) 사용을 지향한다.
-- **현재 hex 사용 정책 (Phase 2~3 누적)** — Phase 2·3 산출은 hex 직접 사용(`#191F28`/`#4E5968`/`#F2F4F6`/`#FBE9E9`/`#E5E8EB`/`#C0392B`/`#8B95A1` 등) 중. Phase 2 qa report §13.1 + Phase 3 qa §14.6 정보 공유. 06 §6.3.5는 adaptive 토큰 권장이지만 디자인 토큰 표 미확정으로 hex 보존. **Phase 4 진입 전 별 ADR 권장** — 일괄 교체. 본 Phase 3에서는 FAIL 아님 (Phase 2 인계 #7 누적).
-- **fontSize 하드코딩 금지** — Typography 토큰(`t1`~`t5`, `st9`~`st12`)만 사용 (06 §6.6).
+- **TDS `colors` 토큰 의무** (Phase 5, ADR-015 D39) — 색상은 `@toss/tds-react-native`에서 `colors` import 후 `colors.white`/`colors.grey100`/`colors.grey700`/`colors.grey900`/`colors.blue500`/`colors.red50`/`colors.red700`/`colors.green50`/`colors.green700`/`colors.grey50`/`colors.grey200`/`colors.grey500` 등 사용. **hex 직접 사용 금지** — `grep -rn "['\"]#[0-9a-fA-F]{3,8}['\"]" src/` → 0건이 SSOT. 다크 모드 adaptive(`colorsByPreference.light/dark` 또는 `useColors()` hook) 도입은 별 ADR(Phase 6 진화).
+- **AI 면책 문구는 NutritionPanel에 fixed** (Phase 5, ADR-015 D40) — `Txt typography="st11" color={colors.grey600}`로 "AI가 생성한 참고용 정보예요. 의료·영양 자문이 아닙니다." 카드 하단 항상 노출. 다른 컴포넌트·화면에서 영양 정보 재표시 시 본 컴포넌트만 사용(중복 면책 금지).
+- **fontSize 하드코딩 금지** — Typography 토큰(`t1`~`t7`, `st1`~`st13`)만 사용 (06 §6.6). `caption*` 등 외부 시스템 토큰명 금지.
 - **Tailwind 클래스 0건** — `className`/`tw\`` 패턴 사용 금지 (Phase 2 baseline §D.2 #2).
 
 ## 진입점

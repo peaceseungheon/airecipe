@@ -27,6 +27,7 @@ import {
   Button,
   PageNavbar,
   Txt,
+  colors,
 } from '@toss/tds-react-native';
 import { createRoute, useNavigation } from '@granite-js/react-native';
 
@@ -146,10 +147,10 @@ function GeneratePage() {
 
         {status === 'streaming' ? (
           <View style={styles.indicator} accessibilityLabel="레시피 생성 진행 중">
-            <Txt typography="t5" color="#191F28">
+            <Txt typography="t5" color={colors.grey900}>
               AI가 레시피를 생성하고 있어요
             </Txt>
-            <Txt typography="st9" color="#4E5968">
+            <Txt typography="st9" color={colors.grey700}>
               몇 초 정도 걸릴 수 있어요. 잠시만 기다려 주세요.
             </Txt>
             <View style={styles.actions}>
@@ -168,10 +169,10 @@ function GeneratePage() {
 
         {status === 'error' && error ? (
           <View style={styles.errorBox} accessibilityLabel="레시피 생성 실패">
-            <Txt typography="t5" color="#C0392B">
+            <Txt typography="t5" color={colors.red700}>
               레시피 생성에 실패했어요
             </Txt>
-            <Txt typography="st9" color="#4E5968">
+            <Txt typography="st9" color={colors.grey700}>
               {error}
             </Txt>
             <View style={styles.actions}>
@@ -218,10 +219,10 @@ function GeneratePage() {
             <NutritionPanel nutrition={recipe.nutrition} />
             {saveError ? (
               <View style={styles.errorBox} accessibilityLabel="레시피 저장 실패">
-                <Txt typography="t5" color="#C0392B">
+                <Txt typography="t5" color={colors.red700}>
                   저장에 실패했어요
                 </Txt>
-                <Txt typography="st9" color="#4E5968">
+                <Txt typography="st9" color={colors.grey700}>
                   {saveError}
                 </Txt>
               </View>
@@ -230,7 +231,7 @@ function GeneratePage() {
         ) : null}
 
         {status === 'idle' && !params.dishName ? (
-          <Txt typography="st9" color="#8B95A1">
+          <Txt typography="st9" color={colors.grey500}>
             요리명과 인분을 입력하고 “레시피 만들기”를 눌러주세요.
           </Txt>
         ) : null}
@@ -242,7 +243,7 @@ function GeneratePage() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.white,
   },
   scrollContent: {
     padding: 20,
@@ -251,13 +252,13 @@ const styles = StyleSheet.create({
   indicator: {
     padding: 20,
     borderRadius: 12,
-    backgroundColor: '#F2F4F6',
+    backgroundColor: colors.grey100,
     gap: 8,
   },
   errorBox: {
     padding: 20,
     borderRadius: 12,
-    backgroundColor: '#FBE9E9',
+    backgroundColor: colors.red50,
     gap: 8,
   },
   result: {

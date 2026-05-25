@@ -70,7 +70,57 @@ AI 레시피 안내 — 앱인토스 미니앱 (React Native + Granite + TDS).
 
 ## 현재 단계
 
-**Phase 4(즐겨찾기·삭제·404 통일) 완료 → Phase 5 진입 준비** (2026-05-25).
+**Phase 5(출시 준비) 완료 → 출시 외부 작업만 PENDING** (2026-05-25).
+
+### Phase 5 — 출시 준비 (ADR-015, 본 차)
+
+Phase 4 완료 후 출시 준비 사이클. **코드 측 검수 점검 ALL PASS** — Q1~Q10 매트릭스 10/10 PASS + D39~D43 시행 5/5 PASS + AC5.1·5.4 코드 측 PASS, AC5.2·5.3은 외부 작업 PENDING (`_workspace/03_qa_report.md`). typecheck PASS, lint 0 errors (router.gen.ts Phase 3 누적 무해 warning 1건).
+
+5 결정 동결 (ADR-015 D39~D43): hex → TDS `colors` 토큰 일괄 교체(D39 — light 모드 정확 동등치) / NutritionPanel AI 면책 문구 추가(D40 — `typography="st11"` fixed 1줄) / 에러 메시지 카탈로그 동결(D41 — Phase 1·3·4 누적 그대로) / 환경별 빌드 스크립트 동결(D42 — `dev:local`/`dev:staging`/`build:staging`/`build:prod` 4종 유지) / 출시 PENDING 분리(D43 — 콘솔/디바이스/번들 외부 작업).
+
+코드 산출 (Phase 5 동결 — Phase 1~4·4.5 누적 위에 변경):
+- `src/components/NutritionPanel.tsx` — hex → TDS colors 토큰 + AI 면책 문구 추가(D40).
+- `src/components/RecipeCard.tsx`/`SearchForm.tsx`/`RecipeDisplay.tsx`/`EmptyState.tsx` — hex → TDS colors 토큰.
+- `src/pages/index.tsx`/`my-recipes.tsx`/`recipe/generate.tsx`/`recipe/[id].tsx` — hex → TDS colors 토큰.
+- `src/lib/ads/adapter.noop.tsx` — hex → TDS colors 토큰.
+- `pages/_404.tsx` (재작성) — raw `Text` → `NotFoundScreen` 재사용 + `useNavigation.canGoBack` 폴백. 단일 404 컴포넌트 정책(ADR-012 D16) 확장 적용.
+- `docs/adr/ADR-015-miniapp-phase5-release-readiness.md` (신규) — D39~D43 5 결정 동결.
+- `docs/appsintoss-port/06-UI-MAPPING.md` §6.1 — 색상은 TDS `colors` 토큰 의무 규약 추가, hex 직접 사용 금지 명시.
+- `docs/appsintoss-port/09-ENV-CONFIG.md` §9.6 — 코드 측 통과/외부 작업 분리표 추가 (§9.6.1/§9.6.2).
+- `src/components/AGENTS.md` — TDS colors 토큰 의무 + AI 면책 문구 fixed 위치 규약.
+
+### 누적 미해결 해소 (Phase 5 본 차)
+
+| 항목 | 출처 | 해소 사유 |
+|------|------|----------|
+| SDK 패키지 경로 (`@apps-in-toss/web-framework` 미해결) | Phase 1~4 인계 | `46f0566` 적용 후 typecheck PASS로 확정 |
+| `useBackEvent` 하드웨어 백 | Phase 3 인계 #3 | Phase 4 ConfirmDialog `closeOnDimmerClick`로 해결됨 (재확인) |
+| 디자인 토큰 hex 직접 사용 | Phase 2 인계 #7 | Phase 5 D39 일괄 교체로 해소 |
+| AI 면책 문구 | 검수 가이드 §10.6 6번 | Phase 5 D40로 NutritionPanel 추가 |
+
+### 누적 미해결 (Phase 6 진화 — 별 ADR 분리)
+
+- **AbortSignal cast 2곳** — ADR-011 D13. 해소 조건 (a)/(b)/(c) 재평가.
+- **무한 스크롤** — Phase 3 인계 #6. 사용자 데이터량 증가 후 별 ADR.
+- **카드 측 삭제 UX (swipe/long-press)** — ADR-013 D22 후속 별 ADR.
+- **다중 동시 PATCH 큐** — Phase 4 v1 한계.
+- **전면 광고 wiring + 빈도 제한** — ADR-014 D30·D34 후속.
+- **Analytics SDK 통합** — ADR-014 D33 후속.
+- **다크 모드 adaptive 토큰** — ADR-015 D39 보조 별 ADR.
+
+### 출시 외부 작업 PENDING (ADR-015 D43)
+
+- **앱인토스 콘솔 등록** — appName/displayName/icon URL/카테고리/도메인 화이트리스트/고객센터·홈페이지/`adGroupId`.
+- **백엔드 옵션 P 배포** — 별 저장소 `AIReceipe`.
+- **`granite build` 산출물 100MB 이하** — 빌드 후 측정.
+- **staging 배포 + 실 디바이스 e2e 테스트** — 6기능 무결성 (AC5.4).
+- **콘솔 검토 요청 제출** — 반려 사유 응답 대기 (AC5.2·5.3).
+
+> 본 절은 Phase 5 갱신 — 이전 Phase(0~4·4.5) 상세 산출은 각 phase의 session log(`_workspace_phase1~4/04_session_log.md`, `_workspace_phase45/04_session_log.md`, 본 차 `_workspace/04_session_log.md`) 참조. 결정 트리는 `docs/adr/ADR-009·010·011·012·013·014·015`.
+
+---
+
+## (이전) Phase 4(즐겨찾기·삭제·404 통일) 완료 → Phase 5 진입 준비 (2026-05-25)
 
 ### Phase 4 — 즐겨찾기·삭제·404 통일 (ADR-013, 본 차)
 
@@ -204,6 +254,7 @@ Phase별 수용 기준은 `docs/appsintoss-port/10-SPRINT-PLAN.md`. 결정 트�
 | 2026-05-24 | Phase 3 완료 갱신 — "현재 단계" 절 재작성 (Phase 2 완료 → Phase 3 완료), Phase 4 진입 인계 + 누적 미해결 6항 명시 | CLAUDE.md | Phase 3 마무리(T5) — ADR-012 동결 + AGENTS.md 3종 보강 + 06 §6.5 갱신과 함께 본 문서도 동기 갱신 |
 | 2026-05-25 | Phase 4 일시 보류 + Phase 4.5(토스 광고 SDK 기반) 완료 — "현재 단계" 절 재작성, Phase 4 재개 인계(_workspace_phase4_paused + ConfirmDialog 정정), Phase 4.5 산출 13 파일 + 누적 미해결 10항 명시. 팀 1개 동시 제약으로 메인 세션이 architect/api-client/frontend/qa 역할 통합 수행 — `airecipe-miniapp-phase4` 팀 미완 상태로 보존(api-client/frontend/qa 3명 shutdown 미응답 idle). | CLAUDE.md | Phase 4.5 마무리 — ADR-014 D25~D38 13 결정 동결 + 11-ADS.md 신규 SSOT + AGENTS.md 3종(src/lib 신규·components/hooks 보강) + 토스 광고 어댑터 격리 시범 적용 완료와 함께 본 문서 동기 갱신 |
 | 2026-05-25 | Phase 4 재개 + 완료 — "현재 단계" 절 재작성(Phase 4 완료 → Phase 5 진입 준비), 산출 10 파일(신규 5 + 확장 4 + Phase 3 그대로 1) + 누적 미해결 11항 갱신(useBackEvent 해결 표기). `_workspace_phase45` 보존 + `_workspace_phase4_paused` → `_workspace` 재개. ADR-013(D19~D24 6 결정 — 낙관적 안 a + PATCH refetch 회피 + DELETE 404 정규화 + 삭제 상세만 + ConfirmDialog 정정 + useToggleFavorite id 가변) 발행 + 06 §6.5 갱신(FilterTabs/DeleteConfirmDialog/FavoriteButton + ConfirmDialog props 정정) + AGENTS.md 3종 보강 | CLAUDE.md | Phase 4 마무리 — Q1~Q9 + D19~D24 + AC4.1~AC4.4 ALL PASS, typecheck/lint 0 errors. AC4.5는 백엔드 옵션 P 배포 PENDING. Phase 5 진입 준비. |
+| 2026-05-25 | Phase 5 완료 — "현재 단계" 절 재작성(Phase 5 출시 준비 완료 → 외부 작업만 PENDING). 산출 10 파일(hex → TDS colors 토큰 일괄 교체 + NutritionPanel AI 면책 + _404 NotFoundScreen 재사용) + 문서 4종(ADR-015 신규 + 06 §6.1/§6.9 + 09 §9.6 + components/AGENTS.md). `_workspace_phase4` 보존 + 새 `_workspace`로 진행. ADR-015(D39~D43 5 결정 — hex 토큰 교체 + AI 면책 + 에러 매핑 동결 + 빌드 스크립트 동결 + 출시 PENDING 분리) 발행. 누적 미해결 4항 해소(SDK 패키지/useBackEvent/hex/AI 면책) | CLAUDE.md | Phase 5 마무리 — Q1~Q10 + D39~D43 + AC5.1·5.4 코드 측 ALL PASS, typecheck/lint 0 errors. AC5.2·5.3은 콘솔/디바이스 외부 작업 PENDING. 출시 외부 작업 5항만 남음. |
 
 ---
 

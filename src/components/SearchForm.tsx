@@ -10,7 +10,7 @@
 
 import React, { useCallback, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { Button, NumericSpinner, TextField, Txt } from '@toss/tds-react-native';
+import { Button, NumericSpinner, TextField, Txt, colors } from '@toss/tds-react-native';
 import { z } from 'zod';
 
 const DISH_NAME_MAX = 100;
@@ -75,7 +75,7 @@ export function SearchForm({
   return (
     <View style={styles.container} accessibilityLabel="레시피 생성 폼">
       <View style={styles.field}>
-        <Txt typography="st10" color="#4E5968">
+        <Txt typography="st10" color={colors.grey700}>
           요리 이름
         </Txt>
         <TextField
@@ -93,7 +93,7 @@ export function SearchForm({
       </View>
 
       <View style={styles.field}>
-        <Txt typography="st10" color="#4E5968">
+        <Txt typography="st10" color={colors.grey700}>
           인분
         </Txt>
         <NumericSpinner

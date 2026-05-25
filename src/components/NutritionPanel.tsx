@@ -1,17 +1,16 @@
 /**
  * NutritionPanel — 1인분 영양 정보 카드.
  *
- * SSOT: 06-UI-MAPPING §6.4.3.
+ * SSOT: 06-UI-MAPPING §6.4.3, 10-SPRINT-PLAN §10.6 (검수 가이드).
  *
  * - 칼로리 강조 + 4 매크로(탄수/단백/지방/식이섬유) + healthNote(있을 때만).
- * - TDS primitive(Txt) + RN View로 합성. 컬러는 직접 hex 대신 TDS 토큰 사용을 원칙으로 하되,
- *   Phase 2 baseline §B.1은 adaptive 토큰을 별 import로 강제하지 않으므로
- *   기본 grey 값은 보수적 hex(#191F28/#4E5968)를 사용. 추후 디자인 토큰 결정 시 일괄 교체.
+ * - TDS primitive(Txt) + RN View로 합성. 색상은 TDS `colors` 토큰(ADR-015 D39).
+ * - 영양 정보가 의료/건강 자문이 아님을 알리는 면책 문구를 카드 하단에 fixed로 표시 (ADR-015 D40).
  */
 
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
-import { Txt } from '@toss/tds-react-native';
+import { Txt, colors } from '@toss/tds-react-native';
 
 import type { Nutrition } from '../types/recipe';
 
@@ -22,15 +21,15 @@ export interface NutritionPanelProps {
 export function NutritionPanel({ nutrition }: NutritionPanelProps) {
   return (
     <View style={styles.card} accessibilityLabel="영양 정보">
-      <Txt typography="st9" color="#4E5968">
+      <Txt typography="st9" color={colors.grey700}>
         1인분 영양 정보
       </Txt>
 
       <View style={styles.calorieRow}>
-        <Txt typography="t1" color="#191F28">
+        <Txt typography="t1" color={colors.grey900}>
           {Math.round(nutrition.calories)}
         </Txt>
-        <Txt typography="st10" color="#4E5968">
+        <Txt typography="st10" color={colors.grey700}>
           kcal
         </Txt>
       </View>
@@ -44,11 +43,15 @@ export function NutritionPanel({ nutrition }: NutritionPanelProps) {
 
       {nutrition.healthNote ? (
         <View style={styles.note}>
-          <Txt typography="st9" color="#1B6E3F">
+          <Txt typography="st9" color={colors.green700}>
             {nutrition.healthNote}
           </Txt>
         </View>
       ) : null}
+
+      <Txt typography="st11" color={colors.grey600}>
+        AI가 생성한 참고용 정보예요. 의료·영양 자문이 아닙니다.
+      </Txt>
     </View>
   );
 }
@@ -62,10 +65,10 @@ interface MacroCellProps {
 function MacroCell({ label, value, unit }: MacroCellProps) {
   return (
     <View style={styles.cell}>
-      <Txt typography="st10" color="#4E5968">
+      <Txt typography="st10" color={colors.grey700}>
         {label}
       </Txt>
-      <Txt typography="t5" color="#191F28">
+      <Txt typography="t5" color={colors.grey900}>
         {formatMacro(value)}
         {unit}
       </Txt>
@@ -83,7 +86,7 @@ const styles = StyleSheet.create({
   card: {
     padding: 20,
     borderRadius: 12,
-    backgroundColor: '#F2F4F6',
+    backgroundColor: colors.grey100,
     gap: 12,
   },
   calorieRow: {
@@ -103,6 +106,6 @@ const styles = StyleSheet.create({
   note: {
     padding: 12,
     borderRadius: 8,
-    backgroundColor: '#E7F4EC',
+    backgroundColor: colors.green50,
   },
 });

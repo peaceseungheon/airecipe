@@ -27,7 +27,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { createRoute, useNavigation } from '@granite-js/react-native';
-import { Button, PageNavbar, Txt } from '@toss/tds-react-native';
+import { Button, PageNavbar, Txt, colors } from '@toss/tds-react-native';
 
 import { AppInlineAd } from '../components/AppInlineAd';
 import { EmptyState } from '../components/EmptyState';
@@ -114,7 +114,7 @@ function MyRecipesPage() {
           <PageNavbar.Title>마이 레시피</PageNavbar.Title>
         </PageNavbar>
         <View style={styles.center}>
-          <Txt typography="st9" color="#4E5968">
+          <Txt typography="st9" color={colors.grey700}>
             식별자를 확인하는 중이에요…
           </Txt>
         </View>
@@ -146,7 +146,7 @@ function MyRecipesPage() {
 
         {favoriteError ? (
           <View style={styles.toastBox} accessibilityLabel="즐겨찾기 변경 실패">
-            <Txt typography="st9" color="#C0392B">
+            <Txt typography="st9" color={colors.red700}>
               {favoriteError}
             </Txt>
           </View>
@@ -154,16 +154,16 @@ function MyRecipesPage() {
 
         {isLoading ? (
           <View style={styles.center}>
-            <Txt typography="st9" color="#4E5968">
+            <Txt typography="st9" color={colors.grey700}>
               레시피를 불러오고 있어요…
             </Txt>
           </View>
         ) : error ? (
           <View style={styles.errorBox} accessibilityLabel="레시피 조회 실패">
-            <Txt typography="t5" color="#C0392B">
+            <Txt typography="t5" color={colors.red700}>
               레시피를 불러오지 못했어요
             </Txt>
-            <Txt typography="st9" color="#4E5968">
+            <Txt typography="st9" color={colors.grey700}>
               {error}
             </Txt>
             <View style={styles.errorActions}>
@@ -235,7 +235,7 @@ function MyRecipesPage() {
                 다음
               </Button>
             </View>
-            <Txt typography="st9" color="#8B95A1" style={styles.pageInfo}>
+            <Txt typography="st9" color={colors.grey500} style={styles.pageInfo}>
               {`${page} / ${lastPage} 페이지 · 총 ${total}개`}
             </Txt>
 
@@ -252,7 +252,7 @@ function MyRecipesPage() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.white,
   },
   scrollContent: {
     padding: 20,
@@ -265,7 +265,7 @@ const styles = StyleSheet.create({
   errorBox: {
     padding: 20,
     borderRadius: 12,
-    backgroundColor: '#FBE9E9',
+    backgroundColor: colors.red50,
     gap: 8,
   },
   errorActions: {
@@ -289,6 +289,6 @@ const styles = StyleSheet.create({
   toastBox: {
     padding: 12,
     borderRadius: 8,
-    backgroundColor: '#FBE9E9',
+    backgroundColor: colors.red50,
   },
 });

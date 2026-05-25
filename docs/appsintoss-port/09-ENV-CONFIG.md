@@ -224,11 +224,23 @@ if (appEnv === 'production') {
 
 ## 9.6 출시 정책 점검 (앱인토스 검수)
 
-- [ ] **비게임 출시 가이드** 준수 (`checklist/app-nongame.md`).
-- [ ] **TDS 의무** — `@toss/tds-react-native` 사용 (06-UI-MAPPING.md에서 frontend가 점검).
-- [ ] **번들 100MB 이하** (압축 해제 기준) — 리소스 분리 권장.
-- [ ] **서비스 오픈 정책** 준수 (`intro/guide.md`) — 레시피 콘텐츠는 디지털 자산/도박/투자/금융 등 제한 카테고리에 해당하지 않음. AI 생성 콘텐츠가 의료·법률 자문으로 오해될 수 있는 헬스노트는 면책 문구 필요 검토.
-- [ ] **콘솔 등록**: appName(앱 ID), displayName, 아이콘, 카테고리(비게임), 도메인 화이트리스트, 고객센터·홈페이지 링크.
+### 9.6.1 코드 측 통과 항목 (Phase 5 본 차 — ADR-015)
+
+- [x] **비게임 출시 가이드** 준수 (`checklist/app-nongame.md`) — 디지털 자산/도박/자금세탁 미해당 (레시피 콘텐츠).
+- [x] **TDS 의무** — `@toss/tds-react-native` 사용 (raw `<Text/>` 0건, hex 직접 사용 0건 — ADR-015 D39 토큰화 완료).
+- [x] **AI 면책 문구** — `src/components/NutritionPanel.tsx` 하단 fixed 1줄 ("AI가 생성한 참고용 정보예요. 의료·영양 자문이 아닙니다.") — ADR-015 D40.
+- [x] **권한 최소화** — `granite.config.ts`의 `permissions: []`.
+- [x] **에러 처리 한국어 UI** — 5개 훅 매핑 일관 (ADR-015 D41).
+- [x] **금지 환경변수 부재** — API 키·DB URL grep 0건 (§9.1.1).
+
+### 9.6.2 외부 작업 PENDING (ADR-015 D43)
+
+- [ ] **번들 100MB 이하** (압축 해제 기준) — `granite build` 산출물 측정 필요.
+- [ ] **콘솔 등록**: appName(앱 ID), displayName, 아이콘 URL(`granite.config.ts` `brand.icon` 채움), 카테고리(비게임), 도메인 화이트리스트, 고객센터·홈페이지 링크.
+- [ ] **CORS·도메인 화이트리스트** 백엔드 측 적용 (03-API-CONTRACT §3.1.4 SSOT — 별 저장소 `AIReceipe`).
+- [ ] **백엔드 옵션 P 배포** — 별 저장소 `AIReceipe`.
+- [ ] **실 디바이스 e2e** — staging 배포 후 6기능 무결성.
+- [ ] **콘솔 검토 요청 제출** → 반려 사유 응답 대기.
 
 ## 9.7 SSOT 참조
 

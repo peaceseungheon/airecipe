@@ -1,98 +1,123 @@
-# Phase 4 Session Log — 즐겨찾기·삭제·404 통일 (재개 및 완료)
+# Phase 5 Session Log — 출시 준비 (TDS 토큰화·AI 면책·검수 분리표)
 
 > 일자: 2026-05-25
-> 입력: 사용자 — "phase 4 작업 재개"
-> 실행: orchestrator(메인 세션, auto mode) — 팀 1개 동시 제약으로 architect/api-client/frontend/qa-as-orchestrator(Phase 4.5와 동일 패턴)
+> 입력: 사용자 — "phase 5 진행."
+> 실행: orchestrator(메인 세션, auto mode) — 팀 1개 동시 제약으로 architect/실행/qa 통합 (Phase 4·4.5 답습)
 
 ## 타임라인
 
-1. **재개 결정** — Phase 4.5(토스 광고 기반) 완료 후 Phase 4(즐겨찾기·삭제·404 통일) 재개. 사용자 요청 "phase 4 작업 재개".
+1. **진입 결정** — Phase 4 완료 후 Phase 5(출시 준비) 진입. SPRINT-PLAN §10.6 + 09-ENV-CONFIG §9.5·§9.6 SSOT 확인.
 
 2. **워크스페이스 정리**:
-   - `_workspace` (Phase 4.5 산출) → `_workspace_phase45/` 보존.
-   - `_workspace_phase4_paused` → `_workspace/` (재개).
-   - `_workspace_phase4_paused/01_architect_phase4_baseline_partial.md` → `_workspace/01_architect_phase4_baseline.md` (정식 승격).
+   - `_workspace` (Phase 4 산출) → `_workspace_phase4/` 보존.
+   - 새 `_workspace/00_input/requirements.md` 작성.
 
-3. **baseline 정정 추가** (정식 승격 시):
-   - "보류" 마커 제거 + 재개 메타 추가.
-   - **§A.1 ConfirmDialog Button props 정정**: partial 초안의 `display="secondary"/"critical"`은 부정확 → `type="light" style="weak"`(취소), `type="danger" style="fill"`(삭제). TDS Button d.ts(`type` + `style` 두 prop 분할)와 정합.
-   - **§B D10 useToggleFavorite 시그니처 정정**: rules of hooks 위반(카드 목록 map 안 카드별 hook 호출 불가) → 시그니처 `useToggleFavorite()` + `toggle(id, target)` + `pendingId` 추적.
+3. **architect baseline 작성** — `_workspace/01_architect_phase5_baseline.md`:
+   - TDS 컴포넌트 실재성 점검 (A) — 직접 `View`/`Text` 사용 11개 파일 검토 → 10개 OK + `pages/_404.tsx`만 raw Text FAIL.
+   - hex → TDS 토큰 매핑 표 (B) — light 모드 정확 동등치 7종.
+   - AI 면책 문구 추가 (C) — NutritionPanel 하단 fixed.
+   - 에러 메시지 카탈로그 (D) — Phase 1·3·4 누적 그대로 동결.
+   - granite.config.ts 점검 (E) — icon URL만 외부 PENDING.
+   - 보안 점검 (F) — API 키/Supabase service role 키 grep 0건.
+   - 출시 정책 (G) — 코드 측 / 외부 작업 분리.
+   - 결정 카탈로그 D39~D43 (H) — 5 결정 동결.
 
-4. **TDS 추가 검증** — `ConfirmDialog.Button = DoubleButtonItem = ComponentProps<typeof Button>` 확인. Button.d.ts: `type: 'primary'|'danger'|'light'|'dark'` + `style: 'fill'|'weak'` + `display`/`size`/`loading`/`disabled` 등.
+4. **TDS 색상 토큰 검증** — `node_modules/@toss/tds-colors/dist/esm/index.d.ts` 직접 검증. light 모드 hex 매핑:
+   - `#FFFFFF` → `colors.white` (정확)
+   - `#F2F4F6` → `colors.grey100` (light=#f2f4f6 정확)
+   - `#E5E8EB` → `colors.grey200` (정확)
+   - `#F9FAFB` → `colors.grey50` (정확)
+   - `#191F28` → `colors.grey900` (정확)
+   - `#4E5968` → `colors.grey700` (정확)
+   - `#8B95A1` → `colors.grey500` (정확)
+   - `#3182F6` → `colors.blue500` (정확)
+   - `#FBE9E9` → `colors.red50` (근사 — #ffeeee)
+   - `#C0392B` → `colors.red700` (근사 — #d22030)
+   - `#E7F4EC` → `colors.green50` (근사 — #f0faf6)
+   - `#1B6E3F` → `colors.green700` (근사 — #029359)
 
-5. **코드 작성 — 신규 5 + 확장 4 + Phase 3 그대로 1**:
-   - `src/hooks/useToggleFavorite.ts` (신규) — id 가변 시그니처 + pendingId + 직전 in-flight abort + invalidate.
-   - `src/hooks/useDeleteRecipe.ts` (신규) — 404 성공 정규화 + invalidate.
-   - `src/hooks/useMyRecipes.ts` 확장 — `mutate(next)` 추가(낙관적 mutation 지원).
-   - `src/hooks/useRecipeDetail.ts` 확장 — `mutate(next)` 추가(PATCH 응답 직접 갱신, refetch 회피).
-   - `src/components/FavoriteButton.tsx` (신규) — IconButton + 멱등 콜백 + 접근성.
-   - `src/components/FilterTabs.tsx` (신규) — SegmentedControl 2-state.
-   - `src/components/DeleteConfirmDialog.tsx` (신규) — ConfirmDialog 정확한 props 합성.
-   - `src/components/RecipeCard.tsx` 확장 — onToggleFavorite 자리표시 활성화 + favoritePending prop.
-   - `src/pages/my-recipes.tsx` 확장 — FilterTabs + RecipeCard.onToggleFavorite + 낙관적 mutate + favoriteError 토스트.
-   - `src/pages/recipe/[id].tsx` 확장 — PageNavbar.AccessoryButtons에 FavoriteButton + 본문 하단 삭제 Button + DeleteConfirmDialog + 낙관적 mutate + favorite·delete 에러 토스트.
+5. **typography 키 검증** — `caption2` 부재 발견 → `st11`로 정정. TDS typography 키는 `t1~t7`, `st1~st13`만 유효.
 
-6. **typecheck 1차 PASS** — exit 0.
+6. **코드 작성** — hex → TDS colors 토큰 일괄 교체 (10 파일, 60+ hex):
+   - `src/components/NutritionPanel.tsx` — 토큰 교체 + AI 면책 문구 추가 (D40).
+   - `src/components/RecipeCard.tsx`/`SearchForm.tsx`/`RecipeDisplay.tsx`/`EmptyState.tsx` — 토큰 교체.
+   - `src/pages/index.tsx`/`my-recipes.tsx`/`recipe/generate.tsx`/`recipe/[id].tsx` — 토큰 교체.
+   - `src/lib/ads/adapter.noop.tsx` — 토큰 교체.
 
-7. **lint 1차 FAIL** — `cancelled` 변수가 mutation 훅(useEffect cleanup 없음)에서 변경 없이 let 선언 → `prefer-const` error 2건. 변수 자체가 무의미하므로 제거. controller.signal.aborted만 사용으로 정합.
+7. **`pages/_404.tsx` 재작성** — raw `Text`/`View` → `NotFoundScreen` 재사용 + `useNavigation.canGoBack` 폴백. 단일 404 컴포넌트 정책(ADR-012 D16)을 Granite 폴백 라우트까지 확장.
 
-8. **lint 2차 PASS** — 0 errors, 1 무해 warning(router.gen.ts Phase 3 누적).
+8. **typecheck 1차 PASS** — exit 0.
 
-9. **QA 매트릭스 Q1~Q9 grep 검증 ALL PASS** + D19~D24 시행 검증 ALL PASS + AC4.1~AC4.4 코드 경로 PASS(AC4.5는 백엔드 옵션 P 배포 PENDING).
+9. **lint 1차 PASS** — 0 errors, 1 무해 warning (router.gen.ts Phase 3 누적).
 
-10. **문서 작성**:
-    - `docs/adr/ADR-013-miniapp-phase4-favorite-delete.md` 발행 — D19~D24 6 결정.
-    - `docs/appsintoss-port/06-UI-MAPPING.md` §6.5 갱신 — FilterTabs/DeleteConfirmDialog/FavoriteButton 실 구현 + RecipeCard Phase 4 확장 + ConfirmDialog props 정정.
-    - `src/hooks/AGENTS.md` 보강 — useToggleFavorite/useDeleteRecipe 행 + 낙관적 UI/id 가변 시그니처 규약.
-    - `src/components/AGENTS.md` 보강 — FavoriteButton/FilterTabs/DeleteConfirmDialog 행 + ConfirmDialog 정정 규약.
-    - `src/pages/AGENTS.md` 보강 — my-recipes·[id] Phase 4 확장 표기 + 낙관적 UI/단일 hook 규약.
-    - `_workspace/03_qa_report.md` 작성 — Q1~Q9 매트릭스 + D19~D24 시행 + AC4.* + 멈춤 트리거 검토.
+10. **hex grep 최종 검증** — `grep -rn "'#[0-9a-fA-F]{3,8}'" src/ pages/` → 0건 확인.
 
-11. **CLAUDE.md "현재 단계" 갱신** (다음 단계).
+11. **에러 메시지 일관성 검증** — 5개 훅의 KOREAN_ERROR_MESSAGE 매핑 grep으로 동일 매핑 확인. ApiErrorCode 8종 모두 한국어 매핑. HTTP 상태/영문 그대로 노출 0건.
 
-12. **커밋** (다음 단계).
+12. **누적 미해결 SDK 패키지 경로 점검** — `@apps-in-toss/framework`로 이미 수정됨 (`commit 46f0566`). typecheck PASS로 해소 확정.
 
-## 결정 사항 (D19~D24, ADR-013 발행)
+13. **QA report 작성** — `_workspace/03_qa_report.md`:
+    - Q1~Q10 매트릭스 10/10 PASS.
+    - D39~D43 시행 5/5 PASS.
+    - AC5.1·5.4 코드 측 PASS, AC5.2·5.3 외부 작업 PENDING.
+    - 누적 미해결 재평가 — SDK 패키지 경로 + useBackEvent + hex + AI 면책 4항 해소.
+
+14. **문서 작성**:
+    - `docs/adr/ADR-015-miniapp-phase5-release-readiness.md` 발행 — D39~D43 5 결정.
+    - `docs/appsintoss-port/06-UI-MAPPING.md` §6.1 색상 규약 갱신 + §6.9 변경 이력 추가.
+    - `docs/appsintoss-port/09-ENV-CONFIG.md` §9.6 코드 측 통과/외부 작업 분리표 갱신.
+    - `src/components/AGENTS.md` 스타일링 규약 갱신 — TDS colors 토큰 의무 + AI 면책 문구 위치.
+    - `CLAUDE.md` "현재 단계" 절 갱신 + 변경 이력 추가.
+
+15. **커밋** (다음 단계).
+
+## 결정 사항 (D39~D43, ADR-015 발행)
 
 | ID | 결정 | 출처 |
 |----|------|------|
-| D19 | 낙관적 안 a + 호출 측 prev 보관 | baseline §B D4 |
-| D20 | PATCH 성공 시 invalidate + 상세 mutate (refetch 회피) | baseline §B D5 |
-| D21 | DELETE 404 성공 정규화 | baseline §B D6 |
-| D22 | 삭제 활성화 상세 화면만 (카드 onDelete 자리표시 유지) | baseline §B D7 |
-| D23 | ConfirmDialog 합성 정정 (leftButton/rightButton + Button props) | baseline §A.1 + 재개 시 정정 |
-| D24 | useToggleFavorite id 가변 시그니처 (rules of hooks) | 재개 시 정정 |
-
-추가 정책 (Phase 3·4.5 답습):
-- D12: 404 단일 컴포넌트 정책 강화 — ADR-012 D16 답습.
-- D13: invalidate 호출 위치 — ADR-012 D15 답습.
-- D8: 삭제 후 handleBack 패턴 — Phase 3 답습.
+| D39 | hex → TDS `colors` 토큰 일괄 교체 (light 모드 정확 동등치). 다크 모드 adaptive는 별 ADR | baseline §B |
+| D40 | AI 면책 문구 — NutritionPanel 하단 fixed 1줄 | baseline §C |
+| D41 | 에러 메시지 카탈로그 — Phase 1·3·4 누적 그대로 동결 | baseline §D |
+| D42 | package.json scripts dev:local·build:staging·build:prod 동결 | 09 §9.4.1 |
+| D43 | 출시 PENDING 명시 (외부 작업 5항) | baseline §E·G |
 
 ## QA 결과 요약
 
-**ALL PASS — Q1~Q9 매트릭스 9/9 + D19~D24 시행 6/6 + AC4.1~AC4.4 4/4 PASS, FAIL 0건**. typecheck PASS, lint 0 errors. AC4.5는 백엔드 옵션 P 배포 후 실증 PENDING(Phase 1·2·3·4.5와 동일 누적).
+**ALL PASS — Q1~Q10 매트릭스 10/10 + D39~D43 시행 5/5 + AC5.1·5.4 코드 측 PASS, FAIL 0건**. typecheck PASS, lint 0 errors (router.gen.ts Phase 3 누적 무해 warning). AC5.2(콘솔 검토 제출)·AC5.3(실 디바이스)은 외부 작업 PENDING.
 
-## 누적 미해결 (Phase 1~4.5 위에 갱신)
+## 누적 미해결 해소 (Phase 5 본 차)
+
+| 항목 | 출처 | 해소 사유 |
+|------|------|----------|
+| SDK 패키지 경로 (`@apps-in-toss/web-framework` 미해결) | Phase 1~4 인계 | `46f0566` 적용 + Phase 5 typecheck PASS로 확정 |
+| `useBackEvent` 하드웨어 백 | Phase 3 인계 #3 | Phase 4 ConfirmDialog `closeOnDimmerClick`로 이미 해결됨 |
+| 디자인 토큰 hex 직접 사용 | Phase 2 인계 #7 | D39 일괄 교체 |
+| AI 면책 문구 | 검수 가이드 §10.6 6번 | D40로 NutritionPanel 추가 |
+
+## 누적 미해결 (Phase 6 진화 — 별 ADR 분리)
 
 | 항목 | 출처 | 상태 |
 |------|------|------|
-| SDK 패키지 경로 (`@apps-in-toss/web-framework` 미해결) | Phase 2 인계 #1 | dev server 실행 시점 검증 보류 |
-| AbortSignal cast 2곳 | ADR-011 D13 | Phase 5 재평가 |
-| `useBackEvent` 하드웨어 백 | Phase 3 인계 #3 | 별 ADR — 본 사이클 ConfirmDialog가 dimmer click + closeOnDimmerClick으로 해결 |
-| 디자인 토큰 hex → adaptive 일괄 교체 | Phase 2 인계 #7 | 별 ADR (Phase 5 진입 전 권장) |
-| 백엔드 옵션 P 배포 | 별 저장소 AIReceipe | 외부 작업 |
-| 무한 스크롤 | Phase 3 인계 #6 | Phase 5 별 ADR |
-| 콘솔 `adGroupId` 발급·승인 | Phase 4.5 PENDING | 외부 작업 |
-| 전면 광고 wiring + 빈도 제한 | ADR-014 D30·D34 | 별 ADR |
-| Analytics SDK 통합 | ADR-014 D33 | 별 ADR |
-| 카드 측 삭제 UX (swipe·long-press) | Phase 4 ADR-013 D22 | 별 ADR |
-| 다중 동시 PATCH 큐 | Phase 4 QA report 동시성 한계 | 별 ADR (현 v1 수용) |
+| AbortSignal cast 2곳 | ADR-011 D13 | Phase 6 별 ADR |
+| 무한 스크롤 | Phase 3 인계 #6 | Phase 6 별 ADR |
+| 카드 측 삭제 UX (swipe·long-press) | Phase 4 ADR-013 D22 | Phase 6 별 ADR |
+| 다중 동시 PATCH 큐 | Phase 4 v1 한계 | Phase 6 별 ADR |
+| 전면 광고 wiring + 빈도 제한 | ADR-014 D30·D34 | Phase 6 별 ADR |
+| Analytics SDK 통합 | ADR-014 D33 | Phase 6 별 ADR |
+| 다크 모드 adaptive 토큰 | Phase 5 D39 보조 | Phase 6 별 ADR |
 
-## Phase 5 인계
+## 출시 외부 작업 PENDING (ADR-015 D43)
 
-- TDS 점검 + 콘솔 등록 + 검수 가이드 (09 §9.6 + appsintoss-publish-checklist 스킬).
-- 광고 정책 정합 점검 (ADR-014 §11.6).
-- 디자인 토큰 hex → adaptive 일괄 교체 별 ADR.
-- 무한 스크롤 별 ADR.
-- 콘솔 `adGroupId` 발급 후 staging 광고 검증.
-- 백엔드 옵션 P 배포 후 AC3.5·AC3.6·AC4.5 실증.
+- 앱인토스 콘솔 등록 (앱 정보·아이콘·도메인 화이트리스트·고객센터·`adGroupId`).
+- 백엔드 옵션 P 배포 (별 저장소 `AIReceipe`).
+- `granite build` 산출물 100MB 이하 확인.
+- staging 배포 + 실 디바이스 e2e (6기능).
+- 콘솔 검토 요청 제출 → 응답 대기.
+
+## Phase 6 인계 (출시 후 진화)
+
+- AbortSignal cast 2곳 해소 검토 + 별 ADR.
+- 무한 스크롤 + 카드 측 삭제 UX (사용자 데이터량/UX 진화).
+- 다중 동시 PATCH 큐 (사용성 이슈 발생 시).
+- 전면 광고 wiring + 빈도 제한 + Analytics SDK 통합 (광고/측정 진화).
+- 다크 모드 adaptive 토큰 (`colorsByPreference.light/dark` 또는 `useColors()` hook 도입).

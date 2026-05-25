@@ -14,7 +14,7 @@
 import React, { useCallback } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { createRoute, useNavigation } from '@granite-js/react-native';
-import { PageNavbar, Txt } from '@toss/tds-react-native';
+import { PageNavbar, Txt, colors } from '@toss/tds-react-native';
 
 import { SearchForm } from '../components/SearchForm';
 
@@ -52,10 +52,10 @@ function HomePage() {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.intro}>
-          <Txt typography="t1" color="#191F28">
+          <Txt typography="t1" color={colors.grey900}>
             오늘 무엇을 만들어 볼까요?
           </Txt>
-          <Txt typography="st9" color="#4E5968">
+          <Txt typography="st9" color={colors.grey700}>
             요리 이름과 인분을 입력하면 AI가 재료·조리법·영양 정보를 한 번에 알려드려요.
           </Txt>
         </View>
@@ -69,7 +69,7 @@ function HomePage() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.white,
   },
   scrollContent: {
     padding: 20,
