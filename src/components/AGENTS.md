@@ -16,6 +16,10 @@ Phase 2의 레시피 생성 화면(`/recipe/generate`)과 홈(`/`)이 사용하�
 | `EmptyState.tsx` (Phase 3) | 빈 상태 안내 — props 4종(title/description/actionLabel/onAction)으로 재사용 가능. 마이 0건 / Phase 4 즐겨찾기 0건 등 | 06 §6.5, Phase 3 baseline §A.2·§B.3 |
 | `NotFoundScreen.tsx` (Phase 3) | **단일 404 UI** — TDS `ErrorPage statusCode={404}` 합성. props `{ onBack }`. **Phase 4 PATCH/DELETE 404 재사용 보장** | 06 §6.5, ADR-005, ADR-012 D16, Phase 3 baseline §A.2·§B.3·§H.2 #13 |
 | `AppInlineAd.tsx` (Phase 4.5) | 토스 인라인 광고 합성 — `ads.InlineAdSlot` 위임. props `{ slot, theme?, tone?, variant? }`. SDK BannerSlotCallbacks 미노출. dev에서 placeholder, staging/prod(+ADS_ENABLED)에서 실 광고 | 11-ADS §11.4, ADR-014 D26·D31·D33 |
+| `FavoriteButton.tsx` (Phase 4) | 별 토글 — TDS `IconButton name="icon-star-bold-mono"`(채움)/`"icon-star-mono"`(비움) + 멱등 목표값 콜백 `onToggle(!isFavorite)`. props `{ isFavorite, onToggle, pending? }`. `accessibilityState={{ selected, disabled }}` | 06 §6.4.5, ADR-013 D1·D10 |
+| `FilterTabs.tsx` (Phase 4) | 마이 레시피 "전체/즐겨찾기" 필터 — TDS `SegmentedControl.Root` + `.Item` 2-state. props `{ value: 'all'\|'favorite', onChange }`. 부모(my-recipes)가 query 변환·page 1 리셋 | 06 §6.5, ADR-013 D2·D11 |
+| `DeleteConfirmDialog.tsx` (Phase 4) | 삭제 확인 다이얼로그 — TDS `ConfirmDialog` 합성. props `{ open, recipeName, onConfirm, onCancel, pending? }`. **leftButton/rightButton ReactElement 필수**(ConfirmDialog.Button = ComponentProps<typeof Button>). 취소 `type="light" style="weak"`, 삭제 `type="danger" style="fill" loading={pending}` | 06 §6.5, ADR-013 D3·D23 |
+| `RecipeCard.tsx` 확장 (Phase 4) | Phase 3 위에 `onToggleFavorite?`/`favoritePending?` 활성화 — header에 `<FavoriteButton>` 합성. `onDelete?`는 자리표시 유지(카드 측 삭제 미활성 — D22) | 06 §6.4.4, ADR-013 D7·D22 |
 
 ## 규약 (강제)
 
@@ -27,6 +31,8 @@ Phase 2의 레시피 생성 화면(`/recipe/generate`)과 홈(`/`)이 사용하�
 - **`Recipe.id` 사용 OK는 `RecipeCard`만** — Phase 3 baseline §H.2 #11. `RecipeCard`는 `recipe: Recipe` props 받으며 카드 클릭 콜백 + Phase 4 즐겨찾기/삭제 자리표시 prop에서 사용. RecipeDisplay/NutritionPanel/SearchForm은 여전히 `id` 미참조.
 - **`<ErrorPage>` 직접 렌더 금지** — Phase 3 baseline §H.2 #13. `NotFoundScreen.tsx:28` 단 1곳에만 import. 다른 컴포넌트·pages에서 `ErrorPage` 직접 import·렌더 금지. 404 화면은 항상 `<NotFoundScreen onBack={...} />` 1개 컴포넌트로 통일.
 - **광고 SDK 직접 import 금지** — Phase 4.5 ADR-014 D26. `@apps-in-toss/framework`의 `InlineAd`/`loadFullScreenAd`/`showFullScreenAd`는 본 디렉토리에서 import 0건. `AppInlineAd.tsx`는 `../lib/ads`의 `ads` 객체만 사용. 광고 UI 추가 시에도 동일 패턴(`<AppInlineAd slot="...">`).
+- **`ConfirmDialog` props 정정** (Phase 4) — ADR-013 D23. `confirmText`/`cancelText`/`onConfirm`/`onCancel` 명명 props는 **실재하지 않음**. `leftButton`/`rightButton` ReactElement(2개 children 강제) + `onClose`/`onExited`(필수)가 SSOT. `ConfirmDialog.Button = ComponentProps<typeof Button>` — TDS Button props `type`/`style`/`size`/`loading`/`disabled` 그대로. 새 dialog 합성 시 본 패턴 답습.
+- **`FavoriteButton`은 멱등 목표값 콜백** (Phase 4) — ADR-013 D1·D10. `onToggle(!isFavorite)` — 현재값의 반대 전달, 멱등 계약 4.1. 호출 측이 낙관적 mutate(D19) + 실패 시 rollback 책임.
 - **호출·상태 0건** — 컴포넌트는 presentational. `fetch`/`useState`(폼 입력 외)/`useEffect`(폼 외) 사용 금지. 비즈니스 로직은 부모(`pages/`) 또는 `hooks/`로 위임.
 - **actions slot은 ReactNode prop** — `RecipeDisplay`의 actions(저장/즐겨찾기 등)는 `actions?: ReactNode` prop으로 주입. 자체 버튼 렌더 금지.
 - **콜백 시그니처 고정** — `SearchForm.onSubmit: (dishName: string, servings: number) => void`, `RecipeCard.onPress: () => void`, `EmptyState.{ onAction: () => void }`, `NotFoundScreen.{ onBack: () => void }`. Phase 4 이후도 시그니처 유지.

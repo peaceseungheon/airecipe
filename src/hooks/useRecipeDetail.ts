@@ -40,6 +40,12 @@ export interface UseRecipeDetailResult {
   error: string | null;
   /** 명시적 재조회. id 변경 없이도 다시 fetch. */
   refetch: () => void;
+  /**
+   * Phase 4 추가 (baseline §B D5·ADR-013 D20):
+   * PATCH favorite 성공 응답을 호출 측이 받아 직접 state 갱신 — refetch GET 1회 회피.
+   * 동기·즉시성(낙관적 UI 확정), 트래픽 절약 모두 우월.
+   */
+  mutate: (next: Recipe) => void;
 }
 
 interface State {
@@ -64,6 +70,16 @@ export function useRecipeDetail(id: string): UseRecipeDetailResult {
 
   const refetch = useCallback(() => {
     setRefetchTick((n) => n + 1);
+  }, []);
+
+  const mutate = useCallback((next: Recipe) => {
+    // Phase 4 D5/D20: PATCH 응답 Recipe로 직접 state 갱신. notFound/error 초기화.
+    setState({
+      data: next,
+      isLoading: false,
+      notFound: false,
+      error: null,
+    });
   }, []);
 
   const abortRef = useRef<AbortController | null>(null);
@@ -136,6 +152,7 @@ export function useRecipeDetail(id: string): UseRecipeDetailResult {
     notFound: state.notFound,
     error: state.error,
     refetch,
+    mutate,
   };
 }
 

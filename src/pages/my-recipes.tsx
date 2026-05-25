@@ -12,8 +12,13 @@
  * - 보호 화면 — `useTossUserId` 필수 (Phase 3 baseline §C.4).
  * - 데이터 호출은 `useMyRecipes` 훅만. `recipes.ts`/`api-client` 직접 호출 금지 (baseline §H.2 #12).
  * - href/useRouter/Link 0건 — useNavigation/Route.useParams.
- * - 즐겨찾기 필터 토글은 Phase 4 — 본 Phase는 query.favorite 미사용(전체 목록만).
+ * - 즐겨찾기 필터 토글은 Phase 4 — `?favorite=true` 적용.
  * - `meta.pageSize` 신뢰 — query.pageSize로 페이지 계산 금지 (baseline §H.2 #18).
+ *
+ * Phase 4 (ADR-013 D4·D9·D11):
+ * - 상단 FilterTabs(전체/즐겨찾기). 변경 시 page 1 리셋(D11).
+ * - RecipeCard.onToggleFavorite 활성화 — 낙관적 mutate + 호출 측 rollback(D4).
+ * - PATCH 404 시 카드는 invalidate로 자동 사라짐(D9). 토스트 노출 없음.
  *
  * Phase 4.5 (ADR-014 D30): 빈 상태와 정상 목록 양쪽 하단에 `<AppInlineAd slot="my-recipes-bottom" />`.
  * 로딩/에러 분기에는 미렌더 — 사용자 컨텍스트 부적합 (G8). 광고 활성/비활성은 환경변수 게이트.
@@ -26,8 +31,10 @@ import { Button, PageNavbar, Txt } from '@toss/tds-react-native';
 
 import { AppInlineAd } from '../components/AppInlineAd';
 import { EmptyState } from '../components/EmptyState';
+import { FilterTabs, type FilterValue } from '../components/FilterTabs';
 import { RecipeCard } from '../components/RecipeCard';
 import { useMyRecipes } from '../hooks/useMyRecipes';
+import { useToggleFavorite } from '../hooks/useToggleFavorite';
 import { useTossUserId } from '../hooks/useTossUserId';
 
 const PAGE_SIZE = 20;
@@ -40,9 +47,18 @@ function MyRecipesPage() {
   const navigation = useNavigation();
   const { tossUserId } = useTossUserId();
   const [page, setPage] = useState(1);
+  const [filter, setFilter] = useState<FilterValue>('all');
 
-  const query = useMemo(() => ({ page, pageSize: PAGE_SIZE }), [page]);
-  const { data, meta, isLoading, error, refetch } = useMyRecipes(query);
+  const query = useMemo(
+    () => ({
+      page,
+      pageSize: PAGE_SIZE,
+      favorite: filter === 'favorite' ? true : undefined,
+    }),
+    [page, filter],
+  );
+  const { data, meta, isLoading, error, refetch, mutate } = useMyRecipes(query);
+  const { toggle, pendingId, error: favoriteError } = useToggleFavorite();
 
   const handleOpenDetail = useCallback(
     (id: string) => {
@@ -62,6 +78,33 @@ function MyRecipesPage() {
   const handlePrevPage = useCallback(() => {
     setPage((prev) => Math.max(1, prev - 1));
   }, []);
+
+  const handleFilterChange = useCallback((next: FilterValue) => {
+    setFilter(next);
+    setPage(1);
+  }, []);
+
+  /**
+   * 즐겨찾기 토글 — baseline D4·D19 낙관적 UI + 호출 측 rollback.
+   * 1) 즉시 mutate(next)로 별 채움/비움
+   * 2) toggle(id, target) 호출
+   * 3) 성공: 서버 응답 Recipe로 재mutate (정합 확정)
+   * 4) 실패(null 반환): mutate(prev)로 rollback. 사용자는 favoriteError 메시지 노출
+   */
+  const handleToggleFavorite = useCallback(
+    async (recipe: { id: string; isFavorite: boolean }, target: boolean) => {
+      const prev = data.find((r) => r.id === recipe.id);
+      if (!prev) return;
+      mutate({ ...prev, isFavorite: target });
+      const updated = await toggle(recipe.id, target);
+      if (updated) {
+        mutate(updated);
+      } else {
+        mutate(prev);
+      }
+    },
+    [data, mutate, toggle],
+  );
 
   // 식별자 가드 (Phase 3 baseline §C.4 + 07 §7.5.2).
   if (tossUserId === undefined) {
@@ -99,6 +142,16 @@ function MyRecipesPage() {
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
+        <FilterTabs value={filter} onChange={handleFilterChange} />
+
+        {favoriteError ? (
+          <View style={styles.toastBox} accessibilityLabel="즐겨찾기 변경 실패">
+            <Txt typography="st9" color="#C0392B">
+              {favoriteError}
+            </Txt>
+          </View>
+        ) : null}
+
         {isLoading ? (
           <View style={styles.center}>
             <Txt typography="st9" color="#4E5968">
@@ -127,12 +180,21 @@ function MyRecipesPage() {
           </View>
         ) : data.length === 0 ? (
           <>
-            <EmptyState
-              title="아직 저장된 레시피가 없어요"
-              description="AI에게 첫 레시피를 추천받아 보세요."
-              actionLabel="첫 레시피 만들기"
-              onAction={handleGoGenerate}
-            />
+            {filter === 'favorite' ? (
+              <EmptyState
+                title="즐겨찾기한 레시피가 없어요"
+                description="별 아이콘으로 자주 만드는 레시피를 모아두세요."
+                actionLabel="전체 보기"
+                onAction={() => handleFilterChange('all')}
+              />
+            ) : (
+              <EmptyState
+                title="아직 저장된 레시피가 없어요"
+                description="AI에게 첫 레시피를 추천받아 보세요."
+                actionLabel="첫 레시피 만들기"
+                onAction={handleGoGenerate}
+              />
+            )}
             <View style={styles.adSlot}>
               <AppInlineAd slot="my-recipes-bottom" />
             </View>
@@ -144,6 +206,10 @@ function MyRecipesPage() {
                 key={recipe.id}
                 recipe={recipe}
                 onPress={() => handleOpenDetail(recipe.id)}
+                onToggleFavorite={(target) =>
+                  handleToggleFavorite(recipe, target)
+                }
+                favoritePending={pendingId === recipe.id}
               />
             ))}
 
@@ -219,5 +285,10 @@ const styles = StyleSheet.create({
   },
   adSlot: {
     marginTop: 16,
+  },
+  toastBox: {
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: '#FBE9E9',
   },
 });

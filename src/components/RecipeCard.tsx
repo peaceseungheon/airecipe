@@ -18,6 +18,7 @@ import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Badge, Txt } from '@toss/tds-react-native';
 
+import { FavoriteButton } from './FavoriteButton';
 import {
   difficultyLabel,
   difficultyTone,
@@ -29,13 +30,23 @@ import type { Recipe } from '../types/recipe';
 export interface RecipeCardProps {
   recipe: Recipe;
   onPress: () => void;
-  /** Phase 4 즐겨찾기 토글 자리표시 — 본 Phase 미렌더 (baseline §B.2). */
+  /**
+   * Phase 4(ADR-013 D7): 카드 측 활성화. 목표값(`!recipe.isFavorite`) 전달 — 멱등 계약 4.1.
+   * 부모(`pages/my-recipes.tsx`)가 낙관적 UI + 호출 후 실패 시 rollback 책임 (D4).
+   */
   onToggleFavorite?: (target: boolean) => void;
-  /** Phase 4 삭제 자리표시 — 본 Phase 미렌더 (baseline §B.2). */
+  /** Phase 4(ADR-013 D7): 본 Phase는 자리표시 prop만 유지 — 카드 측 삭제 미활성화(상세 화면만). */
   onDelete?: () => void;
+  /** 즐겨찾기 토글 진행 중 — FavoriteButton disabled 처리. */
+  favoritePending?: boolean;
 }
 
-export function RecipeCard({ recipe, onPress }: RecipeCardProps) {
+export function RecipeCard({
+  recipe,
+  onPress,
+  onToggleFavorite,
+  favoritePending,
+}: RecipeCardProps) {
   return (
     <Pressable
       onPress={onPress}
@@ -44,9 +55,16 @@ export function RecipeCard({ recipe, onPress }: RecipeCardProps) {
       style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
     >
       <View style={styles.header}>
-        <Txt typography="t5" color="#191F28" numberOfLines={1}>
+        <Txt typography="t5" color="#191F28" numberOfLines={1} style={styles.title}>
           {recipe.dishName}
         </Txt>
+        {onToggleFavorite ? (
+          <FavoriteButton
+            isFavorite={recipe.isFavorite}
+            onToggle={onToggleFavorite}
+            pending={favoritePending}
+          />
+        ) : null}
       </View>
 
       {recipe.description ? (
@@ -108,7 +126,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#F2F4F6',
   },
   header: {
-    gap: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  title: {
+    flex: 1,
   },
   badgeRow: {
     flexDirection: 'row',

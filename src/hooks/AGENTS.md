@@ -55,6 +55,10 @@ export function formatTossUserIdMask(hash: TossUserId | undefined): string;  // 
 | `useRecipeDetail.ts` (Phase 3) | 단건 조회 — `getRecipe` + **404 정규화**(ApiClientError code NOT_FOUND → `notFound:true`, error null). trigger dep 미포함(상세는 id 단건) | 03 §3.4, ADR-004·005, ADR-012 D16, Phase 3 baseline §A.1·§D.5 |
 | `useSaveRecipe.ts` (Phase 3) | 저장 mutation — `save(recipe): Promise<Recipe \| null>`. 성공 시 `invalidate()` 정확 1회. 실패 시 0건(stale 마이 유지). AbortController unmount + cancelled 플래그 | 03 §3.5, ADR-012 D15·D17, Phase 3 baseline §A.1·§A.4·§D.3 |
 | `useFullScreenAd.ts` (Phase 4.5) | 전면 광고 — `ads.showFullScreen({ signal })` 위임. `{ request: () => Promise<AdResult>, isPending, error }`. AbortController unmount + 직전 in-flight abort. **Phase 4.5는 wiring 0곳(코드 경로만)** | 11-ADS §11.4, ADR-014 D30·D31·D32 |
+| `useToggleFavorite.ts` (Phase 4) | PATCH 즐겨찾기 — `{ toggle: (id, target) => Promise<Recipe \| null>, pendingId, error, reset }`. **id 가변 시그니처** (단일 hook 인스턴스 + 카드별 pendingId 판정 — rules of hooks 정합). 성공 시 invalidate() + Recipe 반환. 실패 null 반환(호출 측 rollback). 직전 in-flight abort. | 03 §3.6, ADR-013 D19·D20·D24, baseline §B D10 |
+| `useDeleteRecipe.ts` (Phase 4) | DELETE 삭제 — `{ remove: () => Promise<boolean>, isPending, error, reset }`. id 고정(상세 화면 1곳 호출). **404 성공 정규화** (D21) — `NOT_FOUND` catch → invalidate + true 반환. 메시지 0건. | 03 §3.7, ADR-013 D21, baseline §B D6·D10 |
+| `useMyRecipes.ts` 확장 (Phase 4) | Phase 3 위에 `mutate: (next: Recipe) => void` 추가 — data 안 id 매칭 항목 교체. 낙관적 UI · 호출 측 prev 보관 패턴(D19) | ADR-013 D19, baseline §B D4 |
+| `useRecipeDetail.ts` 확장 (Phase 4) | Phase 3 위에 `mutate: (next: Recipe) => void` 추가 — PATCH 응답 Recipe로 직접 갱신(refetch GET 회피 — D20) | ADR-013 D20, baseline §B D5 |
 
 ## Phase 2·3 추가 규약 (Phase 1 규약 위에 누적)
 
@@ -66,6 +70,9 @@ export function formatTossUserIdMask(hash: TossUserId | undefined): string;  // 
 - **사용자 친화 한국어 에러 매핑** — `ApiErrorCode` 8종 모두 매핑 (4 훅 모두 동일 표). NOT_FOUND는 useRecipeDetail에서 notFound state로 분기되므로 메시지 표는 완전성 유지용.
 - **`useSaveRecipe.save` 성공 시 invalidate 정확 1회** — Phase 3 baseline §H.2 #15. 실패 catch는 setError만. Phase 4 mutation 훅도 동일 패턴 답습.
 - **광고 SDK 직접 import 금지** (Phase 4.5) — ADR-014 D26. `useFullScreenAd`는 `../lib/ads`의 `ads.showFullScreen`만 사용. 본 디렉토리에서 `@apps-in-toss/framework`의 광고 API import 0건. (Toss 인증 SDK `getAnonymousKey`는 광고와 무관, 본 규약 대상 외.)
+- **낙관적 UI는 호출 측 책임** (Phase 4) — ADR-013 D19. mutation 훅(`useToggleFavorite`)은 내부에 prev 보관 안 함. 호출 측이 (a) `mutate(next)` → (b) `await toggle(id, target)` → (c) `null` 시 `mutate(prev)` 롤백. `useMyRecipes.mutate`·`useRecipeDetail.mutate`로 즉시성 보장.
+- **`useToggleFavorite` id 가변 시그니처** (Phase 4) — ADR-013 D24. 카드 목록 map 안에서 카드별 hook 호출 불가(rules of hooks) → 단일 인스턴스 + `toggle(id, target)`. `pendingId === card.id`로 카드별 pending UI 판정. `useDeleteRecipe(id)`는 상세 화면 1곳 호출이라 id 고정.
+- **mutation 훅의 `invalidate()` 호출은 성공 시 1회** (Phase 4) — ADR-013 답습. useToggleFavorite 성공 1회 + useDeleteRecipe 성공·404 정규화 1회. 실패 시 0건(stale data 유지가 안전).
 
 ## 비범위 (Phase 3)
 

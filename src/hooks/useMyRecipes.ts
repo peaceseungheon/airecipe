@@ -45,6 +45,12 @@ export interface UseMyRecipesResult {
   error: string | null;
   /** 명시적 재조회. 캐시 trigger와 무관하게 본 훅만 다시 fetch. */
   refetch: () => void;
+  /**
+   * Phase 4(ADR-013 D4·D19): 낙관적 UI · 호출 측 prev 보관 패턴.
+   * data 안에서 next.id와 일치하는 항목을 next로 교체. 일치하지 않으면 변경 없음.
+   * useRecipeDetail.mutate와 동일 의미.
+   */
+  mutate: (next: Recipe) => void;
 }
 
 interface State {
@@ -71,6 +77,13 @@ export function useMyRecipes(query: RecipeListQuery): UseMyRecipesResult {
 
   const refetch = useCallback(() => {
     setRefetchTick((n) => n + 1);
+  }, []);
+
+  const mutate = useCallback((next: Recipe) => {
+    setState((prev) => ({
+      ...prev,
+      data: prev.data.map((r) => (r.id === next.id ? next : r)),
+    }));
   }, []);
 
   // unmount cleanup + 매 effect 사이클의 in-flight abort.
@@ -143,6 +156,7 @@ export function useMyRecipes(query: RecipeListQuery): UseMyRecipesResult {
     isLoading: state.isLoading,
     error: state.error,
     refetch,
+    mutate,
   };
 }
 

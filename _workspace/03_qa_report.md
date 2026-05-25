@@ -1,79 +1,78 @@
-# Phase 4.5 QA Report — 토스 광고 SDK 기반 작업
+# Phase 4 QA Report — 즐겨찾기·삭제·404 통일
 
-> 검증자: orchestrator(메인) — 팀 1개 동시 제약으로 architect/qa as-orchestrator
+> 검증자: orchestrator(메인 — 팀 1개 동시 제약으로 architect/api-client/frontend/qa-as-orchestrator)
 > 일자: 2026-05-25
-> 입력: `_workspace/01_architect_phase45_baseline.md` §G QA 매트릭스 (G1~G9)
-> 코드 산출: `src/lib/ads/*` (4 파일), `src/components/AppInlineAd.tsx`, `src/hooks/useFullScreenAd.ts`, `granite.config.ts` 확장, `src/env.d.ts` 수동 sync, `src/pages/my-recipes.tsx` 시범 적용, `eslint.config.mjs` `.granite/**` ignore 보강
-> 문서: `docs/appsintoss-port/11-ADS.md`, `docs/adr/ADR-014-toss-ads-integration.md`, `src/lib/AGENTS.md`(신규), `src/components/AGENTS.md`/`src/hooks/AGENTS.md`(보강)
+> 입력: `_workspace/01_architect_phase4_baseline.md` §C.qa 매트릭스 + §B D1~D13 + ADR-013 D19~D24
 
-## 매트릭스 (G1~G9)
+## 매트릭스 (Q1~Q9)
 
 | ID | 항목 | 검증 방법 | 결과 |
 |----|------|----------|------|
-| G1 | 광고 SDK 직접 import는 `adapter.toss.tsx` 1곳만 | `grep -rn "from ['\"]@apps-in-toss/framework['\"]" src/` | **PASS** — 광고 API(`InlineAd`/`loadFullScreenAd`/`showFullScreenAd`)는 `adapter.toss.tsx:22` 1행만. 다른 import는 `_app.tsx:2`의 `AppsInToss`(미니앱 컨테이너)와 `useTossUserId.tsx:21`의 `getAnonymousKey`(Toss 인증 SDK)로 광고와 무관. ADR-014 D26 시행 PASS. |
-| G2 | `adGroupId` 하드코딩 0건 | `grep -rn "adGroupId[[:space:]]*[:=]" src/` | **PASS** — 모두 `config.inlineGroupId`/`config.fullScreenGroupId` 주입(`adapter.toss.tsx:47, 100, 105`). 하드코딩 0건. |
-| G2b | `ADS_*` env 변수 접근은 `index.ts` 1곳만 | `grep -rn "ADS_INLINE_GROUP_ID\|ADS_FULLSCREEN_GROUP_ID\|ADS_ENABLED" src/` | **PASS** — 실 접근은 `src/lib/ads/index.ts:19, 21, 22` 3행만(어댑터 선택 + 주입). 그 외 등장은 `env.d.ts` 타입 선언 + 주석/에러 메시지. 직접 분기 0건. |
-| G3 | `granite.config.ts`에 `ADS_*` 3개 정의 + `env.d.ts` 반영 | 파일 정독 | **PASS** — `granite.config.ts:22-25`에 3개 키 추가 (`ADS_ENABLED`, `ADS_INLINE_GROUP_ID`, `ADS_FULLSCREEN_GROUP_ID`, 기본값 `'false'`/`''`/`''`). `src/env.d.ts:7-9` 수동 sync 완료(빌드 시 plugin-env가 재생성). |
-| G4 | noop placeholder는 TDS `View`+`Txt`만 | `src/lib/ads/adapter.noop.tsx` 정독 | **PASS** — RN `View`/`StyleSheet`(layout 기본)와 TDS `Txt typography="st9"`만 사용. TouchableOpacity·Text(원시) 직접 사용 0건. |
-| G5 | `AppInlineAd`가 BannerSlotCallbacks 미노출 | `src/components/AppInlineAd.tsx` 정독 | **PASS** — `AppInlineAdProps = InlineAdSlotProps`로 `slot/theme/tone/variant` 4개만. `onAd*` 콜백은 어댑터 내부 console.debug(D33). |
-| G6 | `useFullScreenAd` cleanup이 cancel 함수 호출 | `src/hooks/useFullScreenAd.ts` 정독 | **PASS** — useEffect cleanup에서 `abortRef.current?.abort()`. `request()`마다 직전 in-flight abort + 새 AbortController. 어댑터 측 `signal.addEventListener('abort', onAbort)`이 cancelLoad/cancelShow 호출 → SDK 리소스 누수 0. |
-| G7 | `pnpm typecheck` + `pnpm lint` PASS | 명령 실행 | **PASS** — typecheck exit 0(에러 0). lint exit 0(0 errors, 1 warning `router.gen.ts` 자동 생성 unused-disable — Phase 3 누적 무해). 단, lint 첫 실행 시 `.granite/**` 빌드 산출물에서 21 errors 발견 → `eslint.config.mjs`에 `**/.granite/**` ignore 보강 후 PASS. |
-| G8 | `my-recipes.tsx` 4-way 분기 중 빈+정상에만 광고 | 파일 정독 | **PASS** — 로딩/에러 분기에는 `<AppInlineAd />` 미렌더(`my-recipes.tsx:98-103, 104-123`), 빈 분기(125-136)와 정상 list(140-178) 양쪽 하단에 `<View style={styles.adSlot}><AppInlineAd slot="my-recipes-bottom" /></View>` 1회씩. 일관성 PASS. |
-| G9 | 문서 발행 — 11-ADS.md + ADR-014 + AGENTS.md 3건 | 파일 존재 확인 | **PASS** — `docs/appsintoss-port/11-ADS.md`(신규), `docs/adr/ADR-014-toss-ads-integration.md`(신규), `src/lib/AGENTS.md`(신규), `src/components/AGENTS.md`(AppInlineAd 행 + 규약 추가), `src/hooks/AGENTS.md`(useFullScreenAd 행 + 규약 추가). |
+| Q1 | `<ErrorPage>` 직접 렌더 — NotFoundScreen 외 0건 | `grep -rn "<ErrorPage" src/` | **PASS** — `src/components/NotFoundScreen.tsx:28` 실 렌더 1곳, 나머지는 모두 주석·문서. |
+| Q2 | `<NotFoundScreen>` 사용 위치 | `grep -rn "<NotFoundScreen" src/pages` | **PASS** — `src/pages/recipe/[id].tsx:130` 실 렌더 1곳. Phase 4 PATCH/DELETE 404는 컴포넌트 재사용 보장(ADR-013 추가 정책 + ADR-012 D16). |
+| Q3 | "찾을 수 없" 인라인 텍스트 — pages 0건 | `grep -rn "찾을 수 없" src/` | **PASS** — 페이지 인라인 0건. NotFoundScreen title + 6개 훅의 ERROR_CODE_MESSAGES.NOT_FOUND 매핑 표만(에러 카탈로그 — 정상). |
+| Q4 | invalidate() 호출 위치 정합 | `grep -rn "invalidate()" src/hooks` | **PASS** — useSaveRecipe(Phase 3 1곳), useToggleFavorite(D13 1곳), useDeleteRecipe(D13 2곳: 성공·404 정규화). 실패 시 0건. |
+| Q5 | 직접 fetch는 api-client 단일 경로 | `grep -rn "\\bfetch(" src/` | **PASS** — `services/api-client.ts:102` + `services/sse-client.ts:78` 정확 2곳. Phase 1·2 동결 그대로. 신규 0건. |
+| Q6 | 라우트 매니페스트 — Phase 3 그대로 (4 라우트) | `cat src/router.gen.ts` | **PASS** — `/`, `/recipe/generate`, `/my-recipes`, `/recipe/[id]` 4 라우트. 신규 0건. |
+| Q7 | TDS 신규 3 import — IconButton/SegmentedControl/ConfirmDialog 각 1곳 | `grep -rn "from '@toss/tds-react-native'" src/components` | **PASS** — FavoriteButton(IconButton) + FilterTabs(SegmentedControl) + DeleteConfirmDialog(ConfirmDialog) 각 1 import. |
+| Q8 | typecheck + lint | `pnpm typecheck` + `pnpm lint` | **PASS** — typecheck exit 0, lint 0 errors (1 무해 warning `router.gen.ts` Phase 3 누적). |
+| Q9 | 멱등 검증 — PATCH 두 번 호출 시 마지막 의도 보장 | `useToggleFavorite` 코드 정독 | **PASS** — 직전 in-flight `abortRef.current?.abort()` + `setPendingId(id)` + `controller.signal.aborted` 검사로 stale 결과 차단. 03 §3.6.2 멱등 계약과 정합. |
 
-**전체 판정: ALL PASS (코드 경로 9/9), FAIL 0건**.
+## D19~D24 시행 검증
 
-## SDK 이벤트 정규화 검증 (ADR-014 D32)
+| ID | 결정 | 시행 위치 | 결과 |
+|----|------|----------|------|
+| D19 | 낙관적 안 a + 호출 측 prev 보관 | `my-recipes.tsx:handleToggleFavorite` (`data.find` → `mutate(next)` → `await toggle` → 실패 `mutate(prev)`), `recipe/[id].tsx:handleToggleFavorite` (`recipe` → `mutate({...prev, isFavorite: target})` → 실패 `mutate(prev)`) | PASS |
+| D20 | PATCH 성공 시 invalidate + 상세 mutate (refetch 회피) | `useToggleFavorite.toggle` 성공 시 `invalidate()` 1회 + `return updated`. `recipe/[id].tsx` 성공 시 `mutate(updated)` — refetch GET 호출 0건 | PASS |
+| D21 | DELETE 404 성공 정규화 | `useDeleteRecipe.remove` catch에서 `NOT_FOUND` → `invalidate()` + `return true`. setError 0건. | PASS |
+| D22 | 삭제 상세 화면만 + 카드 onDelete 자리표시 유지 | `recipe/[id].tsx` Button + DeleteConfirmDialog 활성화. RecipeCard.onDelete prop 정의만(렌더 0건). my-recipes에서 `onDelete` 미사용. | PASS |
+| D23 | ConfirmDialog 합성 정정 | `DeleteConfirmDialog.tsx` — leftButton/rightButton ReactElement + onClose/onExited 필수. ConfirmDialog.Button type/style props 사용. | PASS |
+| D24 | useToggleFavorite id 가변 시그니처 | `useToggleFavorite()` 인자 없음 + `toggle(id, target)` 호출. `pendingId === recipe.id`로 카드별 pending. | PASS |
 
-`src/lib/ads/adapter.toss.tsx` showFullScreen 내부 switch:
+## AC4.* 수용 기준 (코드 경로)
 
-| SDK 이벤트 | 어댑터 처리 (코드) | 결과 |
-|-----------|------------------|------|
-| `requested` | console.debug + (계속) | PASS |
-| `show` | console.debug + (계속) | PASS |
-| `impression` | console.debug + (계속) | PASS |
-| `clicked` | console.debug + (계속) | PASS |
-| `dismissed` | resolve(`'dismissed'`) + cleanup | PASS |
-| `failedToShow` | reject(`Error('failedToShow')`) + cleanup | PASS (types에 error 필드 없음 — 인용 정확) |
-| `userEarnedReward` | console.debug + resolve(`'dismissed'`) + cleanup | PASS (본 미니앱 미사용) |
-| (signal abort) | resolve(`'cancelled'`) + cleanup | PASS |
-| (onError) | reject(err) + cleanup | PASS |
+| ID | 수용 기준 | 결과 |
+|----|----------|------|
+| AC4.1 | 즐겨찾기 토글 시 별 즉시 채워짐 → 성공 유지 / 실패 시 롤백 | **PASS** — my-recipes·[id] 둘 다 mutate(next) → 실패 시 mutate(prev). |
+| AC4.2 | 즐겨찾기 필터 토글 시 목록 즉시 갱신 | **PASS** — FilterTabs onChange → setFilter + setPage(1) → query 변경 → useMyRecipes useEffect dep 변동 → 자동 refetch. |
+| AC4.3 | 삭제 확인 → 200 → 목록에서 제거 | **PASS** — useDeleteRecipe.remove 성공 → invalidate() → useMyRecipes refetch → 목록에서 자동 제거. recipe/[id]는 handleBack. |
+| AC4.4 | PATCH 404 → NotFoundScreen 분기 (상세 화면) / DELETE 404 → 성공 정규화 | **PASS** — PATCH 404는 호출 측 mutate(prev) + 다시 진입 시 useRecipeDetail 404 → NotFoundScreen. DELETE 404는 D21 정규화. 카드 측 PATCH 404는 invalidate 자동 제거. |
+| AC4.5 | 다른 식별자 격리 | **PENDING (실호출)** — useTossUserId 헤더 격리 코드 경로 그대로(Phase 1 ADR-010·D5 단일 위치). 백엔드 옵션 P 배포 후 실증. Phase 1·2·3과 동일 PENDING 패턴. |
 
-## 환경 분기 매트릭스 (ADR-014 D27·E)
+## 동시성·멱등 시나리오 검증 (AC4.5 + 03 §3.10 #14)
 
-| 환경 | APP_ENV | ADS_ENABLED | 분기 코드(`index.ts`) | 어댑터 |
-|------|---------|-------------|---------------------|--------|
-| local dev | `local` | (any) | `if (env.APP_ENV === 'local') return noopAdsAdapter;` (line 18) | **noop** |
-| staging (광고 끔) | `staging` | `"false"` | `if (env.ADS_ENABLED !== 'true') return noopAdsAdapter;` (line 19) | **noop** |
-| staging (광고 켬) | `staging` | `"true"` | `return createTossAdsAdapter({ inlineGroupId: env.ADS_INLINE_GROUP_ID ?? '', fullScreenGroupId: env.ADS_FULLSCREEN_GROUP_ID ?? '' });` (line 20-23) | **toss** |
-| production | `production` | `"true"` | (동일) | **toss** |
+| 시나리오 | 코드 경로 |
+|---------|----------|
+| 같은 카드 별 두 번 빠르게 누름 | (1) `toggle(id, true)` 시작 → abortRef set → (2) 두 번째 `toggle(id, false)` 호출 시 직전 abort → 새 controller → setPendingId(id) → ... — 마지막 호출의 target만 서버에 반영(멱등 계약 4.1). UI는 mutate로 즉시 반영, invalidate로 서버 truth와 재동기화. PASS. |
+| 다른 두 카드 동시 토글 | useToggleFavorite는 단일 인스턴스 + pendingId 1개라 직전 abort. 사용자가 같은 시점에 두 별을 누르면 첫 호출이 abort되어 첫 카드는 mutate(prev) 롤백. UX 한계 — v1 수용. 후속 별 ADR(다중 동시 PATCH 큐) 필요 시. |
+| 삭제 진행 중 dimmer 클릭 | `closeOnDimmerClick={!pending}` + `onCancel` 가드(`if (!deletePending) setConfirmOpen(false)`) — pending 중 모달 닫힘 차단. PASS. |
+| 삭제 성공 후 마이 목록 자동 갱신 | `useDeleteRecipe.remove` 성공 → `invalidate()` → useMyRecipes useEffect dep 변동 → refetch. handleBack 후 마이 목록 도착 시 데이터 갱신됨. PASS. |
 
-빈 group ID 대비: toss 어댑터의 `TossInlineAdSlot`은 `if (!config.inlineGroupId) return null;` → 빈 공간 회피. `showFullScreen`은 `if (!config.fullScreenGroupId) reject` → 호출 측 catch.
+## TDS 신규 컴포넌트 cross-check
 
-## 검수 정책 정합성 (`appsintoss-publish-checklist` 적용)
+| 컴포넌트 | TDS 패키지 d.ts | 합성 정합 |
+|---------|----------------|-----------|
+| `FavoriteButton` | `IconButton.d.ts` — `{ name, variant, iconSize, label, accessibilityLabel, accessibilityState, disabled, onPress }` | PASS — name string + variant clear + iconSize 24 + 한국어 label/accessibilityLabel + accessibilityState selected/disabled + onPress. |
+| `FilterTabs` | `SegmentedControl/Root.d.ts` + `Item.d.ts` — `{ name, value, defaultValue?, size, onChange }` + `{ value, children }` | PASS — name="my-recipes-filter" + size="small" + onChange 형 변환(`v as FilterValue`). Item 2개. |
+| `DeleteConfirmDialog` | `ConfirmDialog.d.ts` — `{ open, title, description, content?, leftButton, rightButton, closeOnDimmerClick?, onClose, onExited, onEntered? }` + `Button = DoubleButtonItem = ComponentProps<typeof Button>` | PASS — open/title/description/closeOnDimmerClick/onClose/onExited + leftButton·rightButton(ConfirmDialog.Button) + Button props type='light'/'danger' + style='weak'/'fill'. 2 children 강제 충족. |
 
-| 항목 | 정합성 |
-|------|--------|
-| 토스 공식 SDK만 사용 | PASS (D25) |
-| TDS 의무 (placeholder도) | PASS (D29, G4) |
-| 권한 추가 | NO (`permissions: []` 유지) |
-| 도메인 화이트리스트 | 영향 0(광고는 SDK 내부 호출) |
-| 번들 100MB | PASS (광고는 native 측, JS 번들 증가 미미) |
-| AI 면책 충돌 | NO (영양 정보/healthNote와 별 컨테이너) |
-| 디지털 자산/도박 카테고리 | NO (토스 SDK가 카테고리 필터링) |
+## 멈춤 트리거 (baseline §H) 발생 여부
 
-## PENDING (외부 의존성)
-
-| 항목 | 사유 | 해소 조건 |
-|------|------|----------|
-| 실 광고 송출 검증 | 앱인토스 콘솔에서 `adGroupId` 발급·승인 외부 작업 | 콘솔 등록 + 환경변수 주입 + staging 배포 후 검증 |
-| 전면 광고 시범 적용 | D30 본 사이클 wiring 보류 (빈도 제한 정책 별 ADR) | 빈도 제한 결정 + 트리거 위치 결정 별 ADR |
-| Analytics SDK 통합 | D33 본 사이클 미적용 (console.debug only) | 측정 SDK 결정 별 ADR |
+| 트리거 | 발생? | 비고 |
+|--------|------|------|
+| H1: icon-star-bold-mono/icon-star-mono 노랑 fallback | **N/A** — dev server 미실행 환경. 실 발생 시 대안 카탈로그 적용 + 06 §6.4.5 갱신 트리거. baseline §H.1 prerecord. |
+| H2: ConfirmDialog 2 children throw | 미발생 — DeleteConfirmDialog가 leftButton/rightButton 정확히 2개 ReactElement 주입. |
+| H3: PATCH 응답 isFavorite target 불일치 | N/A — 실호출 미수행. ADR-013 R1로 보존. |
+| H4: DELETE 응답이 204 | N/A — 실호출 미수행. ADR-013 R2로 보존. |
+| H5: 백엔드 옵션 P 미배포 | **누적** — Phase 1·2·3 그대로. AC4.5 PENDING. |
+| H6: SDK 패키지 경로 | **누적** — Phase 1·2·3 그대로. dev server 첫 실행 시점 검증. |
 
 ## 결론
 
-Phase 4.5(토스 광고 기반 작업) **ALL PASS — 코드 경로 9/9, FAIL 0건**. ADR-014 D25~D38 13 결정 모두 시행. 다음 단계:
-1. CLAUDE.md "현재 단계" 갱신 + 변경 이력 추가.
-2. 커밋.
-3. Phase 4 보류 팀원 정리 (별 메시지).
-4. (외부) 콘솔 `adGroupId` 발급 후 staging 배포 검증.
+**Phase 4 ALL PASS (코드 경로 Q1~Q9 + D19~D24 + AC4.1~AC4.4)**. FAIL 0건. AC4.5는 백엔드 옵션 P 배포 후 실증 PENDING(Phase 1·2·3과 동일 누적).
+
+다음 단계:
+1. CLAUDE.md "현재 단계" 갱신 — Phase 4 완료.
+2. 06 §6.5 갱신 — FavoriteButton/FilterTabs/DeleteConfirmDialog 실 구현 시그니처.
+3. AGENTS.md 보강 — hooks/components/pages.
+4. 커밋.

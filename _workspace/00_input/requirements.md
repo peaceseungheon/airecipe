@@ -1,208 +1,150 @@
-# Phase 4.5 — 토스 광고(앱인토스 SDK) 기반 작업
+# Phase 4 — 즐겨찾기·삭제 + 404 UI 통일 (기능 e, f)
 
-> 출처: 사용자 요청 "토스 광고를 붙이려고 하니깐 기반 작업을 진행해줘"
-> SSOT 신규 생성: `docs/appsintoss-port/11-ADS.md` (본 사이클에서 작성)
-> 관련 ADR 신규: `docs/adr/ADR-014-toss-ads-integration.md`
+> 출처: 사용자 요청 "phase4 작업 진행"
+> SSOT: `docs/appsintoss-port/10-SPRINT-PLAN.md` §10.5
 
 ## 목적
 
-앱인토스 RN 미니앱(`airecipe-miniapp`)에 **토스 광고 SDK**(`@apps-in-toss/framework` 노출)를 도입하기 위한 **기반 인프라**를 구축한다. 본 사이클의 산출은 광고를 실제 화면에 붙이기 전 단계의 "기반 작업"이다:
+즐겨찾기 토글과 삭제를 완성하고, 404 케이스를 모든 화면에서 일관 처리. Phase 3 산출 `NotFoundScreen`(단일 컴포넌트)·`useRecipeCacheTrigger.invalidate()`·`RecipeCard.{onToggleFavorite,onDelete}` 자리표시 prop을 활성화한다.
 
-- SDK 의존성 격리(어댑터·훅·컴포넌트 추상화)
-- 환경변수 분리(staging/production에서 광고 적용, dev에서 noop)
-- 검수 정책(앱인토스 광고 정책)과의 정합성 검증
-- 시범 적용 1~2곳(architect 결정 — 후보: 마이 레시피 목록 상단·하단, 생성 결과 화면 하단, 또는 보류)
-- SSOT 챕터(`11-ADS.md`)·ADR-014 발행 + AGENTS.md 갱신
+## 입력 전제 (Phase 3 완료)
 
-## 입력 전제 (현 시점)
+- ADR-012 동결 — D14~D18 (목록 라우트 `/my-recipes`, 캐시 무효화 Context+bump trigger, 저장 후 `/recipe/[id]` 직진, `NotFoundScreen` 단일 컴포넌트, EmptyState 정의, 페이지네이션 단순).
+- Phase 3 산출 (수정 0건 동결):
+  - `src/hooks/{useRecipeCache.tsx, useMyRecipes.ts, useRecipeDetail.ts, useSaveRecipe.ts}`
+  - `src/components/{RecipeCard,EmptyState,NotFoundScreen}.tsx` — RecipeCard는 Phase 4 즐겨찾기/삭제 prop 자리표시(`onToggleFavorite?`, `onDelete?`) 보유, 본 Phase에서 활성화.
+  - `src/pages/{my-recipes.tsx, recipe/[id].tsx, recipe/generate.tsx, index.tsx}`
+  - `src/_app.tsx` — `RecipeCacheProvider` 래핑됨.
+- Phase 1·2 동결(ADR-010·011) 그대로.
+- `src/services/recipes.ts` — `toggleFavorite`/`deleteRecipe` 메서드는 Phase 1 baseline에서 이미 정의 완료. 본 Phase는 호출 측(훅·컴포넌트·페이지) 작성이 핵심.
+- `pnpm typecheck`/`lint` PASS, QA FAIL 0건.
+- AGENTS.md: `src/{types,lib/zod,services,hooks,components,pages}/` 모두 Phase 3까지 갱신 완료.
 
-- **Phase 4 일시 보류** — `_workspace_phase4_paused/`로 보존. 즐겨찾기·삭제·404 통일은 다음 사이클에서 재개 가능.
-- **Phase 3 완료 동결** — Phase 3까지의 6 엔드포인트·라우팅·캐시·404 단일 컴포넌트(ADR-005·010·011·012) 그대로.
-- **토스 SDK 패키지** — `@apps-in-toss/framework@^2.6.0`이 이미 설치되어 있고 `@apps-in-toss/types@2.6.0`이 의존성으로 포함됨.
-- **콘솔** — `adGroupId` 발급은 앱인토스 콘솔에서 별도 신청·승인 필요(외부 의존성).
-- **GeneralPlugin-env** — `granite.config.ts`에서 빌드 시점 환경변수 주입 사용 중(09-ENV-CONFIG §9.4.2).
+## 산출물 (10-SPRINT-PLAN §10.5 출력)
 
-## 토스 광고 SDK 외부 인터페이스 (현재 확인)
+### 1. 즐겨찾기 토글 (기능 e)
 
-`node_modules/@apps-in-toss/framework/dist/index.d.ts` + `node_modules/.pnpm/@apps-in-toss+types@2.6.0/.../dist/index.d.ts` 인용:
+**API 계약** (03 §3.6): `PATCH /api/recipes/[id]/favorite`, 본문 `{ isFavorite: boolean }` (목표 값, 토글 아님 — 멱등). 응답 200 + `{ data: Recipe }`. 404·401·400·503 분기.
 
-### 1. `InlineAd` (인라인 배너) — `framework` root export
-```ts
-interface InlineAdProps extends BannerSlotCallbacks {
-  adGroupId: string;
-  theme?: 'auto' | 'light' | 'dark';
-  tone?: 'blackAndWhite' | 'grey';
-  variant?: 'expanded' | 'card';
-  impressFallbackOnMount?: boolean;
-}
-declare function InlineAd(props: InlineAdProps): JSX.Element | null;
+- **`useToggleFavorite`** 훅 신규
+  - 시그니처: `(id: string) => { toggle: (target: boolean) => Promise<void>, isPending: boolean, error: string | null }` (baseline에서 확정).
+  - `toggleFavorite(id, { isFavorite: target }, auth)` 호출 + 401 자동 재시도(`refresh` 주입).
+  - 성공 시: 마이 목록 + 상세 화면 일관성 보장 (baseline에서 결정 — `useRecipeCacheTrigger.invalidate()` 호출 / `useRecipeDetail.refetch()` 직접 호출 등).
+  - 404(`error.code === 'NOT_FOUND'`) 시: 상세 화면이면 `NotFoundScreen` 분기, 목록 카드면 캐시 무효화 후 카드 사라짐.
+  - AbortController unmount 처리 + cancelled 플래그 (기존 훅 패턴 준수).
 
-interface BannerSlotCallbacks {
-  onAdRendered?: (p: BannerSlotEventPayload) => void;
-  onAdViewable?: (p: BannerSlotEventPayload) => void;
-  onAdClicked?: (p: BannerSlotEventPayload) => void;
-  onAdImpression?: (p: BannerSlotEventPayload) => void;
-  onAdFailedToRender?: (p: BannerSlotErrorPayload) => void;
-  onNoFill?: (p: { slotId: string; adGroupId: string; adMetadata: Record<string, never> }) => void;
-}
+- **`FavoriteButton`** 컴포넌트 신규 (06 §6.4.5)
+  - props: `{ isFavorite: boolean; onToggle: (target: boolean) => void | Promise<void>; pending?: boolean }` (06 §6.4.5 — 멱등 목표값 콜백 시그니처 유지).
+  - TDS `IconButton` + `name="icon-star-bold-mono"`(채움)/`"icon-star-mono"`(비움) — Phase 4 baseline에서 정확한 icon name 확정 (TDS Icon 카탈로그 검증).
+  - `accessibilityState={{ selected: isFavorite }}` + `accessibilityLabel`(한국어).
+  - `disabled={pending}`.
 
-interface BannerSlotEventPayload {
-  slotId: string;
-  adGroupId: string;
-  adMetadata: { creativeId: string; requestId: string; styleId: string };
-}
+- **활성화 위치**:
+  - `RecipeCard.onToggleFavorite` 자리표시 prop 활성화 — `<FavoriteButton />` 합성. `recipe.isFavorite` 사용.
+  - 상세 화면(`/recipe/[id]`)에 즐겨찾기 버튼 추가 — 헤더(`PageNavbar.AccessoryButtons`) 또는 본문.
 
-interface BannerSlotErrorPayload {
-  slotId: string;
-  adGroupId: string;
-  adMetadata: Record<string, never>;
-  error: { code: number; message: string; domain?: string };
-}
-```
+- **낙관적 업데이트 정책** (AC4.1): baseline에서 결정.
+  - 안 a: 낙관적 — UI 즉시 별 채움 → 응답 OK → 그대로 / 실패 → 롤백.
+  - 안 b: 보수적 — pending 상태 표시 → 응답 OK 후 별 채움.
+  - 권장: 안 a (UX 우선, AC4.1과 일치). 롤백은 `useToggleFavorite` 내부에서 처리 또는 호출 측이 prev state 보관.
 
-### 2. `loadFullScreenAd` (전면 광고 사전 로드) — `framework` root export
-```ts
-declare const loadFullScreenAd: {
-  (params: LoadFullScreenAdParams): () => void;   // 반환값 = cancel 함수
-  isSupported: () => boolean;
-};
+### 2. 즐겨찾기 필터 (AC4.2)
 
-interface LoadFullScreenAdParams {
-  options: { adGroupId: string };
-  onEvent: (data: { type: 'loaded' }) => void;
-  onError: (err: unknown) => void;
-}
-```
+- **`FilterTabs`** 컴포넌트 신규 (06 §6.5 — TDS `SegmentedControl` 또는 `Tab`)
+  - props: `{ value: 'all' | 'favorite'; onChange: (v: 'all' | 'favorite') => void }`.
+  - 실재성 검증: baseline에서 `@toss/tds-react-native`의 `SegmentedControl`/`Tab` 표본 확인.
 
-### 3. `showFullScreenAd` (전면 광고 표시) — `framework` root export
-```ts
-declare function showFullScreenAd(params: ShowFullScreenAdParams): () => void;   // 반환값 = cancel 함수
-declare namespace showFullScreenAd {
-  var isSupported: () => boolean;
-}
+- **`/my-recipes` 페이지 확장**:
+  - 상단에 `<FilterTabs />` 렌더.
+  - `useMyRecipes({ ..., favorite: value === 'favorite' ? true : undefined })`.
+  - 필터 변경 시 `page` state 1로 리셋.
+  - 빈 상태 분기:
+    - 전체 0건 → 기존 EmptyState ("저장된 레시피가 없어요" + "레시피 만들러 가기").
+    - 즐겨찾기 0건 → EmptyState 재사용 ("즐겨찾기한 레시피가 없어요" + "전체 보기" 또는 "레시피 만들러 가기").
 
-interface ShowFullScreenAdParams {
-  options: { adGroupId: string };
-  onEvent: (data: ShowFullScreenAdEvent) => void;
-  onError: (err: unknown) => void;
-}
+### 3. 삭제 (기능 f)
 
-type ShowFullScreenAdEvent =
-  | { type: 'clicked' }
-  | { type: 'dismissed' }
-  | { type: 'failedToShow'; error: AdError }
-  | { type: 'impression' }
-  | { type: 'show' }
-  | { type: 'userEarnedReward'; amount: number; type_: string }
-  | { type: 'requested' };
+**API 계약** (03 §3.7): `DELETE /api/recipes/[id]`, 본문 없음. 응답 200 + `{ data: { id } }`. 멱등 참고 — 두 번째 호출은 404("이미 삭제됨"으로 처리 — 01-FEATURES AC3).
 
-interface AdError { code: number; message: string; domain?: string }
-```
+- **`useDeleteRecipe`** 훅 신규
+  - 시그니처: `(id: string) => { remove: () => Promise<void>, isPending: boolean, error: string | null }` (baseline에서 확정).
+  - `deleteRecipe(id, auth)` 호출 + 401 자동 재시도.
+  - 성공 시: `useRecipeCacheTrigger.invalidate()` 호출 → 마이 목록 자동 refetch (Phase 3 동일 패턴 — ADR-012 D15 재사용).
+  - 404 시: "이미 삭제됨"으로 정상 처리(에러 표시 없이 invalidate 후 navigate). baseline에서 확정.
+  - AbortController unmount 처리.
 
-## 산출물 (본 사이클)
+- **`DeleteConfirmDialog`** 컴포넌트 신규 (06 §6.5 — TDS `ConfirmDialog` 합성)
+  - props: `{ open: boolean; recipeName: string; onConfirm: () => void; onCancel: () => void; pending?: boolean }`.
+  - TDS `ConfirmDialog` 실재 확인됨 (`@toss/tds-react-native/dist/esm/components/dialog/ConfirmDialog.d.ts`). baseline에서 props 시그니처 확정.
+  - 확인 버튼: "삭제"(destructive 컬러) — TDS 권장 패턴.
+  - 취소 버튼: "취소".
+  - 한국어 카피: "이 레시피를 삭제할까요?\n삭제하면 되돌릴 수 없어요."
 
-### A. 문서 (SSOT)
+- **활성화 위치**:
+  - 상세 화면(`/recipe/[id]`) 에 삭제 버튼 추가 (`PageNavbar.AccessoryButtons` 또는 본문 footer).
+  - 삭제 성공 후: `navigation.goBack()` 또는 `navigate('/my-recipes', {})` (baseline 확정).
+  - 목록 화면(`/my-recipes`) `RecipeCard.onDelete` 자리표시 prop 활성화 여부: baseline 결정. **권장**: Phase 4 v1은 **상세 화면에서만 삭제** — 카드 측 onDelete는 자리표시 유지(과도한 swipe·long-press UX 회피). 카드 onDelete 활성화는 별 ADR.
 
-1. **`docs/appsintoss-port/11-ADS.md`** (신규 챕터)
-   - §11.0 이 챕터의 목적·읽기 순서
-   - §11.1 SDK 외부 인터페이스 인용 (위 3개 — 본 문서 사본 + 패키지 경로 인용)
-   - §11.2 적용 형태 선택 매트릭스 (Inline vs FullScreen vs 둘 다)
-   - §11.3 환경 분리 정책 (`ADS_ENABLED`/`ADS_INLINE_GROUP_ID`/`ADS_FULLSCREEN_GROUP_ID` — dev/staging/production)
-   - §11.4 미니앱 코드 의존성 격리 (어댑터 인터페이스 + dev noop 구현 + production 실 SDK 구현)
-   - §11.5 UX 가이드 (배너 위치·전면 광고 트리거 조건·빈도 제한·접근성·다크모드 `theme: 'auto'`)
-   - §11.6 검수 정책 정합성 (앱인토스 광고 정책·AI 면책 충돌 여부·CORS/도메인 화이트리스트 영향 0건 확인)
-   - §11.7 테스트 가능성 (어댑터 mock·이벤트 콜백 검증)
-   - §11.8 변경 이력
-2. **`docs/adr/ADR-014-toss-ads-integration.md`** (신규 ADR)
-   - 결정 카탈로그 (D25~D30 예상): 어댑터 분리 패턴, 환경변수 정책, dev noop 구현, 시범 적용 위치, 빈도 제한 정책, 광고 미수신(NoFill·Error) 시 UI 폴백.
+### 4. 404 UI 통일 (AC4.4)
 
-### B. 코드
+- 404 응답을 받는 3개 엔드포인트(`GET[id]` Phase 3 완료 / `PATCH favorite` / `DELETE`) 모두 동일 `NotFoundScreen` 컴포넌트로 라우팅.
+- Phase 3 baseline §H.2 #13 "단일 컴포넌트 정책" 강화 — `pages/`에서 `<ErrorPage statusCode={404}>` 직접 렌더 + 인라인 "찾을 수 없" 텍스트 금지 (Phase 4에서도 유지).
+- PATCH favorite 404 (상세 화면): `NotFoundScreen` 즉시 표시 + 캐시 invalidate.
+- PATCH favorite 404 (목록 카드): 캐시 invalidate → 카드 자동 제거 (별도 UI 없음).
+- DELETE 404: "이미 삭제됨"으로 정상 처리 → invalidate + navigate. UI는 NotFoundScreen 표시하지 않음 (사용자 의도 달성).
 
-3. **`src/lib/ads/types.ts`** (신규) — 어댑터 인터페이스 정의 (SDK 의존성 격리)
-   - `AdsAdapter` 인터페이스: `inline(props): JSX.Element`, `loadFullScreen(opts): Promise<void> | (() => void)`, `showFullScreen(opts): Promise<ShowResult>`, `isEnabled(): boolean`.
-   - 타입은 SDK 타입을 재export하되 어댑터를 통해서만 접근 — 직접 SDK import는 어댑터 구현 파일만 허용.
+### 5. 동시성 (AC4.5 + 멱등 검증)
 
-4. **`src/lib/ads/adapter.toss.ts`** (신규) — 토스 SDK 실 구현 어댑터
-   - `@apps-in-toss/framework`의 `InlineAd`/`loadFullScreenAd`/`showFullScreenAd`만 본 파일에서 import.
-   - SDK 이벤트를 단일 Promise/콜백 시그니처로 정규화.
+- PATCH favorite 두 번 빠르게 → 마지막 의도가 보장됨 (멱등 — `isFavorite` 목표 값 명시 덕분).
+- `useToggleFavorite` 내부: 직전 in-flight 요청 abort → 새 요청 발행. cancelled 플래그로 stale setState 차단.
+- 두 명의 다른 식별자 시나리오에서 격리 유지 (백엔드 옵션 P 미배포 시 PENDING, Phase 1·2·3과 동일 패턴).
 
-5. **`src/lib/ads/adapter.noop.ts`** (신규) — dev/테스트용 placeholder 어댑터
-   - `inline` → 회색 박스 + "광고 영역 (dev)" 텍스트 (TDS `View`+`Txt`).
-   - `loadFullScreen`/`showFullScreen` → 콘솔 로그 + 즉시 resolve. SDK 호출 없음.
+## 수용 기준 (10-SPRINT-PLAN §10.5 AC4.*)
 
-6. **`src/lib/ads/index.ts`** (신규) — 환경에 따라 어댑터 선택
-   - `import.meta.env.ADS_ENABLED === 'true'` → toss 어댑터, 아니면 noop.
-   - `import.meta.env.APP_ENV === 'development'` → 강제 noop (dev에서 광고 호출 차단).
-
-7. **`src/components/AppInlineAd.tsx`** (신규) — InlineAd 합성 컴포넌트
-   - props: `{ slot: 'my-recipes-top' | 'recipe-detail-bottom' | ... }` (architect 결정).
-   - 내부적으로 `ads.inline({ adGroupId: env.ADS_INLINE_GROUP_ID, theme: 'auto', tone: 'grey', variant: 'expanded' })`.
-   - 콜백을 통해 onAdImpression/Clicked 로깅(필요 시).
-
-8. **`src/hooks/useFullScreenAd.ts`** (신규) — load + show를 1회 호출로 묶은 훅
-   - 시그니처(baseline 확정): `() => { request: () => Promise<ShowResult>, isPending: boolean, error: string | null }`.
-   - 내부에서 `loadFullScreenAd` → 'loaded' 후 `showFullScreenAd` 호출. cleanup으로 cancel 함수 호출.
-   - dev noop에서는 즉시 dismissed 시뮬레이션.
-
-9. **`granite.config.ts`** (수정) — plugin-env에 광고 환경변수 추가
-   - `ADS_ENABLED: string`, `ADS_INLINE_GROUP_ID: string`, `ADS_FULLSCREEN_GROUP_ID: string`.
-   - `.env.local`(미트래킹) 예시 + `.env.staging`/`.env.production`(미트래킹) 사용법은 09-ENV-CONFIG 갱신에 명시.
-
-10. **시범 적용 (1~2곳, architect 결정)**:
-    - 후보 A: `src/pages/my-recipes.tsx` — 목록 상단/하단에 `<AppInlineAd slot="my-recipes-top" />`.
-    - 후보 B: `src/pages/recipe/generate.tsx` — 생성 완료 + 저장 후에 `useFullScreenAd().request()` (선택적).
-    - **권장**: 후보 A만 본 사이클에서 적용 — 전면 광고는 사용자 흐름 차단 위험 + 빈도 제한 정책 필요. ADR에서 결정.
-
-11. **AGENTS.md 갱신**:
-    - `src/lib/AGENTS.md`(없으면 신규) — 광고 어댑터 책임·SDK 의존성 격리 규칙.
-    - `src/components/AGENTS.md` 보강 — `AppInlineAd` 책임.
-    - `src/hooks/AGENTS.md` 보강 — `useFullScreenAd` 시그니처.
-
-### C. 운영
-
-12. **CLAUDE.md "현재 단계" 갱신** — Phase 4 보류 + Phase 4.5(토스 광고 기반) 완료 표기. 변경 이력에 행 추가.
+- **AC4.1**: 즐겨찾기 토글 시 별 즉시 채워짐 → 응답 OK → 그대로 / 실패 → 롤백.
+- **AC4.2**: 즐겨찾기 필터 토글 시 목록이 즉시 갱신.
+- **AC4.3**: 삭제 확인 → 200 + `{ data: { id } }` → 목록에서 제거.
+- **AC4.4**: 이미 삭제된 id로 다시 PATCH/DELETE 시 404 → 동일 "찾을 수 없어요" UI (PATCH) / "이미 삭제됨" 정상 처리 (DELETE).
+- **AC4.5**: 두 명의 다른 식별자 시나리오에서 격리 유지 (백엔드 옵션 P 미배포 시 코드 경로 PASS / 실 호출 PENDING).
 
 ## SSOT 인용 경로
 
 | 영역 | 챕터 |
 |------|------|
-| SDK 외부 인터페이스 | `node_modules/@apps-in-toss/framework/dist/index.d.ts:192-248` + `node_modules/.pnpm/@apps-in-toss+types@2.6.0/.../dist/index.d.ts:309-365` |
-| 환경변수 주입 | `docs/appsintoss-port/09-ENV-CONFIG.md` §9.4.2 (plugin-env) |
-| 비밀 키 정책(클라이언트 비포함) | `docs/appsintoss-port/09-ENV-CONFIG.md` §9.1.1 + `CLAUDE.md` 코드 규칙 #1 |
-| 검수 정책 | `docs/appsintoss-port/09-ENV-CONFIG.md` §9.6 + `appsintoss-publish-checklist` 스킬 |
-| TDS 사용 의무 (placeholder UI도 TDS) | `CLAUDE.md` 코드 규칙 #2 + ADR-009 D3 |
-| 어댑터 패턴(의존성 역전) | `software-design-principles` 스킬 |
-
-## 수용 기준
-
-- **AC4.5.1**: `pnpm typecheck` + `pnpm lint` PASS, FAIL 0건.
-- **AC4.5.2**: `import.meta.env.ADS_ENABLED !== 'true'` 또는 dev 환경에서는 noop 어댑터만 사용 — `@apps-in-toss/framework`의 광고 API가 호출되지 않음 (코드 경로 PASS).
-- **AC4.5.3**: 시범 적용 위치(architect 결정) 1곳 이상에 `<AppInlineAd />` 또는 `useFullScreenAd().request()`가 wiring되어 있음. 코드 경로 PASS.
-- **AC4.5.4**: `adGroupId`는 코드에 하드코딩 0건. 모두 `import.meta.env.ADS_*_GROUP_ID`에서.
-- **AC4.5.5**: SDK 직접 import(`@apps-in-toss/framework`의 `InlineAd`/`loadFullScreenAd`/`showFullScreenAd`)는 `src/lib/ads/adapter.toss.ts` 1곳에서만 발생.
-- **AC4.5.6**: `docs/appsintoss-port/11-ADS.md` + `docs/adr/ADR-014-toss-ads-integration.md` 발행. AGENTS.md 3곳 갱신.
-- **AC4.5.7**: `appsintoss-publish-checklist` 항목 중 광고 관련 정책 위반 0건(architect/qa 확인).
-- **AC4.5.8**: noop 어댑터의 placeholder UI가 TDS 컴포넌트(`View`+`Txt`)만 사용(검수 정책 — 모든 UI는 TDS 위).
+| PATCH favorite 엔드포인트(멱등·404·400·503) | `docs/appsintoss-port/03-API-CONTRACT.md` §3.6 |
+| DELETE 엔드포인트(200+id·404·503) | `03-API-CONTRACT.md` §3.7 |
+| `FavoriteButton` 매핑 (IconButton + 멱등 콜백) | `06-UI-MAPPING.md` §6.4.5 |
+| `DeleteConfirmDialog` 매핑 (TDS ConfirmDialog) | `06-UI-MAPPING.md` §6.5 |
+| `FilterTabs` 매핑 (SegmentedControl/Tab) | `06-UI-MAPPING.md` §6.5 |
+| 404 UI 단일 컴포넌트 (`NotFoundScreen`) | Phase 3 baseline §H.2 #13 + ADR-005 + ADR-012 D16 |
+| 캐시 무효화 (`useRecipeCacheTrigger.invalidate()`) | Phase 3 baseline §D.2 + ADR-012 D15 |
+| 401 자동 재시도 | `05-AUTH.md` §5.4 + ADR-010 D3 |
+| RecipeCard prop 자리표시 활성화 | Phase 3 baseline §B.2 + `src/components/RecipeCard.tsx:32-35` |
+| 디렉터리 책임 | `src/{hooks,components,pages}/AGENTS.md` |
+| Phase 1·2·3 동결 규약 | `ADR-010`, `ADR-011`, `ADR-012` |
+| 미니앱 코드 규칙 (TDS·zod·헤더 비노출) | `CLAUDE.md` 코드 규칙 |
 
 ## 비범위
 
-- **실 광고 송출 확인** — 콘솔에서 `adGroupId` 발급·승인이 별도 작업. 본 사이클은 코드 경로 PASS까지.
-- **빈도 제한·세션 한도** — D29 ADR로 결정만 (구현은 후속 사이클에서 측정 데이터 본 뒤).
-- **수익 분석·Analytics 연동** — onAdImpression/Clicked 콜백 위치만 마련. 분석 SDK 통합은 별 ADR.
-- **Phase 4 미완(즐겨찾기·삭제·404 통일)** — 별 사이클에서 재개. `_workspace_phase4_paused/` 보존.
-- **무한 스크롤·디자인 토큰 일괄 교체** — Phase 3 누적 미해결 그대로(Phase 5 또는 별 ADR).
+- Phase 5 — TDS 점검·번들 100MB·콘솔·검수 체크리스트 (별 Phase).
+- 카드 측 삭제 UX(swipe·long-press) — 별 ADR(Phase 4 v1은 상세 화면에서만 삭제).
+- 무한 스크롤 — Phase 5 출시 직전 별 ADR (Phase 3 누적 미해결).
+- 디자인 토큰 hex → adaptive 일괄 교체 — 별 ADR (Phase 3 누적 미해결).
+- 백엔드 옵션 P 배포 — 별 저장소 AIReceipe (본 저장소 외부 작업).
+- `useBackEvent` 하드웨어 백 — Phase 4 PATCH/DELETE 낙관적 업데이트 도입 시 검토 (보류 가능).
 
 ## 위험·완화
 
 | 위험 | 완화 |
 |------|------|
-| `adGroupId` 발급 전 빌드/실행 시 SDK가 어떻게 반응하는지 불명확 | dev에서 noop 강제. staging/production에서 `adGroupId` 없으면 빌드 시점 환경변수 누락 → AppInlineAd가 noop으로 폴백 (architect 결정). |
-| InlineAd `onNoFill`/`onAdFailedToRender` 시 UI 빈 공간 노출 | placeholder 또는 collapse 정책 — ADR-014 결정. |
-| 전면 광고 사용자 흐름 차단 (생성 직후) | 본 사이클에서는 전면 광고 시범 적용 보류 권장. ADR-014에서 결정. |
-| 광고 정책 위반(AI 면책 충돌, 도박/디지털 자산 광고) | `appsintoss-publish-checklist` 스킬로 사전 점검. 차단 카테고리는 콘솔에서 설정. |
-| `@apps-in-toss/framework` SDK 직접 import 누락 검사 | qa가 `src/{components,hooks,pages}/`에서 SDK 직접 import grep, 0건 검증(어댑터 외 0건). |
-| TDS 외 컴포넌트 사용 (noop placeholder) | placeholder도 `View`+`Txt`만. 검수 정책 §9.6 준수. |
-| `ADS_ENABLED` 분기 누락 — production 빌드에 실 SDK 호출 강제 | 어댑터 선택 로직(`src/lib/ads/index.ts`)에 단위 테스트 가능한 분기 로직. 환경변수 ↔ 어댑터 매핑 표 11-ADS §11.3에 명시. |
-| 새로 추가한 환경변수가 빌드에 누락 | `granite.config.ts`의 plugin-env 설정과 `src/env.d.ts` 자동 생성 검증. T1에서 baseline에 명시. |
-| Phase 4 미완 재개 시 누락 위험 | `_workspace_phase4_paused/` 보존 + CLAUDE.md "현재 단계"에 "Phase 4 보류" 명시 + Phase 4 인계 6항 그대로 유지. |
-| `LoadFullScreenAdEvent`/`ShowFullScreenAdEvent` 이벤트 다양함 ('requested', 'show', 'impression', 'clicked', 'dismissed', 'failedToShow', 'userEarnedReward') 처리 누락 | 어댑터에서 모든 이벤트를 표준 `AdResult` 객체로 정규화. `dismissed`만 Promise resolve, `failedToShow`/`onError`는 reject. baseline에서 정규화 매핑 표 확정. |
+| TDS Icon name(`icon-star-bold-mono`/`icon-star-mono`) 실재 확인 | baseline에서 TDS Icon 카탈로그 또는 `node_modules/@toss/tds-react-native` 표본 검증 → 실재 안 하면 대안 icon name 채택 + 06 §6.4.5 갱신. |
+| TDS `SegmentedControl`/`Tab` 둘 중 실재 확인 | baseline에서 표본 검증 → 둘 다 부재 시 `Button` 토글 합성. |
+| 낙관적 업데이트 롤백 정책 모호 | baseline §A.1·§A.2에서 안 a(낙관적+롤백)/안 b(보수적) 1택 + 롤백 위치(훅 내부 vs 호출 측) 명시. AC4.1 검증 시 두 시나리오(성공·실패) 코드 경로 PASS. |
+| PATCH favorite 성공 시 마이 목록 + 상세 화면 동시 갱신 정책 (Phase 3 baseline §D.2 인계 미결) | baseline에서 결정 — (1) `invalidate()` 호출 (마이 목록) + (2) 상세 화면은 응답 Recipe로 직접 state 업데이트 (refetch 회피 — UX 즉시성). |
+| DELETE 404 처리 (이미 삭제됨) — 에러 vs 성공 분기 | baseline에서 결정 — 404 시 `useDeleteRecipe`가 성공으로 정규화(invalidate + navigate). 사용자 의도 달성. 01-FEATURES AC3 인용. |
+| RecipeCard 카드 측 즐겨찾기 토글 시 무한 클릭 → 다중 PATCH | `FavoriteButton.pending` + `disabled={pending}` + 직전 in-flight abort. 멱등 덕분에 최종 일관성 보장. |
+| ConfirmDialog 백 버튼 처리(하드웨어 백·dimmer 클릭) | TDS `closeOnDimmerClick` + 백 버튼 시 onCancel 자동 호출. `useBackEvent` 별도 도입은 보류. |
+| 상세 화면 삭제 후 navigation — `goBack()` 시 마이 목록 자동 갱신 보장 | `useRecipeCacheTrigger.invalidate()`로 마이 목록 자동 refetch. `goBack()`로 충분 — `navigate('/my-recipes', {})`는 history 중복 우려. |
+| AC4.4 PATCH 404 시 NotFoundScreen 표시 위치 (상세 화면만 / 목록에도?) | baseline에서 결정 — 상세 화면만. 목록 카드는 invalidate로 자동 제거(별도 UI 없음). |
+| Phase 3 인계 — `useBackEvent` 도입 시점 | 본 Phase에서 보류 가능 — TDS Dialog 자체 백 처리 + navigation goBack로 충분. 별 ADR. |
+| 백엔드 옵션 P 배포 전 AC4.5 실증 불가 | Phase 1·2·3과 동일 PENDING 패턴 — 코드 경로 PASS + curl 시뮬레이션 기록. |

@@ -6,7 +6,8 @@
  * 책임:
  * - 식별자 가드 → `useRecipeDetail(id)` 결합 → 로딩/404/에러/정상 4-way 분기.
  * - 404 시 단일 `<NotFoundScreen />` 컴포넌트 — `<ErrorPage>` 직접 렌더·인라인 "찾을 수 없" 금지 (baseline §H.2 #13).
- * - 즐겨찾기 토글·삭제 버튼은 Phase 4 (자리표시 없이 본 Phase 미렌더).
+ * - **Phase 4 (ADR-013 D5·D7·D8)**: PageNavbar accessory에 FavoriteButton + 본문 하단에 삭제 Button + DeleteConfirmDialog.
+ *   낙관적 mutate(D4) + 삭제 성공·404 정규화(D6) 후 handleBack(D8).
  * - 새로고침·딥링크 정상(ADR-004) — `useRecipeDetail`이 단건 fetch.
  *
  * 불변식:
@@ -16,15 +17,19 @@
  * - validateParams 패턴은 Phase 2 `generate.tsx:39-50` 답습 (baseline §C.2).
  */
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { createRoute, useNavigation } from '@granite-js/react-native';
 import { Button, PageNavbar, Txt } from '@toss/tds-react-native';
 
+import { DeleteConfirmDialog } from '../../components/DeleteConfirmDialog';
+import { FavoriteButton } from '../../components/FavoriteButton';
 import { NotFoundScreen } from '../../components/NotFoundScreen';
 import { NutritionPanel } from '../../components/NutritionPanel';
 import { RecipeDisplay } from '../../components/RecipeDisplay';
+import { useDeleteRecipe } from '../../hooks/useDeleteRecipe';
 import { useRecipeDetail } from '../../hooks/useRecipeDetail';
+import { useToggleFavorite } from '../../hooks/useToggleFavorite';
 import { useTossUserId } from '../../hooks/useTossUserId';
 
 interface DetailParams {
@@ -44,7 +49,17 @@ function RecipeDetailPage() {
   const { id } = Route.useParams();
   const navigation = useNavigation();
   const { tossUserId } = useTossUserId();
-  const { data: recipe, isLoading, notFound, error, refetch } = useRecipeDetail(id);
+  const {
+    data: recipe,
+    isLoading,
+    notFound,
+    error,
+    refetch,
+    mutate,
+  } = useRecipeDetail(id);
+  const { toggle, pendingId, error: favoriteError } = useToggleFavorite();
+  const { remove, isPending: deletePending, error: deleteError } = useDeleteRecipe(id);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const handleBack = useCallback(() => {
     if (navigation.canGoBack?.()) {
@@ -53,6 +68,46 @@ function RecipeDetailPage() {
       navigation.navigate('/my-recipes', {});
     }
   }, [navigation]);
+
+  /**
+   * 즐겨찾기 토글 — baseline D4·D5·D9.
+   * 1) 낙관적: mutate({ ...recipe, isFavorite: target }) — 별 즉시.
+   * 2) toggle 호출 → 성공 시 응답 Recipe로 재 mutate (서버 truth 확정, refetch GET 회피 — D5).
+   * 3) 실패 null 반환 → rollback (prev로 mutate). 토스트는 favoriteError로 노출.
+   * 4) 404는 mutate가 실패해도 useRecipeDetail 자체는 그대로 — 사용자가 다시 진입하면 notFound 분기. 본 사이클에서는 별 UI 강요 없음.
+   */
+  const handleToggleFavorite = useCallback(
+    async (target: boolean) => {
+      if (!recipe) return;
+      const prev = recipe;
+      mutate({ ...prev, isFavorite: target });
+      const updated = await toggle(prev.id, target);
+      if (updated) {
+        mutate(updated);
+      } else {
+        mutate(prev);
+      }
+    },
+    [recipe, mutate, toggle],
+  );
+
+  const handleOpenDeleteConfirm = useCallback(() => setConfirmOpen(true), []);
+  const handleCancelDelete = useCallback(() => {
+    if (!deletePending) setConfirmOpen(false);
+  }, [deletePending]);
+
+  /**
+   * 삭제 확정 — baseline D6·D8.
+   * - useDeleteRecipe.remove(): 성공·404 정규화 모두 true → invalidate + handleBack.
+   * - false 반환 시 deleteError로 사용자에게 노출 후 다이얼로그 유지.
+   */
+  const handleConfirmDelete = useCallback(async () => {
+    const ok = await remove();
+    if (ok) {
+      setConfirmOpen(false);
+      handleBack();
+    }
+  }, [remove, handleBack]);
 
   // 식별자 가드 (Phase 3 baseline §C.4 + 07 §7.5.2).
   if (tossUserId === undefined) {
@@ -79,6 +134,15 @@ function RecipeDetailPage() {
     <View style={styles.root}>
       <PageNavbar>
         <PageNavbar.Title>{recipe?.dishName ?? '레시피'}</PageNavbar.Title>
+        {recipe ? (
+          <PageNavbar.AccessoryButtons>
+            <FavoriteButton
+              isFavorite={recipe.isFavorite}
+              onToggle={handleToggleFavorite}
+              pending={pendingId === recipe.id}
+            />
+          </PageNavbar.AccessoryButtons>
+        ) : null}
       </PageNavbar>
 
       <ScrollView
@@ -115,10 +179,48 @@ function RecipeDetailPage() {
           <View style={styles.result}>
             <RecipeDisplay recipe={recipe} />
             <NutritionPanel nutrition={recipe.nutrition} />
-            {/* Phase 4 진입 시 즐겨찾기·삭제 버튼이 actions slot으로 추가된다. */}
+
+            {favoriteError ? (
+              <View style={styles.toastBox} accessibilityLabel="즐겨찾기 변경 실패">
+                <Txt typography="st9" color="#C0392B">
+                  {favoriteError}
+                </Txt>
+              </View>
+            ) : null}
+
+            {deleteError ? (
+              <View style={styles.toastBox} accessibilityLabel="삭제 실패">
+                <Txt typography="st9" color="#C0392B">
+                  {deleteError}
+                </Txt>
+              </View>
+            ) : null}
+
+            <View style={styles.deleteActions}>
+              <Button
+                type="danger"
+                style="weak"
+                display="block"
+                size="medium"
+                onPress={handleOpenDeleteConfirm}
+                disabled={deletePending}
+              >
+                레시피 삭제
+              </Button>
+            </View>
           </View>
         ) : null}
       </ScrollView>
+
+      {recipe ? (
+        <DeleteConfirmDialog
+          open={confirmOpen}
+          recipeName={recipe.dishName}
+          onConfirm={handleConfirmDelete}
+          onCancel={handleCancelDelete}
+          pending={deletePending}
+        />
+      ) : null}
     </View>
   );
 }
@@ -147,5 +249,13 @@ const styles = StyleSheet.create({
   },
   result: {
     gap: 24,
+  },
+  toastBox: {
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: '#FBE9E9',
+  },
+  deleteActions: {
+    marginTop: 8,
   },
 });

@@ -1,9 +1,10 @@
-# Phase 4 Baseline — 즐겨찾기·삭제 + 404 UI 통일 (기능 e, f) **[보류 - 2026-05-25 토스 광고 우선순위 전환]**
+# Phase 4 Baseline — 즐겨찾기·삭제 + 404 UI 통일 (기능 e, f)
 
 > 작성: miniapp-architect · 2026-05-25 · 팀 `airecipe-miniapp-phase4`
-> 상태: **부분 — TDS 실재성 검증 완료 + 13 결정 중 13/13 사전 동결 가능 / baseline 정식 발행 미완**
-> 다음 세션 진입점: 본 파일 §F 작업 분할 다이어그램 + §G ADR-013 결정 카탈로그를 정식 baseline(`01_architect_phase4_baseline.md`)으로 승격.
-> 보류 워크스페이스 이름: `_workspace_phase4_paused/`(권장).
+> **재개**: 2026-05-25 orchestrator(메인 세션 — 팀 1개 동시 제약으로 architect-as-orchestrator) — Phase 4.5(`_workspace_phase45/`) 완료 후 Phase 4 재개. partial을 정식 승격 + Button props 정정 추가.
+> 상태: **정식 — TDS 실재성 검증 완료 + 13 결정 동결**.
+
+> **재개 시 정정 사항 (2026-05-25)**: `ConfirmDialog.Button = DoubleButtonItem = ComponentProps<typeof Button>`. TDS Button 실제 props는 `type: 'primary'|'danger'|'light'|'dark'` + `style: 'fill'|'weak'` 두 prop 분할(Button.d.ts 인용). partial 초안의 `display="secondary"`/`display="critical"`은 부정확 — 정정 동결: 취소 `type="light" style="weak"`, 삭제 `type="danger" style="fill"`. `display`는 ConfirmDialog 내부에서 자동 처리됨(생략 OK).
 > 입력 SSOT: `_workspace/00_input/requirements.md`, `docs/appsintoss-port/03·06`, `docs/adr/ADR-005·010·011·012`, `_workspace_phase3/01_architect_phase3_baseline.md`, Phase 3 산출 코드.
 
 ---
@@ -73,12 +74,12 @@ export function DeleteConfirmDialog({
       onClose={onCancel}
       onExited={() => { /* close 애니메이션 종료 — no-op (호출 측이 open=false 유지) */ }}
       leftButton={
-        <ConfirmDialog.Button display="secondary" onPress={onCancel} disabled={pending}>
+        <ConfirmDialog.Button type="light" style="weak" onPress={onCancel} disabled={pending}>
           취소
         </ConfirmDialog.Button>
       }
       rightButton={
-        <ConfirmDialog.Button display="critical" onPress={onConfirm} loading={pending} disabled={pending}>
+        <ConfirmDialog.Button type="danger" style="fill" onPress={onConfirm} loading={pending} disabled={pending}>
           삭제
         </ConfirmDialog.Button>
       }

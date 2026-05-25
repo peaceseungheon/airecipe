@@ -10,8 +10,8 @@
 |------|--------|------|------|
 | `index.tsx` | `/` (홈) | PageNavbar(+AccessoryButtons 마이 진입) + SearchForm. 제출 → `/recipe/generate` 진입 (params). 공개 endpoint — useTossUserId 미사용 | 07 §7.3.1, Phase 2 baseline §A.5, Phase 3 baseline §A.3 #7 |
 | `recipe/generate.tsx` | `/recipe/generate` | PageNavbar + SearchForm + 진행 인디케이터 + 에러 박스 + RecipeDisplay/NutritionPanel + **저장 버튼**(`useSaveRecipe` 결합 → `/recipe/[id]` 직진). 공개 endpoint — useTossUserId 미사용 (useSaveRecipe는 훅 내부에서 사용) | 07 §7.3.2, 08 §8.3~8.5, Phase 2 baseline §A.5, Phase 3 baseline §A.3·§A.4 |
-| `my-recipes.tsx` (Phase 3) | `/my-recipes` | 보호 화면 — useTossUserId 가드 + useMyRecipes 결합. 로딩/에러/EmptyState/RecipeCard 목록 4-way 분기 + 단순 페이지네이션(이전/다음 + `meta.pageSize` 신뢰) | 07 §7.3.3, ADR-012 D14·D15·D18, Phase 3 baseline §A.3·§C.1·§C.4·§C.5 |
-| `recipe/[id].tsx` (Phase 3) | `/recipe/[id]` | 보호 화면 — useTossUserId 가드 + useRecipeDetail 결합. 로딩/404/에러/정상 4-way 분기. 404 → `<NotFoundScreen onBack={handleBack} />` 단일 컴포넌트. handleBack은 `canGoBack?.()` + fallback `/my-recipes` | 07 §7.3.4, ADR-004·005, ADR-012 D14·D16, Phase 3 baseline §A.3·§C.2·§C.4 |
+| `my-recipes.tsx` (Phase 3·4·4.5) | `/my-recipes` | 보호 화면 — useTossUserId 가드 + useMyRecipes 결합. **Phase 4(ADR-013)**: 상단 FilterTabs(전체/즐겨찾기) + RecipeCard.onToggleFavorite 활성화(낙관적 mutate). **Phase 4.5(ADR-014)**: 빈+정상 양쪽 하단 `<AppInlineAd slot="my-recipes-bottom" />`(로딩/에러 미렌더). 단순 페이지네이션(이전/다음 + `meta.pageSize` 신뢰) | 07 §7.3.3, ADR-012 D14·D15·D18, ADR-013 D4·D9·D11, ADR-014 D30 |
+| `recipe/[id].tsx` (Phase 3·4) | `/recipe/[id]` | 보호 화면 — useTossUserId 가드 + useRecipeDetail 결합. 로딩/404/에러/정상 4-way 분기. 404 → `<NotFoundScreen onBack={handleBack} />` 단일 컴포넌트. **Phase 4(ADR-013)**: PageNavbar.AccessoryButtons에 FavoriteButton + 본문 하단 삭제 Button + DeleteConfirmDialog. 낙관적 mutate(D4) + 삭제 성공·404 정규화 후 handleBack(D8). handleBack은 `canGoBack?.()` + fallback `/my-recipes` | 07 §7.3.4, ADR-004·005, ADR-012 D14·D16, ADR-013 D5·D6·D7·D8·D9, Phase 3 baseline §A.3·§C.2·§C.4 |
 
 ## 규약 (강제)
 
@@ -27,6 +27,9 @@
 - **`recipe.id` 참조 OK 위치 한정** — 생성 결과는 `GeneratedRecipe`(id 없음, RecipeDisplay 호환). 저장된 Recipe는 `my-recipes.tsx`(목록 map key + onPress 콜백) + `/recipe/[id]`(Route.useParams id) + RecipeCard에서 사용 (Phase 3 baseline §H.2 #11). RecipeDisplay 내부에서는 여전히 0건.
 - **404 UI는 `<NotFoundScreen onBack={...} />` 단일 컴포넌트만** — Phase 3 baseline §H.2 #13. `<ErrorPage statusCode={404}>` 직접 렌더 + 인라인 "찾을 수 없어요" 텍스트 0건. Phase 4 PATCH/DELETE 404 시점에서도 동일 컴포넌트 재사용 보장.
 - **`useMyRecipes`의 `meta.pageSize` 신뢰** — Phase 3 baseline §H.2 #18. lastPage 계산은 `Math.ceil(meta.total / meta.pageSize)`. `query.pageSize`로 계산 금지 (ADR-006 clamp 적용값과 일관).
+- **낙관적 UI는 호출 측 책임** (Phase 4) — ADR-013 D19. 페이지가 (a) `mutate(next)` 즉시 적용 → (b) `await toggle(id, target)` 호출 → (c) `null` 시 `mutate(prev)` 롤백. `useMyRecipes.mutate`(목록 안 매칭 항목 교체) + `useRecipeDetail.mutate`(단건 교체) 둘 다 활용. PATCH 응답 Recipe를 호출 측이 받아 `mutate(updated)`로 서버 truth 확정(refetch GET 회피 — D20).
+- **`useToggleFavorite`는 단일 hook 인스턴스로 카드 목록 공유** (Phase 4) — ADR-013 D24. 카드 map 안에서 hook 호출 금지(rules of hooks). 페이지 상단에서 1회 호출 후 `toggle(id, target)` + `pendingId === card.id` 패턴.
+- **DeleteConfirmDialog는 상세 화면만** (Phase 4) — ADR-013 D22. 카드 측 삭제 트리거(swipe·long-press)는 별 ADR. 상세 화면에서만 `setConfirmOpen` state + DeleteConfirmDialog 합성. 삭제 성공·404 정규화 모두 handleBack(D8).
 
 ## SSE 상태 결합 패턴 (`recipe/generate.tsx` 인용)
 

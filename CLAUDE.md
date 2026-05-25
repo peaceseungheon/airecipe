@@ -70,7 +70,48 @@ AI 레시피 안내 — 앱인토스 미니앱 (React Native + Granite + TDS).
 
 ## 현재 단계
 
-**Phase 4 일시 보류 + Phase 4.5(토스 광고 SDK 기반) 완료** (2026-05-25).
+**Phase 4(즐겨찾기·삭제·404 통일) 완료 → Phase 5 진입 준비** (2026-05-25).
+
+### Phase 4 — 즐겨찾기·삭제·404 통일 (ADR-013, 본 차)
+
+Phase 4.5(토스 광고 기반) 완료 후 Phase 4 재개. **코드 경로 ALL PASS** — Q1~Q9 매트릭스 9/9 PASS + D19~D24 시행 6/6 PASS + AC4.1~AC4.4 4/4 PASS, FAIL 0건 (`_workspace/03_qa_report.md`). typecheck PASS, lint 0 errors. AC4.5는 백엔드 옵션 P 배포 후 실증 PENDING (Phase 1·2·3·4.5 동일 누적).
+
+6 결정 동결 (ADR-013 D19~D24): 낙관적 안 a + 호출 측 prev 보관(D19) / PATCH 성공 시 invalidate + 상세 mutate refetch 회피(D20) / DELETE 404 성공 정규화(D21) / 삭제 상세 화면만(D22) / **ConfirmDialog 정정** — `leftButton`/`rightButton` ReactElement + `onClose`/`onExited` 필수, Button props는 `type`/`style` 두 prop(D23) / `useToggleFavorite` id 가변 시그니처(D24 — rules of hooks).
+
+코드 산출 (Phase 4 동결 — Phase 3·4.5 누적 위에 추가):
+- `src/hooks/useToggleFavorite.ts` (신규) — id 가변 + pendingId 추적(D24) + 직전 in-flight abort + invalidate(D13).
+- `src/hooks/useDeleteRecipe.ts` (신규) — 404 성공 정규화(D21) + invalidate.
+- `src/hooks/useMyRecipes.ts` (확장) — `mutate(next: Recipe)` 추가 — 낙관적 mutation 지원(D19).
+- `src/hooks/useRecipeDetail.ts` (확장) — `mutate(next: Recipe)` 추가 — PATCH 응답 직접 갱신, refetch GET 회피(D20).
+- `src/components/FavoriteButton.tsx` (신규) — TDS `IconButton` + 멱등 목표값 콜백(`!isFavorite` 전달) + 접근성.
+- `src/components/FilterTabs.tsx` (신규) — TDS `SegmentedControl.Root` + `.Item` 2-state.
+- `src/components/DeleteConfirmDialog.tsx` (신규) — TDS `ConfirmDialog` 합성. `leftButton`/`rightButton`은 `ConfirmDialog.Button`(취소 `type="light" style="weak"`, 삭제 `type="danger" style="fill"`).
+- `src/components/RecipeCard.tsx` (확장) — `onToggleFavorite` 자리표시 활성화(header에 FavoriteButton 합성) + `favoritePending` prop. `onDelete?`는 자리표시 유지(D22).
+- `src/pages/my-recipes.tsx` (확장) — 상단 FilterTabs + RecipeCard.onToggleFavorite + 낙관적 mutate(prev/next 패턴) + filter 변경 시 page 1 리셋 + 빈 상태 분기(전체 0건 / 즐겨찾기 0건).
+- `src/pages/recipe/[id].tsx` (확장) — PageNavbar.AccessoryButtons에 FavoriteButton + 본문 하단 삭제 Button + DeleteConfirmDialog state + 낙관적 mutate + 삭제 성공·404 정규화 후 handleBack.
+
+라우트 신규 0건 — Phase 3 4 라우트 그대로 유지.
+
+### 누적 미해결 (Phase 1~4)
+- **SDK 패키지 경로** (`@apps-in-toss/web-framework` 미해결) — dev server 첫 실행 시점 검증.
+- **AbortSignal cast 2곳** — ADR-011 D13. Phase 5 재평가.
+- **`useBackEvent` 하드웨어 백** — 본 사이클 ConfirmDialog `closeOnDimmerClick` + dimmer click 처리로 해결. 별 ADR 불필요.
+- **디자인 토큰 hex 직접 사용** — Phase 5 진입 전 별 ADR.
+- **백엔드 옵션 P 배포** — 별 저장소 AIReceipe.
+- **무한 스크롤** — Phase 5 별 ADR.
+- **콘솔 `adGroupId` 발급·승인** — Phase 4.5 외부 작업.
+- **전면 광고 wiring + 빈도 제한** — ADR-014 D30·D34 후속.
+- **Analytics SDK 통합** — ADR-014 D33 후속.
+- **카드 측 삭제 UX (swipe·long-press)** — ADR-013 D22 후속 별 ADR.
+- **다중 동시 PATCH 큐** — Phase 4 v1 한계, 별 ADR.
+
+> 본 절은 Phase 4 갱신 — 이전 Phase 산출은 각 phase의 session log(`_workspace_phase1~3/04_session_log.md`, `_workspace_phase45/04_session_log.md`) 참조.
+
+Phase별 수용 기준은 `docs/appsintoss-port/10-SPRINT-PLAN.md`. 결정 트리는 `docs/adr/ADR-009·010·011·012·013·014`.
+
+---
+
+## (이전) Phase 4 일시 보류 + Phase 4.5(토스 광고 SDK 기반) 완료 (2026-05-25 오전).
 
 ### Phase 4.5 — 토스 광고 SDK 기반 작업 (ADR-014, 본 차)
 
@@ -162,6 +203,7 @@ Phase별 수용 기준은 `docs/appsintoss-port/10-SPRINT-PLAN.md`. 결정 트�
 | 2026-05-23 | 초기 구성 (4인 팀 + miniapp-orchestrator + 워커 5: technical-documentation, software-design-principles, integration-coherence-qa, granite-rn-development, appsintoss-publish-checklist) | 전체 | RN+Granite+TDS 미니앱 도메인. 별 저장소 AIReceipe의 하네스를 백엔드 분리·TDS 의무·검수 컨텍스트로 재설계 이식. `ai-recipe-integration`·`nextjs-fullstack` 제거, `granite-rn-development`·`appsintoss-publish-checklist` 신규. backend 에이전트 → api-client로 재정의 |
 | 2026-05-24 | Phase 3 완료 갱신 — "현재 단계" 절 재작성 (Phase 2 완료 → Phase 3 완료), Phase 4 진입 인계 + 누적 미해결 6항 명시 | CLAUDE.md | Phase 3 마무리(T5) — ADR-012 동결 + AGENTS.md 3종 보강 + 06 §6.5 갱신과 함께 본 문서도 동기 갱신 |
 | 2026-05-25 | Phase 4 일시 보류 + Phase 4.5(토스 광고 SDK 기반) 완료 — "현재 단계" 절 재작성, Phase 4 재개 인계(_workspace_phase4_paused + ConfirmDialog 정정), Phase 4.5 산출 13 파일 + 누적 미해결 10항 명시. 팀 1개 동시 제약으로 메인 세션이 architect/api-client/frontend/qa 역할 통합 수행 — `airecipe-miniapp-phase4` 팀 미완 상태로 보존(api-client/frontend/qa 3명 shutdown 미응답 idle). | CLAUDE.md | Phase 4.5 마무리 — ADR-014 D25~D38 13 결정 동결 + 11-ADS.md 신규 SSOT + AGENTS.md 3종(src/lib 신규·components/hooks 보강) + 토스 광고 어댑터 격리 시범 적용 완료와 함께 본 문서 동기 갱신 |
+| 2026-05-25 | Phase 4 재개 + 완료 — "현재 단계" 절 재작성(Phase 4 완료 → Phase 5 진입 준비), 산출 10 파일(신규 5 + 확장 4 + Phase 3 그대로 1) + 누적 미해결 11항 갱신(useBackEvent 해결 표기). `_workspace_phase45` 보존 + `_workspace_phase4_paused` → `_workspace` 재개. ADR-013(D19~D24 6 결정 — 낙관적 안 a + PATCH refetch 회피 + DELETE 404 정규화 + 삭제 상세만 + ConfirmDialog 정정 + useToggleFavorite id 가변) 발행 + 06 §6.5 갱신(FilterTabs/DeleteConfirmDialog/FavoriteButton + ConfirmDialog props 정정) + AGENTS.md 3종 보강 | CLAUDE.md | Phase 4 마무리 — Q1~Q9 + D19~D24 + AC4.1~AC4.4 ALL PASS, typecheck/lint 0 errors. AC4.5는 백엔드 옵션 P 배포 PENDING. Phase 5 진입 준비. |
 
 ---
 
