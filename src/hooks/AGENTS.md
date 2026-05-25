@@ -54,6 +54,7 @@ export function formatTossUserIdMask(hash: TossUserId | undefined): string;  // 
 | `useMyRecipes.ts` (Phase 3) | 마이 목록 조회 — `listRecipes` raw `{data, meta}` 보존 (ADR-010 D5 예외). `trigger`를 useEffect dep에 포함. 401 자동 재시도(refresh 주입) | 03 §3.3, ADR-006(meta.pageSize 신뢰), Phase 3 baseline §A.1 |
 | `useRecipeDetail.ts` (Phase 3) | 단건 조회 — `getRecipe` + **404 정규화**(ApiClientError code NOT_FOUND → `notFound:true`, error null). trigger dep 미포함(상세는 id 단건) | 03 §3.4, ADR-004·005, ADR-012 D16, Phase 3 baseline §A.1·§D.5 |
 | `useSaveRecipe.ts` (Phase 3) | 저장 mutation — `save(recipe): Promise<Recipe \| null>`. 성공 시 `invalidate()` 정확 1회. 실패 시 0건(stale 마이 유지). AbortController unmount + cancelled 플래그 | 03 §3.5, ADR-012 D15·D17, Phase 3 baseline §A.1·§A.4·§D.3 |
+| `useFullScreenAd.ts` (Phase 4.5) | 전면 광고 — `ads.showFullScreen({ signal })` 위임. `{ request: () => Promise<AdResult>, isPending, error }`. AbortController unmount + 직전 in-flight abort. **Phase 4.5는 wiring 0곳(코드 경로만)** | 11-ADS §11.4, ADR-014 D30·D31·D32 |
 
 ## Phase 2·3 추가 규약 (Phase 1 규약 위에 누적)
 
@@ -64,6 +65,7 @@ export function formatTossUserIdMask(hash: TossUserId | undefined): string;  // 
 - **id 정규화 책임** — `useRecipeDetail`이 catch 첫 분기에서 NOT_FOUND를 `notFound: true` state로 변환. 화면 측은 try/catch 없이 `notFound` 분기만 (ADR-005·ADR-012 D16).
 - **사용자 친화 한국어 에러 매핑** — `ApiErrorCode` 8종 모두 매핑 (4 훅 모두 동일 표). NOT_FOUND는 useRecipeDetail에서 notFound state로 분기되므로 메시지 표는 완전성 유지용.
 - **`useSaveRecipe.save` 성공 시 invalidate 정확 1회** — Phase 3 baseline §H.2 #15. 실패 catch는 setError만. Phase 4 mutation 훅도 동일 패턴 답습.
+- **광고 SDK 직접 import 금지** (Phase 4.5) — ADR-014 D26. `useFullScreenAd`는 `../lib/ads`의 `ads.showFullScreen`만 사용. 본 디렉토리에서 `@apps-in-toss/framework`의 광고 API import 0건. (Toss 인증 SDK `getAnonymousKey`는 광고와 무관, 본 규약 대상 외.)
 
 ## 비범위 (Phase 3)
 

@@ -25,3 +25,6 @@ coverage/
 
 # plugin-env 자동 생성 (09-ENV-CONFIG §9.4.2 — 빌드 시점 주입)
 src/env.d.ts
+
+# Claude harness 런타임 산출
+.claude/scheduled_tasks.lock

@@ -14,6 +14,9 @@
  * - href/useRouter/Link 0건 — useNavigation/Route.useParams.
  * - 즐겨찾기 필터 토글은 Phase 4 — 본 Phase는 query.favorite 미사용(전체 목록만).
  * - `meta.pageSize` 신뢰 — query.pageSize로 페이지 계산 금지 (baseline §H.2 #18).
+ *
+ * Phase 4.5 (ADR-014 D30): 빈 상태와 정상 목록 양쪽 하단에 `<AppInlineAd slot="my-recipes-bottom" />`.
+ * 로딩/에러 분기에는 미렌더 — 사용자 컨텍스트 부적합 (G8). 광고 활성/비활성은 환경변수 게이트.
  */
 
 import React, { useCallback, useMemo, useState } from 'react';
@@ -21,6 +24,7 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import { createRoute, useNavigation } from '@granite-js/react-native';
 import { Button, PageNavbar, Txt } from '@toss/tds-react-native';
 
+import { AppInlineAd } from '../components/AppInlineAd';
 import { EmptyState } from '../components/EmptyState';
 import { RecipeCard } from '../components/RecipeCard';
 import { useMyRecipes } from '../hooks/useMyRecipes';
@@ -122,12 +126,17 @@ function MyRecipesPage() {
             </View>
           </View>
         ) : data.length === 0 ? (
-          <EmptyState
-            title="아직 저장된 레시피가 없어요"
-            description="AI에게 첫 레시피를 추천받아 보세요."
-            actionLabel="첫 레시피 만들기"
-            onAction={handleGoGenerate}
-          />
+          <>
+            <EmptyState
+              title="아직 저장된 레시피가 없어요"
+              description="AI에게 첫 레시피를 추천받아 보세요."
+              actionLabel="첫 레시피 만들기"
+              onAction={handleGoGenerate}
+            />
+            <View style={styles.adSlot}>
+              <AppInlineAd slot="my-recipes-bottom" />
+            </View>
+          </>
         ) : (
           <View style={styles.list}>
             {data.map((recipe) => (
@@ -163,6 +172,10 @@ function MyRecipesPage() {
             <Txt typography="st9" color="#8B95A1" style={styles.pageInfo}>
               {`${page} / ${lastPage} 페이지 · 총 ${total}개`}
             </Txt>
+
+            <View style={styles.adSlot}>
+              <AppInlineAd slot="my-recipes-bottom" />
+            </View>
           </View>
         )}
       </ScrollView>
@@ -203,5 +216,8 @@ const styles = StyleSheet.create({
   pageInfo: {
     textAlign: 'center',
     marginTop: 4,
+  },
+  adSlot: {
+    marginTop: 16,
   },
 });

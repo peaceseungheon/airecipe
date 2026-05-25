@@ -70,7 +70,41 @@ AI 레시피 안내 — 앱인토스 미니앱 (React Native + Granite + TDS).
 
 ## 현재 단계
 
-**Phase 3 완료 → Phase 4 진입 준비** (2026-05-24).
+**Phase 4 일시 보류 + Phase 4.5(토스 광고 SDK 기반) 완료** (2026-05-25).
+
+### Phase 4.5 — 토스 광고 SDK 기반 작업 (ADR-014, 본 차)
+
+`@apps-in-toss/framework`의 `InlineAd`/`loadFullScreenAd`/`showFullScreenAd`를 어댑터 격리 패턴으로 도입. **코드 경로 ALL PASS** — G1~G9 매트릭스 9/9 PASS, typecheck/lint 0 errors (`_workspace/03_qa_report.md`). 13 결정 동결(ADR-014 D25~D38) + 신규 SSOT 챕터 `docs/appsintoss-port/11-ADS.md` 발행. SDK 직접 import는 `src/lib/ads/adapter.toss.tsx` 1곳만(`grep` 검증). 시범 적용: `src/pages/my-recipes.tsx` 빈 EmptyState 아래 + 정상 목록 pageInfo 아래 양쪽에 `<AppInlineAd slot="my-recipes-bottom" />` 1회씩(로딩/에러 분기 미렌더). 환경 분기: `APP_ENV='local'` OR `ADS_ENABLED!=='true'` → noop, 그 외 toss 어댑터(D27).
+
+코드 산출 (Phase 4.5 동결):
+- `src/lib/ads/types.ts` (신규) — `AdsAdapter` 인터페이스 + `InlineAdSlotProps` + `AdResult` 5종.
+- `src/lib/ads/adapter.toss.tsx` (신규) — 토스 SDK 실 구현. SDK 직접 import 단일 위치. 7 이벤트(`requested/show/impression/clicked/dismissed/failedToShow/userEarnedReward`) → `AdResult` 정규화(D32). cancelLoad/cancelShow + AbortSignal cleanup.
+- `src/lib/ads/adapter.noop.tsx` (신규) — dev placeholder. TDS `View`+`Txt`만(D29).
+- `src/lib/ads/index.ts` (신규) — 환경 분기로 `ads` 객체 export.
+- `src/components/AppInlineAd.tsx` (신규) — `ads.InlineAdSlot` 위임. BannerSlotCallbacks 미노출(D33).
+- `src/hooks/useFullScreenAd.ts` (신규) — `ads.showFullScreen` 위임. AbortController unmount cleanup. **Phase 4.5는 wiring 0곳**(D30 — 코드 경로만).
+- `granite.config.ts` (확장) — env 키 3개 추가(`ADS_ENABLED`, `ADS_INLINE_GROUP_ID`, `ADS_FULLSCREEN_GROUP_ID`).
+- `src/env.d.ts` (수동 sync — D38) — `.gitignore` 대상이라 빌드 시 plugin-env 재생성.
+- `src/pages/my-recipes.tsx` (확장) — 빈+정상 양쪽 하단에 AppInlineAd. 로딩/에러 미렌더(G8).
+- `eslint.config.mjs` (보강) — `.granite/**` ignore 추가(빌드 산출물 검사 제외).
+- `src/lib/AGENTS.md` (신규) + `src/components/AGENTS.md`/`src/hooks/AGENTS.md` (보강) — 광고 SDK 직접 import 금지 규약 명시.
+
+### Phase 4.5 PENDING (외부 또는 별 ADR)
+
+| 항목 | 사유 | 해소 조건 |
+|------|------|----------|
+| 실 광고 송출 검증 | 콘솔에서 `adGroupId` 발급·승인 외부 작업 | 콘솔 등록 + 환경변수 주입 + staging 배포 |
+| 전면 광고 시범 적용 | D30 본 사이클 wiring 보류 (빈도 제한 정책 필요) | 빈도 제한 ADR + 트리거 위치 결정 |
+| Analytics SDK 통합 | D33 본 사이클 미적용 (console.debug only) | 측정 SDK 결정 별 ADR |
+
+### Phase 4 일시 보류 (재개 진입점)
+
+Phase 4(즐겨찾기·삭제·404 통일)는 토스 광고 우선순위 전환으로 일시 보류. `_workspace_phase4_paused/`에 보존:
+- `_workspace_phase4_paused/00_input/requirements.md` — 5 출력 영역(즐겨찾기 토글·필터·삭제·404·동시성)
+- `_workspace_phase4_paused/01_architect_phase4_baseline_partial.md` — 13 결정 사전 동결 + TDS 실재성 검증 5종 PASS + ADR-013 D19~D23 결정 카탈로그 + 멈춤 트리거 6항
+- **중요 정정** (재개 시 적용 필수): ConfirmDialog 실제 props는 `leftButton`/`rightButton`(ReactElement, ConfirmDialog.Button 권장) + `onClose`/`onExited` 필수. 요구사항의 `confirmText/cancelText/onConfirm/onCancel`는 SSOT 아님 — 06 §6.5 갱신 + DeleteConfirmDialog 합성 시그니처 정정.
+
+### Phase 3 완료 동결 (Phase 4·4.5 진입 전 — 2026-05-24)
 
 Phase 3(저장·목록·상세, 기능 c·d) **코드 경로 ALL PASS** — QA 매트릭스 76+ PASS / FAIL 0건 누적 (`_workspace/03_qa_report.md`). Phase 1·2 동결(ADR-010·011) 그대로 유지(수정 0건). 본 Phase 결정은 ADR-012(D14~D18) + AGENTS.md 3종(`src/hooks|components|pages/AGENTS.md`) 보강에 동결. 06-UI-MAPPING §6.5 추가 컴포넌트 표는 NotFoundScreen·EmptyState·RecipeCard 실 구현 시그니처 반영. 세션 전체 흐름은 `_workspace_phase1/04_session_log.md`(Phase 1) + `_workspace_phase2/04_session_log.md`(Phase 2) + `_workspace/04_session_log.md`(Phase 3 — 본 차).
 
@@ -96,17 +130,21 @@ Phase 3(저장·목록·상세, 기능 c·d) **코드 경로 ALL PASS** — QA �
 - 404 UI는 Phase 3 산출 `<NotFoundScreen />` 그대로 재사용(ADR-012 D16).
 - 캐시 무효화는 Phase 3 산출 `useRecipeCacheTrigger.invalidate()` 그대로 재사용(ADR-012 D15).
 
-### Phase 2·3 누적 미해결 (Phase 4 또는 별 ADR)
-- **SDK 패키지 경로** (`@apps-in-toss/web-framework` 미해결) — Phase 4 첫 보호 endpoint 호출 dev server 시점에서 검증, 실패 시 ADR-010 §R1.
+### 누적 미해결 (Phase 1~4.5)
+- **SDK 패키지 경로** (`@apps-in-toss/web-framework` 미해결) — Phase 4 재개 시 dev server 시점 검증, 실패 시 ADR-010 §R1.
 - **AbortSignal cast 2곳** — ADR-011 D13 해소 조건 (a)/(b)/(c) Phase 4·5 재평가.
 - **`useBackEvent` 하드웨어 백** — Phase 4 PATCH/DELETE 낙관적 업데이트 도입 시 결정.
-- **디자인 토큰 hex 직접 사용** — Phase 4 진입 전 별 ADR 권장(adaptive 토큰 일괄 교체).
+- **디자인 토큰 hex 직접 사용** — Phase 5 진입 전 별 ADR 권장(adaptive 토큰 일괄 교체).
 - **백엔드 옵션 P 배포** — 별 저장소 AIReceipe의 후속 ADR. 미배포 상태에서는 모든 보호 호출이 401.
 - **무한 스크롤** — Phase 5 출시 직전 별 ADR.
+- **Phase 4 즐겨찾기·삭제·404 통일** — `_workspace_phase4_paused/`. 재개 시 partial baseline §I 6단계.
+- **콘솔 `adGroupId` 발급·승인** — Phase 4.5 외부 작업 (앱인토스 콘솔).
+- **전면 광고 wiring + 빈도 제한** — ADR-014 D30·D34 후속.
+- **Analytics SDK 통합** — ADR-014 D33 후속.
 
-> 본 절은 Phase 3 갱신 — 이전 Phase(0~2)의 상세 산출은 각 phase의 session log(`_workspace_phase1/04_session_log.md`, `_workspace_phase2/04_session_log.md`) 참조.
+> 본 절은 Phase 4.5 갱신 — 이전 Phase(0~3)의 상세 산출은 각 phase의 session log(`_workspace_phase1/04_session_log.md`, `_workspace_phase2/04_session_log.md`, `_workspace_phase3/04_session_log.md`) + Phase 4 미완은 `_workspace_phase4_paused/` 참조.
 
-Phase별 수용 기준은 `docs/appsintoss-port/10-SPRINT-PLAN.md`. 결정 트리는 `docs/adr/ADR-009·010·011·012`.
+Phase별 수용 기준은 `docs/appsintoss-port/10-SPRINT-PLAN.md`. 결정 트리는 `docs/adr/ADR-009·010·011·012·014`.
 
 ---
 
@@ -123,6 +161,7 @@ Phase별 수용 기준은 `docs/appsintoss-port/10-SPRINT-PLAN.md`. 결정 트�
 |------|----------|------|------|
 | 2026-05-23 | 초기 구성 (4인 팀 + miniapp-orchestrator + 워커 5: technical-documentation, software-design-principles, integration-coherence-qa, granite-rn-development, appsintoss-publish-checklist) | 전체 | RN+Granite+TDS 미니앱 도메인. 별 저장소 AIReceipe의 하네스를 백엔드 분리·TDS 의무·검수 컨텍스트로 재설계 이식. `ai-recipe-integration`·`nextjs-fullstack` 제거, `granite-rn-development`·`appsintoss-publish-checklist` 신규. backend 에이전트 → api-client로 재정의 |
 | 2026-05-24 | Phase 3 완료 갱신 — "현재 단계" 절 재작성 (Phase 2 완료 → Phase 3 완료), Phase 4 진입 인계 + 누적 미해결 6항 명시 | CLAUDE.md | Phase 3 마무리(T5) — ADR-012 동결 + AGENTS.md 3종 보강 + 06 §6.5 갱신과 함께 본 문서도 동기 갱신 |
+| 2026-05-25 | Phase 4 일시 보류 + Phase 4.5(토스 광고 SDK 기반) 완료 — "현재 단계" 절 재작성, Phase 4 재개 인계(_workspace_phase4_paused + ConfirmDialog 정정), Phase 4.5 산출 13 파일 + 누적 미해결 10항 명시. 팀 1개 동시 제약으로 메인 세션이 architect/api-client/frontend/qa 역할 통합 수행 — `airecipe-miniapp-phase4` 팀 미완 상태로 보존(api-client/frontend/qa 3명 shutdown 미응답 idle). | CLAUDE.md | Phase 4.5 마무리 — ADR-014 D25~D38 13 결정 동결 + 11-ADS.md 신규 SSOT + AGENTS.md 3종(src/lib 신규·components/hooks 보강) + 토스 광고 어댑터 격리 시범 적용 완료와 함께 본 문서 동기 갱신 |
 
 ---
 

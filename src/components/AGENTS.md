@@ -15,6 +15,7 @@ Phase 2의 레시피 생성 화면(`/recipe/generate`)과 홈(`/`)이 사용하�
 | `RecipeCard.tsx` (Phase 3) | 저장된 `Recipe` 카드 — Pressable 전체 클릭 영역 + Txt(t5/st9) + Badge 3종. **`recipe.id` 사용 OK** (저장된 Recipe 한정). Phase 4 즐겨찾기/삭제 prop만 받고 미렌더 | 06 §6.4.4, Phase 3 baseline §A.2·§B.2 |
 | `EmptyState.tsx` (Phase 3) | 빈 상태 안내 — props 4종(title/description/actionLabel/onAction)으로 재사용 가능. 마이 0건 / Phase 4 즐겨찾기 0건 등 | 06 §6.5, Phase 3 baseline §A.2·§B.3 |
 | `NotFoundScreen.tsx` (Phase 3) | **단일 404 UI** — TDS `ErrorPage statusCode={404}` 합성. props `{ onBack }`. **Phase 4 PATCH/DELETE 404 재사용 보장** | 06 §6.5, ADR-005, ADR-012 D16, Phase 3 baseline §A.2·§B.3·§H.2 #13 |
+| `AppInlineAd.tsx` (Phase 4.5) | 토스 인라인 광고 합성 — `ads.InlineAdSlot` 위임. props `{ slot, theme?, tone?, variant? }`. SDK BannerSlotCallbacks 미노출. dev에서 placeholder, staging/prod(+ADS_ENABLED)에서 실 광고 | 11-ADS §11.4, ADR-014 D26·D31·D33 |
 
 ## 규약 (강제)
 
@@ -25,6 +26,7 @@ Phase 2의 레시피 생성 화면(`/recipe/generate`)과 홈(`/`)이 사용하�
 - **`GeneratedRecipe.id` 참조 0건** — `RecipeDisplay`는 저장 전(`GeneratedRecipe`)과 저장됨(`Recipe`) 공통 필드만 사용. `id`/`createdAt`/`isFavorite` 미참조 (03 §3.10 #5, 불변식 2).
 - **`Recipe.id` 사용 OK는 `RecipeCard`만** — Phase 3 baseline §H.2 #11. `RecipeCard`는 `recipe: Recipe` props 받으며 카드 클릭 콜백 + Phase 4 즐겨찾기/삭제 자리표시 prop에서 사용. RecipeDisplay/NutritionPanel/SearchForm은 여전히 `id` 미참조.
 - **`<ErrorPage>` 직접 렌더 금지** — Phase 3 baseline §H.2 #13. `NotFoundScreen.tsx:28` 단 1곳에만 import. 다른 컴포넌트·pages에서 `ErrorPage` 직접 import·렌더 금지. 404 화면은 항상 `<NotFoundScreen onBack={...} />` 1개 컴포넌트로 통일.
+- **광고 SDK 직접 import 금지** — Phase 4.5 ADR-014 D26. `@apps-in-toss/framework`의 `InlineAd`/`loadFullScreenAd`/`showFullScreenAd`는 본 디렉토리에서 import 0건. `AppInlineAd.tsx`는 `../lib/ads`의 `ads` 객체만 사용. 광고 UI 추가 시에도 동일 패턴(`<AppInlineAd slot="...">`).
 - **호출·상태 0건** — 컴포넌트는 presentational. `fetch`/`useState`(폼 입력 외)/`useEffect`(폼 외) 사용 금지. 비즈니스 로직은 부모(`pages/`) 또는 `hooks/`로 위임.
 - **actions slot은 ReactNode prop** — `RecipeDisplay`의 actions(저장/즐겨찾기 등)는 `actions?: ReactNode` prop으로 주입. 자체 버튼 렌더 금지.
 - **콜백 시그니처 고정** — `SearchForm.onSubmit: (dishName: string, servings: number) => void`, `RecipeCard.onPress: () => void`, `EmptyState.{ onAction: () => void }`, `NotFoundScreen.{ onBack: () => void }`. Phase 4 이후도 시그니처 유지.
