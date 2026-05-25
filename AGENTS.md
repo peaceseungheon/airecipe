@@ -48,6 +48,8 @@ AI 기반 요리 레시피 안내 웹앱. Next.js 14+ (App Router) + TypeScript.
 - [ADR-006](docs/adr/ADR-006-pagesize-clamp.md) — pageSize 상한 초과 clamp (400 거부 아님)
 - [ADR-007](docs/adr/ADR-007-proxy-file-convention.md) — 페이지 보호 proxy.ts 전환 (Next 16, 구 middleware.ts)
 - [ADR-008](docs/adr/ADR-008-gemini-default-with-claude-fallback.md) — AI Provider 기본 Gemini 전환, Claude 비활성 보존(롤백용)
+- [ADR-009](docs/adr/ADR-009-appsintoss-port-architecture.md) — 앱인토스 미니앱 포팅(별 저장소·HTTPS 호출·Toss 식별자·옵션 P 매핑). 포팅 사양서는 [`docs/appsintoss-port/`](docs/appsintoss-port/)
+- [ADR-010](docs/adr/ADR-010-option-p-toss-user-mapping.md) — 옵션 P 구현 + 인증 경로 병존(쿠키+`X-Toss-User-Id` 헤더). `profiles` 매핑 테이블, `recipes.user_id` FK 제거, `requireUser(request)` 단일 추상, service-role RLS 우회, CORS·OPTIONS. generate는 비인증 유지(D8).
 
 ## 개발 명령
 - 개발 서버: `npm run dev`

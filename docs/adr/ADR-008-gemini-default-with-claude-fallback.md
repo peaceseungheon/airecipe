@@ -66,3 +66,7 @@
 - ADR-002 (Claude AI Adapter + Facade + Factory) — 본 ADR이 그 격리의 연장선.
 - `src/lib/ai/AGENTS.md` — Provider-agnostic 갱신본.
 - `_workspace/01_architect_api_contract.md` — `GeneratedRecipe` SSOT.
+
+## 후속 ADR
+
+- [ADR-009](ADR-009-appsintoss-port-architecture.md) — 앱인토스 미니앱은 백엔드를 호출만 하므로 Provider 선택을 인지하지 않는다. 본 ADR의 Factory·환경변수 토글은 그대로 살아남는다.

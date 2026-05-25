@@ -44,3 +44,10 @@ next-env.d.ts
 # oh-my-claudecode session state (로컬 전용)
 .omc/sessions/
 .omc/state/
+
+# 세션 audit trail (로컬 전용, 커밋 금지)
+_workspace/
+_workspace_*/
+
+# Claude Code 런타임 잠금 파일
+.claude/scheduled_tasks.lock

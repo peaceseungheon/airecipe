@@ -38,3 +38,8 @@ backend가 구현 중 이것이 ADR-001의 RLS 이중 방어와 충돌함을 보
 - frontend: `/recipe/[id]` 등에서 타인/없음을 동일 "찾을 수 없음" UI로 처리(403 분기 불필요).
 - QA: 검증 단언에서 "타인 소유 → 403" 기대를 "타인 소유 → 404"로 갱신.
 - 관련: ADR-001(RLS 이중 방어), ADR-004(단건 조회 추가).
+
+## 후속 ADR
+
+- [ADR-009](ADR-009-appsintoss-port-architecture.md) — 앱인토스 미니앱에서도 본 ADR의 404 수렴 정책을 그대로 적용한다. 없음·타인·잘못된 id 모두 동일 "찾을 수 없어요" UI로 처리.
+- [ADR-010](ADR-010-option-p-toss-user-mapping.md) — 미니앱 헤더 경로(service-role + RLS 우회)에서도 본 ADR의 404 수렴이 그대로 유지된다. RLS 대신 Repository의 `.eq('user_id', internalUserId)` 애플리케이션 필터가 동일하게 빈 결과를 만들어 404로 수렴.

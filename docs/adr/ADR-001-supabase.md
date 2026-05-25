@@ -53,3 +53,8 @@ Sprint 1은 레시피 저장/조회/즐겨찾기와 이메일+패스워드 인�
 - 트레이드오프: Repository/Mapper 도입으로 보일러플레이트가 증가한다. 그러나 테스트 용이성·경계면 안전성이 비기능 요구를 충족한다.
 - 후속: jsonb 임베드(ingredients/steps/nutrition)는 검색 요구가 없어 정규화하지 않는다. Sprint 2에서 재료 기반 검색 도입 시 정규화 여부를 재검토한다.
 - 관련: 데이터 모델·매핑 규칙은 `_workspace/01_architect_architecture.md` 5절.
+
+## 후속 ADR
+
+- [ADR-009](ADR-009-appsintoss-port-architecture.md) — 앱인토스 미니앱 포팅 시 본 ADR의 `recipes.user_id`(uuid)·RLS·Mapper를 모두 보존한다(옵션 P). 미니앱 식별자는 `profiles` 매핑 테이블로 internal uuid에 연결.
+- [ADR-010](ADR-010-option-p-toss-user-mapping.md) — 옵션 P 구현 ADR. 본 ADR의 RLS는 **쿠키 경로(웹앱)에서만** 보존되고, 미니앱 헤더 경로는 service-role + Repository `.eq('user_id', ...)` 단일 방어로 격리한다. `recipes.user_id`의 `auth.users(id)` FK는 제거(두 출처 uuid 공존 위함). Mapper·camelCase 매핑 표는 그대로 살아남는다.

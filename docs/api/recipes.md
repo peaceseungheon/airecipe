@@ -11,6 +11,29 @@
 - **경계는 camelCase.** snake_case가 응답에 새면 Mapper 버그.
 - 프론트는 항상 `.data`를 unwrap한다.
 
+## 인증 (ADR-010)
+
+보호 5개 엔드포인트(GET/POST `/api/recipes`, GET/DELETE `/api/recipes/[id]`, PATCH `/api/recipes/[id]/favorite`)는 **두 경로 병존**:
+- **쿠키 (웹앱)** — Supabase Auth 세션 쿠키. RLS `auth.uid() = user_id`로 격리.
+- **헤더 (미니앱)** — `X-Toss-User-Id: <hex hash>`. 백엔드가 `profiles` 매핑으로 internal_user_id 해석. service-role + Repository `.eq('user_id', ...)` 단일 방어로 격리.
+- **우선순위**: 헤더 우선 · 쿠키 fallback. 동시 전달 시 헤더 사용자로 처리.
+- **둘 다 없음** → `401 UNAUTHORIZED`.
+
+`POST /api/recipes/generate`는 **비인증 공개** (ADR-010 D8) — 비로그인 미리보기 흐름 유지. 헤더 유무 무관.
+
+## CORS · OPTIONS (ADR-010 D5)
+
+모든 라우트(인증·비인증 무관)에 적용:
+- `Access-Control-Allow-Origin`: `APPSINTOSS_ALLOWED_ORIGINS` 환경변수 화이트리스트 echo. 비매칭이면 헤더 미부착(브라우저 차단).
+- `Access-Control-Allow-Headers: Content-Type, X-Toss-User-Id, Accept`
+- `Access-Control-Allow-Methods: GET, POST, PATCH, DELETE, OPTIONS`
+- `Access-Control-Max-Age: 600`
+- `Access-Control-Allow-Credentials: false`
+- `Vary: Origin`
+- **`OPTIONS` preflight**: 모든 라우트에서 `204 No Content` + 위 헤더(화이트리스트만).
+
+웹앱은 same-origin이라 CORS 검사 자체가 생략되어 영향 없음. 미니앱(cross-origin)만 본 정책에 의존.
+
 ### 에러 코드 → HTTP 상태
 | code | HTTP |
 |------|------|
@@ -27,7 +50,7 @@
 
 ## POST /api/recipes/generate
 
-요리 이름으로 레시피 + 영양 정보 생성. **공개**(비로그인 허용). 저장 안 함(id 없음).
+요리 이름으로 레시피 + 영양 정보 생성. **공개**(비로그인 허용, ADR-010 D8 — 헤더·쿠키 무관). 저장 안 함(id 없음).
 
 ### 요청 (`GenerateRecipeRequest`)
 ```json
@@ -79,7 +102,7 @@ data: {"type":"done"}
 
 ---
 
-## GET /api/recipes — 인증
+## GET /api/recipes — 인증 (쿠키/헤더)
 
 내 레시피 목록. 소유자 격리.
 
@@ -102,7 +125,7 @@ data: {"type":"done"}
 
 ---
 
-## GET /api/recipes/[id] — 인증 (ADR-004)
+## GET /api/recipes/[id] — 인증 (쿠키/헤더, ADR-004)
 
 저장된 레시피 1건 조회. `/recipe/[id]` 딥링크·새로고침 진입 지원(목록 캐시 의존 제거). 본문 없음.
 
@@ -116,7 +139,7 @@ data: {"type":"done"}
 
 ---
 
-## POST /api/recipes — 인증
+## POST /api/recipes — 인증 (쿠키/헤더)
 
 `GeneratedRecipe`를 현재 사용자 소유로 저장.
 
@@ -134,7 +157,7 @@ data: {"type":"done"}
 
 ---
 
-## PATCH /api/recipes/[id]/favorite — 인증
+## PATCH /api/recipes/[id]/favorite — 인증 (쿠키/헤더)
 
 즐겨찾기 목표 값 설정(토글 아님 — 멱등).
 
@@ -153,7 +176,7 @@ data: {"type":"done"}
 
 ---
 
-## DELETE /api/recipes/[id] — 인증
+## DELETE /api/recipes/[id] — 인증 (쿠키/헤더)
 
 레시피 삭제. 본문 없음.
 

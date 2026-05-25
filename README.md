@@ -61,8 +61,9 @@ src/
 ├── types/                  # 공유 타입 SSOT
 └── proxy.ts                # Next.js 16 페이지 보호
 docs/
-├── adr/                    # ADR-001~008
+├── adr/                    # ADR-001~009 (ADR-009: 앱인토스 미니앱 포팅)
 ├── api/recipes.md          # API 문서
+├── appsintoss-port/        # 앱인토스 미니앱 포팅 사양서 11개 챕터 (00~10)
 └── SESSION_NOTES.md        # 세션별 작업 기록
 supabase/
 ├── schema.sql              # 테이블 정의

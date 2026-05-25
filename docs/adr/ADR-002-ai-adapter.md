@@ -50,3 +50,7 @@ F1(레시피 생성)·F2(영양 분석)는 Claude API(claude-sonnet-4-6)로 구�
 - **구조화 출력 방식 차이는 어댑터 내부에 격리**: Claude는 tool use(`input_schema`), Gemini는 `responseSchema`. 두 스키마 모두 동일한 `GeneratedRecipe`(`src/types/recipe.ts`)와 zod 검증(`recipe-schema.ts`)에 1:1 정합.
 
 상세 결정·근거·결과·롤백 절차는 [ADR-008](ADR-008-gemini-default-with-claude-fallback.md) 참조.
+
+## 후속 ADR
+
+- [ADR-009](ADR-009-appsintoss-port-architecture.md) — 앱인토스 미니앱은 백엔드를 HTTPS로만 호출한다. 본 ADR의 Adapter+Facade+Factory 격리가 그대로 살아남아 미니앱은 AI Provider 차이를 인지하지 않는다.
