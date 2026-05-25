@@ -4,7 +4,7 @@ import { env } from '@granite-js/plugin-env';
 
 export default defineConfig({
   scheme: 'intoss',
-  appName: 'airecipe-miniapp',
+  appName: 'airecipe',
 
   plugins: [
     appsInToss({
