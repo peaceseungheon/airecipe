@@ -22,3 +22,6 @@ yarn-error.log
 # build artifacts
 *.ait
 coverage/
+
+# plugin-env 자동 생성 (09-ENV-CONFIG §9.4.2 — 빌드 시점 주입)
+src/env.d.ts
