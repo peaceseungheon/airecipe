@@ -458,7 +458,28 @@ function GeneratePage() {
 | `/recipe/[id]` | `<Navbar left={<Navbar.BackButton onPress={navigation.goBack} />} title={recipe?.dishName ?? "레시피"} />` |
 | `/recipe/recommend` (Phase 6) | `<Navbar left={<Navbar.BackButton onPress={navigation.goBack} />} title="오늘의 추천" />` |
 
-**하단 탭바 대안**: 홈/마이만으로 구성된 단순 미니앱이므로 v1은 탭바 없이 **스택 네비게이션**만으로 충분. 향후 화면 수가 늘면 하단 탭 도입 검토.
+**하단 탭바 대안**: 홈/마이만으로 구성된 단순 미니앱이므로 v1은 탭바 없이 **스택 네비게이션**만으로 충분. 향후 화면 수가 늘면 하단 탭 도입 검토. → **이 검토가 §7.8.1로 실행됨 (ADR-017).**
+
+### 7.8.1 하단 탭바 도입 — 커스텀 고정 하단 바 (ADR-017, D53~D62)
+
+사용자 요청("내 레시피 목록 탭")에 따라 [홈 `/`][마이 레시피 `/my-recipes`] 2탭 **하단 탭바**를 도입한다. Granite/TDS 실증 검증 결과를 ADR-017이 동결했다.
+
+**실증 결론(코드 근거):**
+- Granite는 하단 탭 네비게이터를 **1급 지원하지 않는다**. `@granite-js/react-native@1.0.28`의 export(`dist/index.d.ts`)에 탭 네비게이터 부재, `Router`는 항상 `StackNavigator`(NativeStack)만 마운트(`src/router/Router.tsx:203`), `createRoute.screenOptions`는 `NativeStackNavigationOptions`만 수용(`dist/router/createRoute.d.ts`). `_layout` 예약어는 자식 스크린 전환 네비게이터가 아니라 래퍼 FC(`mergeParentLayoutScreen`).
+- `@react-navigation/bottom-tabs`는 미설치(`package.json`/lock 0건)이며 루트 네비게이터 주입 슬롯도 없다.
+- TDS에는 하단 탭바 전용 컴포넌트가 없다. `Tab`(상단 세그먼트)·`tab-view Tabs`(스와이프 콘텐츠)는 용도가 다름. → **TDS 프리미티브(`Txt`/`colors`/선택적 `Icon`) + RN `Pressable`/`View`로 합성.**
+
+**채택(C — 커스텀 고정 하단 탭바):** NativeStack 위에 `BottomTabBar` 단일 컴포넌트를 두고, **탭이 보여야 하는 화면(`/`·`/my-recipes`)이 직접 마운트**한다. 탭 누름 → `navigation.navigate(path, {})`. **새 라우트·router.gen.ts 변경 0개.**
+
+| 화면 | 하단 탭바 | 상단 Navbar |
+|------|----------|-------------|
+| `/` (홈) | `<BottomTabBar active="home" />` 렌더 | `PageNavbar` Title만 (AccessoryTextButton "마이 레시피" **제거** — D58) |
+| `/my-recipes` (마이) | `<BottomTabBar active="my" />` 렌더 | `PageNavbar` BackButton + "마이 레시피" |
+| `/recipe/generate`·`/recipe/[id]`·`/recipe/recommend`·`/_404` | **미렌더** (몰입형 진입, BackButton으로 복귀 — D56) | 기존 유지 |
+
+**활성 색** = TDS `colors.primary` 계열 토큰, 비활성 = `colors.grey500`. hex 직접 사용 금지(ADR-015 D39). 아이콘은 `Icon.name`이 자유 문자열이라 실재 검증 시에만 추가, 미검증 시 라벨 only(D60). 하단 SafeArea 패딩 + ScrollView `paddingBottom` 확보(D61).
+
+> ⚠️ **appName 회귀 동시 수정(D62)**: 현재 `granite.config.ts:7` `appName: 'airecipe'`는 hotfix가 원복했어야 할 `'airecipe-miniapp'`이 monorepo 병합으로 되돌아간 회귀 상태다. 진입 deep link prefix와 미스매치 → `/_404` 폴백. 탭바 도입 전 `'airecipe-miniapp'`로 원복 필수. 콘솔 등록 deep link prefix ↔ `appName` 1:1 동기는 출시 전 검증 의무.
 
 ## 7.9 검증 절차 (QA가 확인할 항목)
 
@@ -491,3 +512,4 @@ function GeneratePage() {
 | 날짜 | 변경 | 사유 |
 |------|------|------|
 | 2026-05-22 | 초기 작성 (세션 #4) | App Router 7화면 → Granite 5화면 매핑 + proxy 가드 식별자 단일 조건으로 단순화 + 딥링크/백버튼 |
+| 2026-05-29 | §7.8.1 신설 — 하단 탭바([홈/마이 레시피]) 도입. Granite/TDS 실증 검증(탭 네비게이터 1급 부재 → 커스텀 고정 하단 바 채택) + 홈 AccessoryTextButton 제거 + appName 회귀 동시 수정 명시. ADR-017 D53~D62. | 사용자 요청(마이 레시피 탭) — §7.8 "향후 검토"의 실행 |

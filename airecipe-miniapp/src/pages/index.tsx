@@ -7,8 +7,10 @@
  * 정책:
  * - 공개 generate 엔드포인트라 본 화면에서 useTossUserId 사용하지 않는다 (Phase 2 baseline §F.1).
  * - SearchForm 제출 시 navigation.navigate('/recipe/generate', { dishName, servings }).
- * - Phase 3: PageNavbar 우측 액세서리에 "마이 레시피" 진입 활성화 (Phase 3 baseline §A.3 #7, §C.5).
- *   `/my-recipes` 식별자 보장 가드는 마이 화면 측 책임이므로 본 화면은 navigation만 한다.
+ * - ADR-017 D58: 마이 레시피 진입은 하단 탭바(BottomTabBar)가 전담 — PageNavbar 우측
+ *   "마이 레시피" 액세서리 버튼은 중복이라 제거. PageNavbar는 Title만 유지.
+ * - ADR-017 D57: 화면 최하단에 `<BottomTabBar active="home" />` 1줄 마운트.
+ *   "오늘의 추천 받기" CTA(ADR-016 D50)는 유지.
  */
 
 import React, { useCallback } from 'react';
@@ -16,6 +18,7 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import { createRoute, useNavigation } from '@granite-js/react-native';
 import { Button, PageNavbar, Txt, colors } from '@toss/tds-react-native';
 
+import { BottomTabBar } from '../components/BottomTabBar';
 import { SearchForm } from '../components/SearchForm';
 
 export const Route = createRoute('/', {
@@ -32,10 +35,6 @@ function HomePage() {
     [navigation],
   );
 
-  const handleOpenMyRecipes = useCallback(() => {
-    navigation.navigate('/my-recipes', {});
-  }, [navigation]);
-
   const handleOpenRecommend = useCallback(() => {
     navigation.navigate('/recipe/recommend', {});
   }, [navigation]);
@@ -44,11 +43,6 @@ function HomePage() {
     <View style={styles.root}>
       <PageNavbar>
         <PageNavbar.Title>AI 레시피</PageNavbar.Title>
-        <PageNavbar.AccessoryButtons>
-          <PageNavbar.AccessoryTextButton onPress={handleOpenMyRecipes}>
-            마이 레시피
-          </PageNavbar.AccessoryTextButton>
-        </PageNavbar.AccessoryButtons>
       </PageNavbar>
 
       <ScrollView
@@ -78,6 +72,8 @@ function HomePage() {
           </Button>
         </View>
       </ScrollView>
+
+      <BottomTabBar active="home" />
     </View>
   );
 }
@@ -90,6 +86,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 20,
     gap: 24,
+    paddingBottom: 24, // 하단 탭바 가림 방지 (ADR-017 D61)
   },
   intro: {
     gap: 8,

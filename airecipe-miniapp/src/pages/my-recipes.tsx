@@ -30,6 +30,7 @@ import { createRoute, useNavigation } from '@granite-js/react-native';
 import { Button, PageNavbar, Txt, colors } from '@toss/tds-react-native';
 
 import { AppInlineAd } from '../components/AppInlineAd';
+import { BottomTabBar } from '../components/BottomTabBar';
 import { EmptyState } from '../components/EmptyState';
 import { FilterTabs, type FilterValue } from '../components/FilterTabs';
 import { RecipeCard } from '../components/RecipeCard';
@@ -118,6 +119,7 @@ function MyRecipesPage() {
             식별자를 확인하는 중이에요…
           </Txt>
         </View>
+        <BottomTabBar active="my" />
       </View>
     );
   }
@@ -245,6 +247,8 @@ function MyRecipesPage() {
           </View>
         )}
       </ScrollView>
+
+      <BottomTabBar active="my" />
     </View>
   );
 }
@@ -257,6 +261,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 20,
     gap: 16,
+    paddingBottom: 24, // 하단 탭바 가림 방지 (ADR-017 D61)
   },
   center: {
     paddingVertical: 60,

@@ -1,66 +1,35 @@
-# Session Log — 진입 폴백 hotfix (4 root cause 확정 + 모두 fix)
+# 세션 로그 — 하단 탭바([홈 / 마이 레시피]) 도입
 
-> 일자: 2026-05-29
-> 단계: 4 root cause 확정 + fix 적용 + 사용자 dev 검증 정상 동작 확인.
+> 날짜: 2026-05-29 · 기준 디렉토리 `airecipe-miniapp/` · monorepo 루트 `airecipe-router` → `miniapp-orchestrator` 위임.
 
-## 타임라인
+## 요청
+"내 레시피 저장 목록을 조회할 수 있는 탭을 만들어줘."
 
-1. 사용자 보고: "로그인 하고 어플 진입 시 NotFoundScreen '레시피를 찾을 수 없어요'가 뜨면서 아무것도 동작하지 않아. 닫기 버튼을 눌러도 동작하지 않아."
-2. 사용자 추가 명령: 현재까지 작업 논리적 commit + 새 사이클 시작.
-3. **commit 2개 정리** — Phase 5 보존(`chore: ...`) + Phase 6 구현(`feat: Phase 6 — ...`).
-4. 분석 baseline 작성(`_workspace/01_architect_baseline.md`) — 7 가설 + 안전 fix 후보 + 사용자 확인 요청 4항.
-5. 사용자 응답 — appName=airecipe(일치), 메인 메뉴 진입(정상), metro 에러 없음, 좌="고객센터 문의" 우="닫기".
-6. **TDS ErrorPage 실 구현 검증**(`node_modules/.../ErrorPage.js`) — 좌측 카피 하드코딩 "고객센터 문의", 우측 404 시 "닫기"(400 시 "다시 입력하기").
-7. root cause 확정: 기존 NotFoundScreen이 `onPressLeftButton={onBack}`만 바인딩 → 좌측 "고객센터 문의"에 onBack 잘못 매핑, 우측 "닫기"는 핸들러 없음.
-8. fix 적용: NotFoundScreen props 확장 + `_404.tsx` 카피 분리 + 진단 로그.
-9. QA report + 본 log 작성.
+라우터 코드 확인 결과: 저장 목록 화면(`/my-recipes`)·백엔드 `GET /api/recipes`는 이미 완성. 빠진 것은 "탭 접근 방식". 사용자 확정 → **하단 탭바(bottom tab) [홈/마이 레시피] 2탭 상시 노출**. 미니앱 단독 작업(백엔드 무변경).
 
-## 확정 사항
+## 워크플로우 (오케스트레이터)
+- Phase 3 (architect 단독 선행): Granite/TDS 하단 탭 실증 검증 → 방식 결정 + ADR-017 발행.
+- Phase 4 (frontend): BottomTabBar 구현 + 두 화면 통합 + appName 회귀 수정.
+- Phase 5 (qa + architect): 경계면 검증 + 색 결정 회부 + 문서 정합.
 
-| 항목 | 결과 |
-|------|------|
-| 닫기 무동작 root cause | TDS ErrorPage 좌·우 버튼 카피 하드코딩 매핑 오류 (Phase 3 이래 누적) |
-| fix | NotFoundScreen `onBack`을 `onPressRightButton`에 정확 바인딩 |
-| SSOT 정정 | 06 §6.5 NotFoundScreen 행 — 카피 매핑 + props 확장 + 진화 인계 |
-| 백워드 호환 | `src/pages/recipe/[id].tsx:130` 그대로 — default 카피 유지 |
-| typecheck PASS, lint 0 errors | PASS (Phase 3 누적 router.gen.ts warning 1건만) |
+## 핵심 결정 (ADR-017 D53~D62)
+- **방식 (C) 커스텀 고정 하단 탭바** — Granite는 탭 네비게이터 1급 미지원(`@granite-js/react-native@1.0.28` export 부재, Router는 NativeStack만 마운트), TDS에 하단 탭 전용 컴포넌트 없음(`Tab`=상단 세그먼트, `tab-view`=스와이프). (A)Granite 1급·(B)`@react-navigation/bottom-tabs` 모두 기각(미설치·루트 주입 슬롯 없음·deep link 파손 리스크).
+- **단일 SSOT 컴포넌트** `BottomTabBar` props `{ active: 'home'|'my' }` — 탭 노출 화면(`/`·`/my-recipes`)이 직접 마운트. 탭 누름 → `navigation.navigate(path, {})`. **새 라우트·router.gen.ts 변경 0.**
+- **노출 범위 (D56)**: `/`·`/my-recipes`만. generate/[id]/recommend/_404 미렌더.
+- **홈 중복 제거 (D58)**: 홈 `PageNavbar.AccessoryTextButton "마이 레시피"` 제거(탭바가 전담). "오늘의 추천" CTA 유지.
+- **활성 탭 색 (D59)**: `colors.orange500`(`#FF6B00`) — brand `primaryColor #FF6B35` 최근접 실재 토큰. `colors.primary` 부재(TS2339)·`colors.blue500` 브랜드 이질 기각. hex 직접 사용 금지(ADR-015 D39 정신 부합).
+- **appName 회귀 동시 수정 (D62)**: `granite.config.ts` `appName: 'airecipe' → 'airecipe-miniapp'`. monorepo 병합(`05ef27c`)이 직전 hotfix의 원복값을 되돌린 **실재 회귀** — 미수정 시 진입이 `/_404`로 폴백. 콘솔 deep link prefix ↔ appName 1:1 동기는 출시 전 검증 의무.
 
-## 본 root cause 확정 (진단 로그 차수)
+## 산출 파일
+- **신규**: `src/components/BottomTabBar.tsx` (단일 SSOT), `docs/adr/ADR-017-bottom-tab-navigation.md`.
+- **수정**: `src/pages/index.tsx`(AccessoryTextButton 제거 + BottomTabBar + paddingBottom), `src/pages/my-recipes.tsx`(BottomTabBar 항상 노출 + paddingBottom, 목록 로직 무변경), `granite.config.ts`(appName 원복), `src/components/AGENTS.md`(BottomTabBar 행), `docs/appsintoss-port/07-ROUTING.md`(§7.8.1 신설), `docs/appsintoss-port/06-UI-MAPPING.md`(§6.1 색 규약 정합).
+- **변경 0**: `src/router.gen.ts`, `src/_app.tsx`, api-client/hooks/zod/types, 스택 화면(`recipe/*`), `pages/_404.tsx`, `pages/*.tsx` shim.
 
-`pages/_404.tsx` `__DEV__` `navigation.getState` JSON 출력으로:
-```
-routes[0] = { name: "/_404", path: "-miniapp" }
-```
-→ 진입 deep link `intoss://airecipe-miniapp`에서 SDK가 `granite.config.ts` `appName: 'airecipe'` 기반 prefix `intoss://airecipe` strip → 잔여 `"-miniapp"` → 라우트 미매칭 → wildcard `*` → `/_404` 폴백 확정.
+## QA 결과 (`03_qa_report.md`)
+- Q1~Q12 **12/12 PASS, FAIL 0**. typecheck PASS, lint 0 errors/1 warning(router.gen.ts 누적, 허용).
+- 경계면: navigate ↔ router.gen.ts 라우트 키 일치, TDS 실재성 표본 10개 PASS(orange500 실재 포함), 데이터 경로 무영향(git diff empty).
+- Q10 appName: 코드 측 문자열 1:1 PASS. **디바이스/샌드박스 dev 진입 실증(홈 정상·`/_404` 미표시)은 외부 단계 PENDING.**
 
-**원인 commit**: `87625a4 chore: 앱 이름 변경` (`airecipe-miniapp` → `airecipe`).
-
-**fix**: `granite.config.ts` appName 원복.
-
-## 사용자 검증 결과
-
-> "정상동작 확인함."
-
-- 진입 시 홈 화면 정상 표시.
-- 모든 라우트 정상 동작.
-- typecheck PASS, lint 0 errors(Phase 3 누적 router.gen.ts warning 1건만).
-
-## 산출 파일 (최종)
-
-| 파일 | 변경 |
-|------|------|
-| `granite.config.ts` | appName `airecipe` → `airecipe-miniapp` 원복 |
-| `src/components/NotFoundScreen.tsx` | TDS 카피 매핑 정정 + props 확장 |
-| `pages/_404.tsx` | 진입 폴백 카피 분리 + try-catch + `__DEV__` 진단 로그 |
-| `pages/{index,my-recipes,recipe/generate,recipe/[id],recipe/recommend}.tsx` | shim 5종 상대 경로 정정 |
-| `src/router.gen.ts` | Granite plugin-router 정규 순서 재생성 |
-| `docs/appsintoss-port/06-UI-MAPPING.md` | §6.5 NotFoundScreen 행 정정 + 변경 이력 |
-| `_workspace/01_architect_baseline.md` | 분석 baseline (7 가설 + 안전 fix 후보) |
-| `_workspace/03_qa_report.md` | 4 root cause 확정 + 산출 파일 + 검수 정책 인계 |
-| `_workspace/04_session_log.md` | 본 문서 |
-
-## 후속 작업
-
-- CS deeplink 연동(좌측 "고객센터 문의" `onContactSupport` 활성화) — 별 ADR.
-- 별 ADR 추가: 콘솔 등록 정보 ↔ 미니앱 코드 동기 정책(appName / deep link prefix / displayName 등).
-- 본 사이클 종료 — `_workspace_phase6/` 그대로 보존 + 본 `_workspace/`도 hotfix 사이클로 commit 시 그대로 (다음 사이클 시작 시 보존명으로 이동).
+## 외부 작업 PENDING
+- 디바이스/샌드박스 dev 진입 실증(appName 회귀 수정 후 홈 정상 진입 + 하단 탭 동작 + iOS SafeArea 하단 겹침 확인).
+- (후속 진화) 하단 탭 아이콘 추가(D60 — `Icon name` 실재 검증 후), SafeArea `insets.bottom` 훅 도입(현재 `paddingBottom: 12` 상수 폴백, D61).

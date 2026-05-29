@@ -1,119 +1,211 @@
-# 진입 버그 분석 baseline — NotFoundScreen 진입 + 닫기 무동작
+# 01 — Architect Baseline: 하단 탭바([홈 / 마이 레시피]) 도입
 
-> 일자: 2026-05-29
-> 작성자: orchestrator (메인 세션 단일 수행)
-> 단계: 원인 후보 매트릭스 + 안전 fix 후보 + 사용자 추가 정보 요청.
-
----
-
-## A. 증상 재확인
-
-1. 토스 인증 통과 후 미니앱 진입.
-2. 홈(`/`) 대신 **NotFoundScreen**(`pages/_404.tsx` → `src/components/NotFoundScreen.tsx`)이 표시.
-3. ErrorPage 좌측 버튼(현재 카피 "닫기" 또는 "뒤로") 탭 → 무동작.
+> Phase 3 SSOT 우선 설계 (architect 단독 선행). 기준 디렉토리 `airecipe-miniapp/`.
+> 발행 ADR: **ADR-017** (D53~D62). 07-ROUTING §7.8.1 갱신 완료.
+> 날짜: 2026-05-29
 
 ---
 
-## B. 코드 경로 검토 결과
+## A. 실증 검증 결과 (블로커 게이트 — frontend 착수 전 필독)
 
-### B.1 Granite 라우팅 메커니즘 (`@granite-js/react-native@1.0.28`)
+### A.1 채택 방식 = (C) 커스텀 고정 하단 탭바
 
-- `Granite.registerApp(AppContainer, { appName, context, ... })`로 등록.
-- `require.context('./pages')`가 root `pages/` 폴더의 모든 `.ts(x)`를 인덱싱.
-- `getRouteScreens(context)` (node_modules/.../router/utils/screen.tsx:23)가:
-  - `context(key)?.default ?? routeMap.get(context(key)?.Route?._path)?.component`로 컴포넌트 추출 (양 패턴 지원).
-  - `getRoutePath(filePath)`로 `./index.tsx` → `/`, `./recipe/[id].tsx` → `/recipe/:id`, `./_404.tsx` → `/_404`.
-- `getScreenPathMapConfig`가 react-navigation linking config 생성:
-  - `screensConfig['/'] = { path: '' }` — root 매칭.
-  - `screensConfig['/_404'] = { path: '*' }` — **모든 매칭 실패 시 폴백**.
-  - `_404` 페이지 미존재 시 throw `'404 page not found.'`.
+| 후보 | 판정 | 코드 근거 (파일:라인) |
+|------|------|----------------------|
+| (A) Granite 1급 탭 라우팅 | **기각** | `node_modules/@granite-js/react-native/dist/index.d.ts:1-23` — 탭 네비게이터 export 0건. `src/router/Router.tsx:24,203` — Router는 항상 `<StackNavigator.Navigator>`만 마운트(네비게이터 주입 props 없음). `dist/router/createRoute.d.ts:7-15` — `screenOptions`는 `NativeStackNavigationOptions`만. `dist/router/utils/mergeParentLayoutScreen.d.ts` — `_layout`은 `FC<{children}>` 래퍼이지 탭 네비게이터 아님. |
+| (B) `@react-navigation/bottom-tabs` 직접 | **기각** | `package.json`/`pnpm-lock.yaml` 0건(미설치). 루트 네비게이터(StackNavigator) 고정이라 주입 슬롯 없음. 중첩 시 deep link 매칭(`getScreenPathMapConfig`)·진입 폴백 파손 + 번들/검수 리스크. |
+| **(C) 커스텀 고정 하단 탭바** | **채택** | TDS 프리미티브로 합성 가능(A.2). NativeStack 계약 유지, 새 라우트 0개, deep link 무영향. |
 
-### B.2 본 미니앱의 페이지 등록
+**한 줄 근거**: Granite Router는 NativeStack을 고정 마운트하고 탭 네비게이터 export가 전무하며 TDS에 하단 탭바 전용 컴포넌트도 없으므로, 유일하게 계약-정합한 방법은 TDS 프리미티브 + RN Pressable로 합성한 고정 하단 바를 탭 노출 화면이 직접 렌더하는 것이다.
 
-| 파일 (root) | 패턴 | re-export 대상 (src) | route path |
-|-------------|------|--------------------|-----------|
-| `pages/index.tsx` | `export { Route } from 'pages/index';` | `src/pages/index.tsx` | `/` |
-| `pages/my-recipes.tsx` | `export { Route } from 'pages/my-recipes';` | `src/pages/my-recipes.tsx` | `/my-recipes` |
-| `pages/recipe/generate.tsx` | `export { Route } from 'pages/recipe/generate';` | `src/pages/recipe/generate.tsx` | `/recipe/generate` |
-| `pages/recipe/[id].tsx` | `export { Route } from 'pages/recipe/[id]';` | `src/pages/recipe/[id].tsx` | `/recipe/[id]` (→ `/recipe/:id`) |
-| `pages/recipe/recommend.tsx` (Phase 6 신규) | `export { Route } from 'pages/recipe/recommend';` | `src/pages/recipe/recommend.tsx` | `/recipe/recommend` |
-| `pages/_404.tsx` | `export default function NotFoundPage()` | (raw 합성 — NotFoundScreen import) | `/_404` (path `*`) |
+### A.2 TDS 실재성 (검증 완료)
 
-### B.3 router.gen.ts 검증
+| 사용 항목 | 실재 | 근거 |
+|-----------|------|------|
+| `Txt` | OK | `dist/esm/components/txt/Txt.d.ts`, 기존 전반 사용 |
+| `colors` | OK | `dist/esm/index.d.ts:64` (`export { colors } from '@toss/tds-colors'`) |
+| `Icon` | OK (단, `name: string` 자유 문자열) | `dist/esm/components/icon/Icon.d.ts:1-12` — `{ name: string; size?; color?; type? }`. ⚠️ 열거 아님 → 실재 검증된 name만(D60) |
+| `PressableEffect` | OK | `dist/esm/interactions/pressable-effect/index.d.ts` |
+| RN `Pressable`/`View` | OK | 기존 RecipeCard 등에서 사용 |
+| `Tab`(상단 세그먼트) | 부적합 | `dist/esm/components/tab/Tab.d.ts` — 하단 바 아님 |
+| `tab-view Tabs`(스와이프) | 부적합 | `dist/esm/extensions/tab-view/Tabs.d.ts` — 콘텐츠 TabView |
 
-- `plugin-router`의 `generateRouterFile()`을 본 사이클에서 직접 호출 시뮬레이션 → Phase 6 수동 갱신과 **내용 동일**(순서만 다름). 자동 생성도 동일 라우트를 등록함.
-- 즉 라우트 등록 자체는 정상.
+**하단 탭바 전용 TDS 컴포넌트는 없다.** → `Txt`+`colors`(+선택적 `Icon`) + RN `Pressable`/`View` 합성.
 
-### B.4 babel/metro 측 import 해석
+### A.3 ⚠️ appName 진입 폴백 회귀 (확인 — 본 작업에 포함, D62)
 
-- `babel-preset-granite@1.0.28`은 `[@react-native/babel-preset, @babel/plugin-transform-export-namespace-from]`만 포함 — **`babel-plugin-module-resolver` 없음**.
-- `tsconfig.json` `baseUrl: "src"`는 tsc 전용. metro/babel은 영향 없음.
-- 그러므로 `pages/index.tsx`의 `from 'pages/index'`는 metro에서:
-  - node_modules에 `pages` 패키지 없음 → resolve 실패 가능.
-  - **단, Phase 2~5에서 이 패턴 그대로 동작 보고된 적 있는지 사용자 확인 필요**. 만약 실제 dev에서 한 번도 진입 검증 안 했다면 본 issue가 처음 발견된 가능성.
+- 현재: `granite.config.ts:7` → `appName: 'airecipe'`.
+- hotfix가 원복했어야 할 값: `'airecipe-miniapp'` (`_workspace_hotfix_entry_fallback/03_qa_report.md:21,101`, CLAUDE.md hotfix 표 #1).
+- monorepo 병합(`05ef27c`)이 hotfix 이전 값을 재도입 → **진입 시 `/_404` 폴백 회귀 상태**.
+- 탭바 도입과 별개로 앱이 홈 진입조차 못 하므로 **본 작업에서 동시 수정**.
 
 ---
 
-## C. 원인 후보 매트릭스
+## B. Frontend 구현 명세 (그대로 따라 구현)
 
-| # | 가설 | 가능성 | 검증 방법 |
-|---|------|-------|----------|
-| H1 | **앱 이름 미스매치** — `granite.config.ts`의 `appName: 'airecipe'`가 콘솔 등록 prefix와 불일치 → 진입 URL 매칭 실패 → `path: '*'` → `/_404` | **HIGH** | 사용자에게 콘솔 등록 appName 확인 |
-| H2 | **shim re-export resolve 실패** — `from 'pages/index'`가 metro에서 resolve 안 됨 → 컴포넌트 등록 실패 → 라우트 미존재 → `/_404` | MEDIUM | metro dev server 로그(stderr) — `Unable to resolve` 메시지 확인 |
-| H3 | **진입 URL 비-root path** — 토스 SDK가 default path를 `/`가 아닌 임의 string으로 설정 | MEDIUM | dev server에서 navigation 초기 state 로그 |
-| H4 | **`_404.tsx`의 navigation.canGoBack 분기 결함** — Granite 폴백 컨텍스트에서 useNavigation이 일부 메서드 미지원이라 onBack 무동작 (ADR-015 §롤백 R3 사전 기록) | MEDIUM (닫기 무동작은 설명, 진입 시 _404는 별 cause) | _404 코드 단순화 후 재현 |
-| H5 | **TossUserIdProvider SDK 호출 실패** — `getAnonymousKey()` throw → ErrorBoundary fallback이 `/_404` | LOW (Granite는 `defaultErrorComponent` 별도라 _404 직결 아님) | useTossUserId catch 흐름 검토 |
-| H6 | **`pages/recipe/recommend.tsx` Phase 6 신규가 라우트 등록 break** — Granite의 라우트 path 충돌 또는 검증 실패 | LOW (router.gen.ts 시뮬레이션 PASS) | Phase 6 commit revert 후 재현 |
-| H7 | **NotFoundScreen 카피 부적합** — "레시피를 찾을 수 없어요"는 단건 404용. 진입 폴백 _404 카피는 별도여야 함 (UX 결함) | HIGH (UX) | 카피 분리 |
+### B.1 [신규] `src/components/BottomTabBar.tsx` — 단일 SSOT 컴포넌트 (D57)
+
+```tsx
+import React, { useCallback } from 'react';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { useNavigation } from '@granite-js/react-native';
+import { Txt, colors } from '@toss/tds-react-native';
+
+export type TabKey = 'home' | 'my';
+
+export interface BottomTabBarProps {
+  /** 현재 화면이 자신의 활성 탭을 명시 전달 (런타임 상태 의존 제거 — D57/§3.4) */
+  active: TabKey;
+}
+
+const TABS: { key: TabKey; label: string; path: '/' | '/my-recipes' }[] = [
+  { key: 'home', label: '홈', path: '/' },
+  { key: 'my', label: '마이 레시피', path: '/my-recipes' },
+];
+
+export function BottomTabBar({ active }: BottomTabBarProps) {
+  const navigation = useNavigation();
+
+  const handlePress = useCallback(
+    (key: TabKey, path: '/' | '/my-recipes') => {
+      if (key === active) return;          // 동일 탭 재탭 no-op
+      navigation.navigate(path, {});        // D55 — navigate(재포커스)
+    },
+    [navigation, active],
+  );
+
+  return (
+    <View style={styles.bar}>
+      {TABS.map((tab) => {
+        const isActive = tab.key === active;
+        return (
+          <Pressable
+            key={tab.key}
+            style={styles.item}
+            onPress={() => handlePress(tab.key, tab.path)}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: isActive }}
+            accessibilityLabel={tab.label}
+          >
+            <Txt
+              typography="st11"
+              color={isActive ? colors.orange500 : colors.grey500}
+            >
+              {tab.label}
+            </Txt>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  bar: {
+    flexDirection: 'row',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.grey200,
+    backgroundColor: colors.white,
+    paddingBottom: 12,   // SafeArea 폴백 (D61) — useSafeAreaInsets 실재 확인 시 교체
+    paddingTop: 8,
+  },
+  item: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 6,
+  },
+});
+```
+
+**검증 필수 (frontend):**
+1. 활성 색 = **`colors.orange500`(`#FF6B00`)** — QA 실증 확정(D59). `colors.primary`는 `@toss/tds-colors@0.1.0` **부재**(TS2339)이므로 사용 금지, `colors.blue500`은 브랜드 이질로 기각. **hex 직접 사용 금지.**
+2. `colors.orange500`/`grey200`/`grey500`/`white` — 실재 확인됨(orange500=`#FF6B00`).
+3. `Txt typography="st11"` — 기존 AI 면책 라인이 동일 레벨 사용(실재).
+4. (선택) 아이콘 추가 시 `Icon name` 실재성 AppsInToss MCP `search_tds_rn_docs`로 확인 후에만(D60). 미확인 시 라벨 only로 출하.
+5. SafeArea: `react-native-safe-area-context`/Granite 인셋 훅 실재 확인 후 `paddingBottom`을 `insets.bottom`으로. 미확인 시 위 상수 폴백 유지.
+
+### B.2 [수정] `src/pages/index.tsx` (홈)
+
+- D58: `PageNavbar.AccessoryButtons`/`AccessoryTextButton "마이 레시피"` 블록 **제거**. `handleOpenMyRecipes` 콜백도 제거. `PageNavbar`는 `Title`만 유지.
+- "오늘의 추천 받기" CTA(`handleOpenRecommend`)·SearchForm은 **유지**.
+- 화면 최하단에 `<BottomTabBar active="home" />` 추가. `root` 컨테이너는 `flex:1`이므로 ScrollView 아래에 형제로 배치(탭바가 항상 하단 고정).
+- ScrollView `contentContainerStyle`에 `paddingBottom: 24` 정도 추가(탭바 가림 방지 — D61).
+- import: `import { BottomTabBar } from '../components/BottomTabBar';`. `PageNavbar` 제거로 미사용 import 정리(`Button`은 추천 CTA에서 계속 사용).
+
+구조:
+```tsx
+<View style={styles.root}>
+  <PageNavbar><PageNavbar.Title>AI 레시피</PageNavbar.Title></PageNavbar>
+  <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+    {/* intro + SearchForm + 추천 CTA (기존) */}
+  </ScrollView>
+  <BottomTabBar active="home" />
+</View>
+```
+
+### B.3 [수정] `src/pages/my-recipes.tsx` (마이)
+
+- **화면 로직 변경 최소화** (목록/필터/페이지네이션/즐겨찾기/광고 그대로).
+- 최하단에 `<BottomTabBar active="my" />` 추가. 현재 구조의 최외곽 `View(flex:1)` 안, 콘텐츠(ScrollView 등) 다음 형제로.
+- ScrollView/콘텐츠 `paddingBottom` 확보(탭바 가림 방지).
+- 상단 `PageNavbar`의 BackButton은 유지(탭바와 별개 — 상세에서 돌아온 경우 등). 단 마이가 탭 진입의 종착이므로 BackButton 동작은 기존 그대로.
+- import: `import { BottomTabBar } from '../components/BottomTabBar';`.
+
+> 주의: 식별자 가드(`useTossUserId`)로 로딩/에러 분기가 화면 전체를 차지하는 경우에도 탭바는 보이는 게 자연스럽다. 분기 렌더가 `return` early인 구조라면, 탭바를 각 분기 바깥(최외곽 View 자식)으로 끌어올려 항상 렌더되게 한다.
+
+### B.4 [수정] `granite.config.ts` (D62 — 회귀 동시 수정)
+
+```ts
+appName: 'airecipe-miniapp',   // 'airecipe'에서 원복 — 진입 deep link prefix와 1:1 동기
+```
+다른 필드(scheme/brand/env/ads) 변경 없음.
+
+### B.5 변경 없음 (확인용)
+
+- `src/router.gen.ts` — **변경 0**. 새 라우트 없음(D55). 기존 5라우트 그대로.
+- `src/_app.tsx` — **변경 0**. 탭바는 화면별 마운트라 Provider 추가 불필요.
+- `pages/*.tsx` shim 5개 — **변경 0**.
+- `src/services`·`hooks`·zod·types — **변경 0**. api-client 팀 no-op.
+- 스택 화면(`recipe/generate`·`[id]`·`recommend`)·`pages/_404.tsx` — **변경 0**(탭바 미렌더 D56).
+
+### B.6 [선택] AGENTS.md
+
+`src/components/AGENTS.md`에 `BottomTabBar` 행 1줄 추가(단일 하단 탭바 SSOT, 화면별 `active` prop 명시 전달, 색은 TDS 토큰). frontend가 컴포넌트 추가 시 동기.
 
 ---
 
-## D. 가장 의심되는 cause
+## C. QA 검증 항목 (miniapp-qa)
 
-**H1 (앱 이름 미스매치) + H7 (카피 부적합) 결합** 가능성 높음.
+| # | 항목 | 기대 |
+|---|------|------|
+| Q1 | typecheck | `pnpm typecheck` PASS |
+| Q2 | lint | `pnpm lint` 0 errors (router.gen.ts 누적 warning 1건 허용) |
+| Q3 | BottomTabBar 단일 컴포넌트 | `src/components/BottomTabBar.tsx` 1개. 중복 정의 0 (D57) |
+| Q4 | 탭 전환 | 홈↔마이 `navigation.navigate('/'|'/my-recipes', {})`. push 아님(D55) |
+| Q5 | 탭바 노출 범위 | `/`·`/my-recipes`만 렌더. generate/[id]/recommend/_404 **미렌더** (D56) — grep으로 BottomTabBar import가 두 화면에만 |
+| Q6 | 홈 중복 진입점 제거 | `index.tsx`에 `AccessoryTextButton "마이 레시피"` 부재 (D58). "오늘의 추천" CTA 유지 |
+| Q7 | 색 토큰 | hex 직접 사용 0건 — `colors.*`만 (ADR-015 D39). 활성/비활성 토큰 구분 |
+| Q8 | 아이콘 | (추가 시) `Icon name` 실재 검증 근거 첨부. 미검증이면 라벨 only |
+| Q9 | SafeArea | 하단 패딩 존재 + ScrollView paddingBottom으로 탭바 가림 없음 (D61) |
+| Q10 | **appName 회귀** | `granite.config.ts` `appName: 'airecipe-miniapp'` (D62). dev 진입 시 홈 정상(=`/_404` 미표시). `navigation.getState` `routes[0].path` 정상 매칭 |
+| Q11 | router.gen.ts | 변경 0 — 5라우트 그대로 |
+| Q12 | 데이터 경로 | api-client/hooks/zod 변경 0 (계약 무영향) |
 
-- Phase 5 commit `dd045c8` → `87625a4 chore: 앱 이름 변경` (airecipe-miniapp → airecipe) 시점에 콘솔/진입 prefix와 미스매치 가능.
-- 이미 H7 — 진입 폴백 _404가 "레시피를 찾을 수 없어요"로 떠서 사용자가 "왜 진입했는데 레시피 404?"로 혼동.
-- 닫기 무동작은 H4 — `navigation.canGoBack=false` + `navigate('/', {})` 호출했지만 `/` 자체가 매칭 실패면 또 _404 → 사용자 체감 "무동작".
-
----
-
-## E. 안전 fix 후보 (root cause 미해소 시에도 적용 가능)
-
-### E.1 NotFoundScreen 카피 prop화 (백워드 호환)
-
-- 현재 시그니처: `NotFoundScreenProps { onBack }`.
-- 확장: `NotFoundScreenProps { onBack, title?, subtitle?, leftButtonText? }` — default는 현재 카피 유지.
-- `_404.tsx`에서 카피 분기: 진입 폴백 시 "원하시는 페이지를 찾을 수 없어요" / 홈으로 이동 안내.
-- 단일 컴포넌트 정책(ADR-012 D16) 유지 — 분기는 prop으로만.
-
-### E.2 _404.tsx handleBack 견고화
-
-- `canGoBack` 분기 제거, 항상 `navigation.navigate('/', {})` + 실패 catch.
-- 닫기 텍스트 "홈으로" 명시.
-- 추가 reload UX는 별 ADR.
-
-### E.3 `appName` 동기화 안내
-
-- 콘솔 등록명 ↔ `granite.config.ts` `appName` 1:1 확인 절차를 09-ENV-CONFIG 또는 10-SPRINT-PLAN에 추가.
+**Q10은 디바이스/샌드박스 dev 진입 실증이 최종 — 코드 측은 appName 문자열 1:1 확인까지.**
 
 ---
 
-## F. 사용자에게 확인 요청할 항목
+## D. SSOT 인용
 
-1. **콘솔 등록 정보**: 앱인토스 콘솔에 등록된 미니앱의 `appName`은? (현재 코드: `airecipe`).
-2. **진입 경로**: 어떤 방식으로 미니앱에 진입했는지 (토스 앱 메인 → 미니앱 메뉴 / 특정 deeplink / dev server QR / 기타).
-3. **dev server 메시지**: `pnpm dev` 또는 `pnpm dev:local`로 띄울 때 metro/babel 측 에러·warning 있었는지 (특히 `Unable to resolve module 'pages/...'`).
-4. **닫기 버튼 카피**: ErrorPage에 표시된 닫기 버튼의 정확한 텍스트(좌측·우측). TDS `ErrorPage`는 `onPressLeftButton`/`onPressRightButton` 둘 다 노출 가능.
+- ADR-017 §1(실증)·§2(D53~D62)·§3(정합성) — 본 작업 결정 SSOT.
+- 07-ROUTING §7.8.1 — 라우팅 측 SSOT(갱신 완료).
+- 06-UI-MAPPING §6.1 — TDS colors 토큰 의무(hex 금지, ADR-015 D39).
+- hotfix: `_workspace_hotfix_entry_fallback/03_qa_report.md` — appName 회귀 root cause.
 
----
+## E. 팀 통지
 
-## G. 본 사이클 진행 계획
-
-1. ✅ 분석 baseline 작성(본 문서) + 가설 동결.
-2. ⏸ **사용자 응답 대기** — F 4항 정보.
-3. fix 결정 + 적용:
-   - 정보 응답에 따라 E.1·E.2 단독 또는 결합 적용.
-   - root cause가 H1이면 `granite.config.ts` `appName` 조정 + 콘솔 동기 안내.
-4. typecheck + lint 통과.
-5. QA + session log.
+- **frontend**: B.1~B.6 구현. 블로커 게이트 통과(방식 C 확정). 활성 색 `colors.orange500`(확정, D59). SafeArea 훅/Icon name은 실재 확인 후 채택(추측 금지).
+- **api-client**: no-op (계약 무영향).
+- **qa**: C의 Q1~Q12. Q10(appName)·Q5(노출 범위)·Q6(중복 제거) 우선.
+- **백엔드 영향**: 없음.
