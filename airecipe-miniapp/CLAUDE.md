@@ -322,7 +322,7 @@ Phase별 수용 기준은 `docs/appsintoss-port/10-SPRINT-PLAN.md`. 결정 트�
 
 **트리거:** 본 미니앱의 기능 개발·수정·추가, 페이지/화면/api-client 메서드 추가, 아키텍처 설계, QA·검수 점검, 문서화, 버그 수정, 리팩터링 등 본 앱 관련 작업 요청 시 `miniapp-orchestrator` 스킬을 사용하라. 단순 질문은 직접 응답 가능.
 
-**구성:** 에이전트 팀 4명(miniapp-architect / miniapp-api-client / miniapp-frontend / miniapp-qa) + 워커 스킬 5개. 상세는 `miniapp-orchestrator` 스킬과 `.claude/agents/`, `.claude/skills/`에서 관리.
+**구성:** 에이전트 팀 4명(miniapp-architect / miniapp-api-client / miniapp-frontend / miniapp-qa) + 워커 스킬 5개. **하네스는 monorepo 루트 `.claude/`에서 관리한다** (서브프로젝트 `.claude/` 아님). 루트에서는 `airecipe-router`가 백엔드/미니앱을 판별해 위임하며, 미니앱 팀은 기준 디렉토리 `airecipe-miniapp/`로 동작한다. 도메인 분리 워커 스킬은 `-miniapp` 접미사(`software-design-principles-miniapp`, `technical-documentation-miniapp`, `integration-coherence-qa-miniapp`) + `granite-rn-development`·`appsintoss-publish-checklist`.
 
 **변경 이력:**
 | 날짜 | 변경 내용 | 대상 | 사유 |

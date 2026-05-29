@@ -14,7 +14,7 @@ AI 기반 요리 레시피 안내 웹앱 (Next.js + TypeScript). 핵심 요구�
 
 **트리거:** 레시피 앱의 기능 개발·수정·추가, AI 레시피 생성/추천·영양 분석 구현, 페이지/API 추가, 아키텍처 설계, QA 검증, 문서화, 버그 수정, 리팩터링 등 이 앱 관련 작업 요청 시 `recipe-app-orchestrator` 스킬을 사용하라. 단순 질문은 직접 응답 가능.
 
-**구성:** 에이전트 팀 4명(architect / backend / frontend / qa) + 워커 스킬 5개. 상세는 `recipe-app-orchestrator` 스킬과 `.claude/agents/`, `.claude/skills/`에서 관리.
+**구성:** 에이전트 팀 4명(recipe-architect / recipe-backend / recipe-frontend / recipe-qa) + 워커 스킬 5개. **하네스는 monorepo 루트 `.claude/`에서 관리한다** (서브프로젝트 `.claude/` 아님). 루트에서는 `airecipe-router`가 백엔드/미니앱을 판별해 위임하며, 백엔드 팀은 기준 디렉토리 `airecipe-backend/`로 동작한다. 도메인 분리 워커 스킬은 `-backend` 접미사(`software-design-principles-backend`, `technical-documentation-backend`, `integration-coherence-qa-backend`) + `nextjs-fullstack`·`ai-recipe-integration`.
 
 **변경 이력:**
 | 날짜 | 변경 내용 | 대상 | 사유 |
