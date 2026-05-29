@@ -44,12 +44,21 @@ let cachedTossUserId: TossUserId | undefined;
 /**
  * SDK를 1회 호출하여 hash를 발급받고 캐시에 보관한다.
  *
+ * - SDK 반환 shape(`@apps-in-toss/framework@2.6.0`):
+ *   `Promise<{ type: 'HASH', hash: string } | 'ERROR' | undefined>`
+ *   `undefined` = 최소 지원 미만 앱 버전, `'ERROR'` = SDK 내부 오류.
  * - 부적합 hash(길이 위반 등)는 캐시에 두지 않고 throw → 호출부가 UI 에러로 변환.
  * - SDK 호출 자체는 본 함수 1곳에만 존재(SRP + DIP). 다른 모듈은 본 훅을 통해서만 접근.
  */
 async function fetchAndCacheTossUserId(): Promise<TossUserId> {
-  const raw: unknown = await getAnonymousKey();
-  const parsed = tossUserIdSchema.safeParse(raw);
+  const result = await getAnonymousKey();
+  if (result === undefined) {
+    throw new Error('TOSS_USER_ID_UNSUPPORTED_APP_VERSION');
+  }
+  if (result === 'ERROR') {
+    throw new Error('TOSS_USER_ID_SDK_ERROR');
+  }
+  const parsed = tossUserIdSchema.safeParse(result.hash);
   if (!parsed.success) {
     throw new Error('TOSS_USER_ID_INVALID');
   }
@@ -102,9 +111,13 @@ export function TossUserIdProvider({ children }: PropsWithChildren) {
       .then((hash) => {
         if (!cancelled) setTossUserId(hash);
       })
-      .catch(() => {
+      .catch((err: unknown) => {
         // 실패 로깅에 hash가 포함되지 않으므로 무해(09 §9.5 라인 221).
         // 사용자 토스트는 호출부 책임(05 §5.4 라인 291).
+        if (__DEV__) {
+          const reason = err instanceof Error ? err.message : String(err);
+          console.warn('[useTossUserId] getAnonymousKey failed:', reason);
+        }
       });
     return () => {
       cancelled = true;
