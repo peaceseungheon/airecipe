@@ -1,0 +1,30 @@
+node_modules/
+dist/
+npm-debug.log
+
+.yarn/*
+.pnp.*
+yarn-error.log
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+
+.env
+.env.local
+.env.staging
+.env.production
+.granite
+.swc
+.DS_Store
+
+# build artifacts
+*.ait
+coverage/
+
+# plugin-env 자동 생성 (09-ENV-CONFIG §9.4.2 — 빌드 시점 주입)
+src/env.d.ts
+
+# Claude harness 런타임 산출
+.claude/scheduled_tasks.lock
