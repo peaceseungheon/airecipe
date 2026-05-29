@@ -14,7 +14,7 @@
  *   const { save, isSaving, error, reset } = useSaveRecipe();
  *   ...
  *   const saved = await save(generatedRecipe);
- *   if (saved) navigation.navigate('/recipe/[id]', { id: saved.id });
+ *   if (saved) navigation.navigate('/recipe/:id', { id: saved.id });
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';

@@ -36,7 +36,7 @@ interface DetailParams {
   id: string;
 }
 
-export const Route = createRoute('/recipe/[id]', {
+export const Route = createRoute('/recipe/:id', {
   // Phase 2 generate.tsx:39-50 패턴 답습 (baseline §C.2).
   validateParams: (params: unknown): DetailParams => {
     const obj = (params ?? {}) as Record<string, unknown>;

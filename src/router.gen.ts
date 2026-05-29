@@ -10,7 +10,7 @@ declare module '@granite-js/react-native' {
   interface RegisterScreenInput {
     '/': (typeof _IndexRoute)['_inputType'];
     '/my-recipes': (typeof _MyRecipesRoute)['_inputType'];
-    '/recipe/[id]': (typeof _RecipeIdRoute)['_inputType'];
+    '/recipe/:id': (typeof _RecipeIdRoute)['_inputType'];
     '/recipe/generate': (typeof _RecipeGenerateRoute)['_inputType'];
     '/recipe/recommend': (typeof _RecipeRecommendRoute)['_inputType'];
   }
@@ -18,7 +18,7 @@ declare module '@granite-js/react-native' {
   interface RegisterScreen {
     '/': (typeof _IndexRoute)['_outputType'];
     '/my-recipes': (typeof _MyRecipesRoute)['_outputType'];
-    '/recipe/[id]': (typeof _RecipeIdRoute)['_outputType'];
+    '/recipe/:id': (typeof _RecipeIdRoute)['_outputType'];
     '/recipe/generate': (typeof _RecipeGenerateRoute)['_outputType'];
     '/recipe/recommend': (typeof _RecipeRecommendRoute)['_outputType'];
   }

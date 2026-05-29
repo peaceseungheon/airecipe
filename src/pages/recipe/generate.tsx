@@ -7,7 +7,7 @@
  * 책임:
  * - useRecipeGenerate 훅 결합 — SSE 호출·청크 분기·AbortController·폴백·에러 매핑은 훅 책임.
  * - Phase 3: useSaveRecipe 결합 — `status === 'done' && recipe` 시 저장 버튼 노출.
- *   클릭 → save(recipe) → 성공 시 `navigation.navigate('/recipe/[id]', { id: saved.id })` (baseline §A.4).
+ *   클릭 → save(recipe) → 성공 시 `navigation.navigate('/recipe/:id', { id: saved.id })` (baseline §A.4).
  *   캐시 invalidate는 useSaveRecipe 내부에서 자동(baseline §D.3) — 본 화면 호출 책임 없음.
  * - 본 화면은 (1) URL params 수신, (2) 초기값 있으면 자동 1회 generate, (3) UI 분기,
  *   (4) 취소·다시 시도·에러 노출·저장 트리거만 담당 (SRP).
@@ -118,7 +118,7 @@ function GeneratePage() {
     if (!recipe) return;
     const saved = await save(recipe);
     if (saved) {
-      navigation.navigate('/recipe/[id]', { id: saved.id });
+      navigation.navigate('/recipe/:id', { id: saved.id });
     }
   }, [recipe, save, navigation]);
 

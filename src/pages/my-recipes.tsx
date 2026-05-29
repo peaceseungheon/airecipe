@@ -62,7 +62,7 @@ function MyRecipesPage() {
 
   const handleOpenDetail = useCallback(
     (id: string) => {
-      navigation.navigate('/recipe/[id]', { id });
+      navigation.navigate('/recipe/:id', { id });
     },
     [navigation],
   );
