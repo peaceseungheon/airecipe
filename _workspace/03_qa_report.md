@@ -1,124 +1,176 @@
-# Phase 5 QA Report — 출시 준비
+# Phase 6 QA Report — 테마 기반 요리 추천 (ADR-016)
 
-> 일자: 2026-05-25
-> 범위: Q1~Q10 매트릭스 + AC5.1~AC5.4 분리표 + 누적 미해결 재평가
-> 진입 조건: Phase 4 완료 + Phase 5 baseline §B·C·E 코드 측 작업 완료
+> 일자: 2026-05-29
+> 검증자: orchestrator (메인 세션 — 팀원 무산출로 통합 수행, Phase 4.5·5 선례)
+> 결과: **ALL PASS** — Q1~Q12 12/12 PASS, FAIL 0건. typecheck PASS, lint 0 errors(Phase 3 누적 router.gen.ts warning 1건만).
 
----
+## 결과 요약
 
-## 1. Q 매트릭스 (10항 — 정적 검증)
+| 매트릭스 | 항목 | 결과 |
+|----------|------|------|
+| Q1 | SSOT ↔ zod ↔ api-client ↔ frontend 응답 shape 일치 | PASS |
+| Q2 | 테마 미선택 시 zod refine + UI disabled | PASS |
+| Q3 | 401 자동 재시도 1회 (apiFetch 단일 위치) | PASS |
+| Q4 | 테마 변경 시 이전 in-flight abort + 새 fetch | PASS |
+| Q5 | 카드 탭 → `/recipe/generate?dishName=<선택>` + SearchForm prefilled | PASS |
+| Q6 | 추천 결과 정확히 5개 (zod `length(5)` 강제) | PASS |
+| Q7 | AI 면책 1줄 (D52 — `typography="st11"`, `colors.grey600`) | PASS |
+| Q8 | TDS 컴포넌트 실재성 (SegmentedControl/Pressable/Badge/Txt/Button/PageNavbar) | PASS |
+| Q9 | hex 직접 사용 0건 (`colors.*` 토큰 — ADR-015 D39 준수) | PASS |
+| Q10 | 한국어 에러 메시지 (ApiErrorCode 8종 매핑) | PASS |
+| Q11 | SSOT 5종 갱신 정합성 (01/03/06/07/10) | PASS |
+| Q12 | typecheck PASS + lint 0 errors | PASS |
 
-| ID | 점검 항목 | 방법 | 결과 |
-|----|----------|------|------|
-| Q1 | hex 색상 → TDS `colors` 토큰 일괄 교체 (D39) | `grep -rn "'#[0-9a-fA-F]{3,8}'" src/ pages/` | **PASS** — 0건. 모든 hex 토큰화 |
-| Q2 | TDS `colors` import 누락 (필요한 파일) | `grep -rn "from '@toss/tds-react-native'" src/ pages/` | **PASS** — 색상 사용 파일 10개 모두 colors import |
-| Q3 | NutritionPanel AI 면책 문구 (D40) | NutritionPanel.tsx 최하단 `Txt typography="st11"` 검증 | **PASS** — "AI가 생성한 참고용 정보예요. 의료·영양 자문이 아닙니다." |
-| Q4 | pages/_404.tsx TDS 사용 | `pages/_404.tsx` 내용 검증 | **PASS** — NotFoundScreen 재사용 + navigation.canGoBack 폴백 |
-| Q5 | granite.config.ts 검수 항목 | scheme/appName/permissions/displayName | **PASS** — 코드 측 OK. icon URL은 콘솔 등록 후 채움 (PENDING) |
-| Q6 | 금지 환경변수(API 키·DB URL) 코드 부재 | `grep -rn "GEMINI_API_KEY\|ANTHROPIC_API_KEY\|SUPABASE_SERVICE_ROLE_KEY"` | **PASS** — 0건 |
-| Q7 | tossUserId 평문 노출 (UI/log) | `grep -rn "console.*tossUserId\|console.*hash"` (코드) | **PASS** — 0건. `formatTossUserIdMask` 규약 준수 |
-| Q8 | 에러 메시지 한국어 매핑 일관성 (D41) | 5개 훅의 KOREAN_ERROR_MESSAGE 매핑 비교 | **PASS** — useSaveRecipe/useMyRecipes/useToggleFavorite/useDeleteRecipe/useRecipeDetail 동일 매핑 |
-| Q9 | SDK 패키지 경로 해결 (Phase 1·2·3 누적 미해결) | `pnpm typecheck` 모듈 해결 | **PASS** — 누적 미해결 해소됨 (commit `46f0566` 적용 후 검증 완료) |
-| Q10 | 환경별 빌드 스크립트 (D42) | `package.json` scripts | **PASS** — dev:local·dev:staging·build:staging·build:prod 4종 정의 |
+## Q1. SSOT ↔ zod ↔ api-client ↔ frontend 응답 shape 일치
 
-**합계: 10/10 PASS, FAIL 0건.**
+- **SSOT(03 §3.8.3)**: `{ data: { items × 5, meta: { theme, generatedAt } } }`.
+- **zod(`src/lib/zod/recommendations.ts`)**: `recommendationsResponseSchema` — `items: array(itemSchema).length(5)` + `meta: { theme, generatedAt }`.
+- **api-client(`src/services/recipes.ts:212`)**: `apiFetch('/api/recommendations', apiResponseSchema(recommendationsResponseSchema), ...)` → `wrapped.data: { items, meta }`.
+- **frontend(`src/hooks/useRecommendations.ts:106`)**: `setItems(result.items)`. `result`은 `{ items, meta }`이고 `items: RecommendationItem[]`로 타입 일치.
+- **카드(`src/components/RecommendationCard.tsx`)**: `item.dishName`/`item.description`/`item.tags` 모두 zod schema 동일.
 
----
+**결과: PASS** — 경계면 4단계(SSOT/zod/api-client/frontend) 모두 정합.
 
-## 2. D39~D43 시행 검증
+## Q2. 테마 미선택 시 zod refine + UI disabled
 
-| ID | 결정 | 시행 결과 |
-|----|------|----------|
-| D39 | hex → TDS `colors` 토큰 (light 모드 정확 동등치) | 10 파일 60+ hex 토큰 교체 완료. typecheck/lint PASS |
-| D40 | AI 면책 문구 — NutritionPanel 하단 fixed 1줄 | NutritionPanel.tsx에 `typography="st11" color={colors.grey600}` 추가 |
-| D41 | 에러 메시지 카탈로그 동결 — Phase 1·3·4 누적 그대로 | 5개 훅 동일 매핑, 화면 측 한국어 일관 |
-| D42 | package.json scripts 4종 동결 | 추가 변경 0건 |
-| D43 | 출시 PENDING 명시 (외부 작업) | §3 분리표 참조 |
+- **zod(`recommendations.ts:23-26`)**: `recommendationThemeSchema.refine(v => v.situation !== undefined || v.weather !== undefined, ...)`.
+- **UI(`recommend.tsx:39`)**: `const selected = theme.situation !== undefined || theme.weather !== undefined;`.
+- **CTA(`recommend.tsx:104`)**: `<Button disabled={!selected || isLoading}>`.
+- **훅(`useRecommendations.ts:81-86`)**: `if (!selected) { setItems([]); ... return; }` — 호출 보류.
+- 미선택 상태일 때 안내 메시지 노출(`recommend.tsx:118-122`).
 
----
+**결과: PASS** — AC6.1 통과. zod refine은 백엔드도 호출되기 전 frontend 측 가드로도 작동(보낼 일 없지만 방어선).
 
-## 3. AC5.1~AC5.4 검증 (수용 기준 분리표)
+## Q3. 401 자동 재시도 1회
 
-| AC | 내용 | 본 사이클 | 코드 측 결과 | 외부 작업 |
-|----|------|-----------|-------------|----------|
-| AC5.1 | 검수 가이드(비게임) 체크리스트 모두 통과 | 코드 측 검증 | **PASS** — TDS 100%/권한 최소/면책 문구/한국어 UI | 콘솔 검수 제출 PENDING |
-| AC5.2 | 콘솔 "검토 요청" 제출 → 반려 사유 없음 | **외부 작업 PENDING** | — | 콘솔 제출 + 응답 대기 |
-| AC5.3 | 토스앱 5.246.0+ 미니앱 진입·홈 화면 등록 | **외부 작업 PENDING** | — | 실 디바이스 + 콘솔 |
-| AC5.4 | 사용자 6기능 e2e 무결성 | 코드 경로 PASS | **PASS** — Phase 1~4 누적 산출 + 본 사이클 hex 교체 후 시각적 회귀 0 | 실 디바이스 테스트 PENDING |
+- **api-client(`api-client.ts:110-118`)**: `if (res.status === 401 && allowRetry && init.refreshTossUserId) { ... recursion with allowRetry=false }`.
+- **useRecommendations(`useRecommendations.ts:107`)**: `refreshTossUserId` 전달 → 401 재시도 활성화.
+- **useTossUserId**: refresh는 SDK `getAnonymousKey()` 재호출 후 새 hash 반환(05 §5.4 SSOT).
 
----
+**결과: PASS** — Phase 1·3·4 패턴 재사용, 별도 변경 없음.
 
-## 4. 누적 미해결 재평가 (Phase 5 본 차)
+## Q4. 테마 변경 시 이전 in-flight abort + 새 fetch
 
-### 4.1 해소된 항목
+- **`useRecommendations.ts:91-93`**: `abortRef.current?.abort()` → new AbortController.
+- **`useRecommendations.ts:107`**: `signal: controller.signal` 전달 → `apiFetch`가 `fetch`에 주입(`api-client.ts:100`).
+- **`useRecommendations.ts:78-85`**: theme 변경 시 useEffect 재실행(deps `[key, selected, theme, tossUserId, refreshTossUserId, trigger]`).
+- **cleanup(`useRecommendations.ts:74-78`)**: unmount 시 `cancelledRef.current = true` + abort.
 
-| 항목 | 출처 | 해소 사유 |
-|------|------|----------|
-| SDK 패키지 경로 (`@apps-in-toss/web-framework` 미해결) | Phase 1~4 인계 | `commit 46f0566`에서 `@apps-in-toss/framework`로 수정 + Phase 5 본 차 typecheck PASS로 확정 |
-| **`useBackEvent` 하드웨어 백** | Phase 3 인계 | Phase 4 ConfirmDialog `closeOnDimmerClick`로 해결 (Phase 4 baseline에서 표기됨) |
-| **디자인 토큰 hex 직접 사용** | Phase 2 인계 #7 | Phase 5 D39로 일괄 교체 완료 |
-| **AI 면책 문구** | 검수 가이드 §10.6 6번 | Phase 5 D40로 NutritionPanel 추가 완료 |
+**결과: PASS** — AC6.4 통과. 동일 테마 재호출(`refresh()`)도 trigger 증가로 동일 경로 실행.
 
-### 4.2 본 사이클 비범위 (별 ADR로 분리)
+## Q5. 카드 탭 → `/recipe/generate?dishName=<선택>` + SearchForm prefilled
 
-| 항목 | 출처 | 향후 처리 |
-|------|------|----------|
-| AbortSignal cast 2곳 | ADR-011 D13 | 별 ADR (현 v1 유지 가능 — 해소 조건 미달) |
-| 무한 스크롤 | Phase 3 인계 #6 | 별 ADR (출시 후 진화) |
-| 카드 측 삭제 UX (swipe/long-press) | Phase 4 ADR-013 D22 | 별 ADR (출시 후 진화) |
-| 다중 동시 PATCH 큐 | Phase 4 v1 한계 | 별 ADR (출시 후 진화) |
-| 전면 광고 wiring + 빈도 제한 | ADR-014 D30·D34 | 별 ADR (콘솔 발급 후) |
-| Analytics SDK 통합 | ADR-014 D33 | 별 ADR (측정 SDK 결정 후) |
-| 다크 모드 adaptive 토큰 도입 | Phase 5 D39 보조 | 별 ADR (출시 후 진화) |
+- **카드(`RecommendationCard.tsx:38`)**: `onPress` 콜백 위임.
+- **페이지(`recommend.tsx:48-53`)**: `handleSelectDish(dishName)` → `navigation.navigate('/recipe/generate', { dishName })`.
+- **generate(`generate.tsx:46-57`)**: `validateParams`에서 `dishName: string` 수신.
+- **SearchForm**: Phase 2부터 `initialDishName`/`initialServings` prop 지원 — `generate.tsx` 본문에서 이미 사용 중.
 
-### 4.3 외부 작업 (코드 측 비범위)
+**결과: PASS** — AC6.3 통과. generate.tsx 측 변경 없음(이미 지원).
 
-| 항목 | 담당 | 해소 조건 |
-|------|------|----------|
-| 콘솔 `adGroupId` 발급·승인 | 앱인토스 콘솔 | 콘솔 등록 + 승인 |
-| 콘솔 앱 등록 (appName/displayName/icon URL/카테고리/고객센터·홈페이지/도메인 화이트리스트) | 앱인토스 콘솔 | 검수 제출 전 등록 |
-| 백엔드 옵션 P 배포 | 별 저장소 AIReceipe | 별 저장소 작업 |
-| 번들 100MB 점검 | 빌드 산출 | `granite build` 실행 후 산출물 크기 확인 |
-| 실 디바이스 e2e 테스트 (6기능) | QA 인력 | staging 배포 + 디바이스 테스트 |
+## Q6. 추천 결과 정확히 5개
 
----
+- **zod(`recommendations.ts:46`)**: `z.array(recommendationItemSchema).length(5)`.
+- **api-client → zod 검증**: `apiFetch`가 `schema.safeParse` 실패 시 `ApiClientError('INTERNAL_ERROR', '서버 응답 형식이 올바르지 않아요.')` throw(`api-client.ts:124-131`).
+- **에러 경로**: `useRecommendations` catch에서 한국어 메시지로 변환.
 
-## 5. typecheck + lint 결과
+**결과: PASS** — AC6.2 통과. 백엔드가 5개를 보장하지 않으면 사용자에게 명확한 에러 노출.
+
+## Q7. AI 면책 1줄 (D52)
+
+- **위치(`recommend.tsx:152-158`)**: `items.length > 0` 분기 하단 fixed.
+- **스타일**: `<Txt typography="st11" color={colors.grey600}>`.
+- **카피**: "AI가 생성한 참고용 추천이에요. 식당·식자재 등 실제 상황을 고려해 선택해주세요."
+- **Phase 5 D40 NutritionPanel 패턴과 동일**.
+
+**결과: PASS** — AC6.6 통과.
+
+## Q8. TDS 컴포넌트 실재성
+
+- `SegmentedControl.Root` + `.Item` — Phase 4 FilterTabs에서 검증 PASS(06 §6.5).
+- `Pressable` — react-native 표준.
+- `Badge` — Phase 3·4 RecipeCard 사용 PASS.
+- `Txt` typography(`t4`, `t5`, `st9`, `st11`) — Phase 2·3·4·5 누적 사용 PASS.
+- `Button` `type="primary"|"light"` × `style="fill"|"weak"` — Phase 2·4 누적 PASS.
+- `PageNavbar` + `.Title` — Phase 2부터 사용.
+- `colors.*`(white, grey200, grey500, grey600, grey700, grey900, red50, red700, grey100) — Phase 5 D39 토큰 카탈로그.
+
+**결과: PASS** — 모든 컴포넌트가 `@toss/tds-react-native` 실재. 추가 검증 없이 PASS.
+
+## Q9. hex 직접 사용 0건
+
+```
+grep -rEn "['\"]#[0-9a-fA-F]{3,8}['\"]" src/components/{ThemePicker,RecommendationCard}.tsx \
+  src/hooks/useRecommendations.ts src/lib/zod/recommendations.ts \
+  src/pages/recipe/recommend.tsx
+→ (0건)
+```
+
+**결과: PASS** — ADR-015 D39 준수. 신규 파일 5종 모두 `colors.*` 토큰만 사용.
+
+## Q10. 한국어 에러 메시지 (ApiErrorCode 8종 매핑)
+
+- **`useRecommendations.ts:142-151`**: `ERROR_CODE_MESSAGES: Record<ApiErrorCode, string>` — 8종 모두 매핑.
+- **`toUserMessage`**: `ApiClientError` 분기 + fallback `INTERNAL_ERROR`.
+- **`pages/recipe/recommend.tsx:139-144`**: error state 렌더 — 한국어 메시지 + "다시 시도" Button.
+- HTTP 상태 직접 분기 0건(03 §3.10 #2 + #7 통일).
+
+**결과: PASS** — Phase 1·3·4 패턴 누적.
+
+## Q11. SSOT 5종 갱신 정합성
+
+| SSOT | 절 | 갱신 내용 |
+|------|----|-----------|
+| 01-FEATURES | §1.7 신설 + §1.8/§1.9/§1.10 renumber + 매트릭스 행 추가 | 기능 g) 흐름·AC·관련 API·화면·컴포넌트 |
+| 03-API-CONTRACT | §3.8 신설 + §3.9/§3.11(#6 5→6)/§3.13 갱신 | 엔드포인트 7 신설 + HTTP 매트릭스 행 |
+| 06-UI-MAPPING | §6.10 신설 | ThemePicker + RecommendationCard 시그니처 + AI 면책 |
+| 07-ROUTING | §7.3.6 신설 + 라우트 표 행 5 + Navbar 분산 표 | `/recipe/recommend` |
+| 10-SPRINT-PLAN | §10.7 신설 + §10.8/§10.10 renumber + 의존성 그래프 | Phase 6 AC6.1~AC6.6 |
+
+- ADR-016 의 SSOT 인용 위치 모두 일치.
+- 한국어 라벨(상황 6종 + 날씨 5종)은 03 §3.8.2 표를 단일 SSOT로 ThemePicker가 의존(`SITUATION_LABELS`/`WEATHER_LABELS`).
+- 03 §3.8.4 에러 코드는 `ApiErrorCode` 8종 카탈로그 재사용(신규 코드 0건).
+
+**결과: PASS** — 5종 SSOT + ADR-016 모두 동기.
+
+## Q12. typecheck PASS + lint 0 errors
 
 ```
 $ pnpm typecheck
 > tsc --noEmit
-(exit 0, 0 errors)
+(0 errors)
 
 $ pnpm lint
 > eslint .
-src/router.gen.ts:1:1  warning  Unused eslint-disable directive
+src/router.gen.ts
+  1:1  warning  Unused eslint-disable directive (no problems were reported)
 ✖ 1 problem (0 errors, 1 warning)
 ```
 
-router.gen.ts warning은 Phase 3 누적 무해 warning. 본 사이클 신규 0건.
+- router.gen.ts warning은 Phase 3부터 누적된 무해 warning(eslint-disable directive — granite 자동 생성 산출물).
 
----
+**결과: PASS** — Phase 5와 동일 상태.
 
-## 6. 멈춤 트리거 검토
+## 외부 작업 PENDING (코드 측 통과 — ADR-016 외)
 
-본 사이클 멈춤 트리거 4종 (baseline §I) 모두 미발동:
-1. ✓ hex 교체 시각적 회귀 — 모든 매핑이 light 모드 정확 동등치(`#f2f4f6 == colors.grey100` 등). 시각적 동일.
-2. ✓ TDS 매핑표 정정 — 매핑표 검증으로 정확 매핑 확인 (tds-colors `index.d.ts`).
-3. ✓ 면책 문구 중복 인식 — NutritionPanel 하단 별 위치(healthNote와 분리).
-4. ✓ typecheck/lint 강제 우회 — 정상 통과.
+| 항목 | 상태 |
+|------|------|
+| 백엔드 `app/api/recommendations/route.ts` 구현 | 별 저장소 `AIReceipe`에 인계 |
+| CORS 화이트리스트 등록 | 외부 |
+| staging·prod 배포 | 외부 |
+| 실 송출 검증 (5개 응답·zod 통과·401 자동 재시도) | 백엔드 배포 후 |
+| `/recipe/recommend` granite 자동 라우트 생성 | granite build 시 router.gen.ts 자동 — 본 사이클은 수동 갱신 |
 
----
+## 미해결 (Phase 7 진화 — 별 ADR)
 
-## 7. 결론
-
-**Phase 5 코드 측 모든 검수 점검 통과 (ALL PASS).** 출시 가능 상태 도달.
-
-남은 작업은 모두 **외부 작업**:
-1. 앱인토스 콘솔 등록 (앱 정보·고객센터·도메인 화이트리스트·아이콘 URL·`adGroupId`).
-2. 백엔드 옵션 P 배포 확인 (별 저장소).
-3. staging 배포 + 실 디바이스 e2e 테스트 (6기능).
-4. `granite build` 산출물 100MB 이하 확인.
-5. 콘솔 검토 요청 제출 → 반려 사유 응답 대기.
-
-**Phase 6(출시 후 진화)는 별 ADR로 분리** — AbortSignal cast, 무한 스크롤, 카드 측 삭제 UX, 다중 동시 PATCH 큐, 전면 광고 wiring, Analytics SDK 통합, 다크 모드 adaptive 토큰.
+ADR-016 §누적 미해결 참조:
+- 자유 텍스트 테마 입력 (D44 보조)
+- 추천 이미지 URL (D45 보조)
+- 개인화 추천 (D47 보조 — 과거 저장 레시피 기반)
+- 추천 결과 위치 광고 (ADR-014 D34 후속)
+- 다크 모드 adaptive 토큰 (ADR-015 D39 보조)
+- AbortSignal cast 2곳 (ADR-011 D13)
+- 무한 스크롤 (Phase 3 인계)
+- 카드 측 삭제 UX swipe·long-press (ADR-013 D22)
+- 다중 동시 PATCH 큐 (Phase 4 v1 한계)
+- 전면 광고 wiring (ADR-014 D30·D34)
+- Analytics SDK (ADR-014 D33)

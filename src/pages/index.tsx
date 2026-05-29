@@ -14,7 +14,7 @@
 import React, { useCallback } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { createRoute, useNavigation } from '@granite-js/react-native';
-import { PageNavbar, Txt, colors } from '@toss/tds-react-native';
+import { Button, PageNavbar, Txt, colors } from '@toss/tds-react-native';
 
 import { SearchForm } from '../components/SearchForm';
 
@@ -34,6 +34,10 @@ function HomePage() {
 
   const handleOpenMyRecipes = useCallback(() => {
     navigation.navigate('/my-recipes', {});
+  }, [navigation]);
+
+  const handleOpenRecommend = useCallback(() => {
+    navigation.navigate('/recipe/recommend', {});
   }, [navigation]);
 
   return (
@@ -61,6 +65,18 @@ function HomePage() {
         </View>
 
         <SearchForm onSubmit={handleSubmit} />
+
+        <View style={styles.recommendCta}>
+          <Button
+            type="light"
+            style="weak"
+            display="block"
+            size="medium"
+            onPress={handleOpenRecommend}
+          >
+            오늘의 추천 받기
+          </Button>
+        </View>
       </ScrollView>
     </View>
   );
@@ -77,5 +93,8 @@ const styles = StyleSheet.create({
   },
   intro: {
     gap: 8,
+  },
+  recommendCta: {
+    marginTop: 8,
   },
 });

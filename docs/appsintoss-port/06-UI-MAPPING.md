@@ -342,6 +342,22 @@ export const difficultyLabel: Record<Difficulty, string> = {
 | `RecipeCard` (06 §6.4.4 신규 구현) | 저장된 Recipe 카드 (마이 목록 아이템) | `View` + `Pressable` + `Txt` + `Badge` + `FavoriteButton`(Phase 4 활성화) | **Phase 3 완료 (2026-05-24) + Phase 4 확장 (2026-05-25)** — `src/components/RecipeCard.tsx`. props `{ recipe, onPress, onToggleFavorite?, onDelete?, favoritePending? }`. **Phase 4(ADR-013 D7·D22)**: `onToggleFavorite` 자리표시 활성화 → header에 `<FavoriteButton>` 합성. `onDelete` prop은 자리표시 유지(카드 측 삭제는 별 ADR — swipe·long-press 미도입). `recipe.id` 사용 OK (저장된 Recipe 한정) |
 | `FavoriteButton` (06 §6.4.5) | 별 토글 (마이 카드 + 상세 화면 헤더) | TDS `IconButton` + Icon name 동적 fetch | **Phase 4 완료 (2026-05-25)** — `src/components/FavoriteButton.tsx`. `import { IconButton } from '@toss/tds-react-native'`. props `{ isFavorite, onToggle, pending? }`. 멱등 목표값 콜백 — `onToggle(!isFavorite)`. icon name: `icon-star-bold-mono`(채움)/`icon-star-mono`(비움) — 토스 CDN 동적 fetch(컴파일 검증 불가, dev 노랑 fallback이 멈춤 트리거 §H.1). `variant="clear"`, `iconSize={24}`, `accessibilityState={{ selected: isFavorite, disabled: pending }}` |
 
+## 6.10 Phase 6 신규 컴포넌트 (테마 추천 — ADR-016)
+
+Phase 6에서 추가되는 컴포넌트 2종. SegmentedControl·Pressable·Badge는 §6.5 표에서 이미 실재 검증됨 — 본 절은 합성 시그니처 SSOT만 동결.
+
+| 새 컴포넌트 | 책임 | TDS 매핑 | 실 구현 (예정) |
+|-------------|------|---------|----------------|
+| `ThemePicker` | 상황(6종) + 날씨(5종) 테마 축 2개 선택 UI | TDS `SegmentedControl.Root` + `.Item` 2축 합성 | **Phase 6 (2026-05-29 예정)** — `src/components/ThemePicker.tsx`. `import { SegmentedControl, Txt } from '@toss/tds-react-native'`. props `{ value: RecommendationTheme, onChange: (next) => void }`. 2개 SegmentedControl.Root 행 — 상황(6 Item)·날씨(5 Item) 각 행 라벨 `Txt typography="st9"`. value는 nullable `{ situation?, weather? }`. 한국어 라벨 매핑은 03 §3.8.2 SSOT 사용. **검증 핵심**: 둘 다 미선택 시 부모가 disabled CTA 보장(AC6.1) |
+| `RecommendationCard` | 추천 카드 1장 (요리명·설명·태그) | `Pressable` + `View` + `Txt`(typography 토큰) + `Badge` × N | **Phase 6 (2026-05-29 예정)** — `src/components/RecommendationCard.tsx`. `import { Pressable } from 'react-native'`(또는 TDS) + `import { Txt, Badge, colors } from '@toss/tds-react-native'`. props `{ item: RecommendationItem, onPress: () => void }`. 합성: Pressable 외곽 → Txt(`dishName`, `typography="t5"`) + Txt(`description`, `typography="t2" color={colors.grey700}`) + `tags.map(tag => <Badge type="normal" size="small">{tag}</Badge>)`. **추천은 ephemeral** — `recipe.id` 없음, 카드 탭 시 `dishName`을 URL 파라미터로 전달(`/recipe/generate?dishName=...`) — 기존 SearchForm `initialDishName` 재사용 |
+
+> `useRecommendations` 훅과 `pages/recipe/recommend.tsx` 라우트는 §6.10 외 — 훅은 `src/hooks/AGENTS.md`, 라우트는 07-ROUTING §7.3.6에서 동결.
+
+**AI 면책 문구 (ADR-016 D52 — Phase 5 D40 패턴 재사용):**
+- 위치: `pages/recipe/recommend.tsx` 추천 결과 리스트 하단 1줄.
+- 카피: "AI가 생성한 참고용 추천이에요. 식당·식자재 등 실제 상황을 고려해 선택해주세요."
+- 스타일: `<Txt typography="st11" color={colors.grey600}>` fixed 1줄.
+
 ## 6.6 접근성·국제화 체크리스트
 
 | 항목 | 적용 방식 |
@@ -387,4 +403,5 @@ QA(`integration-coherence-qa` 스킬)가 본 챕터 검증 시 확인:
 | 2026-05-24 | §6.4.6 / §6.5 #6 행 갱신 — `Navbar` → `PageNavbar` 대체 (compound API + import 경로 + 핵심 props + Phase 2 실 사용 위치) | Phase 2 baseline §B.2 결정 + ADR-011 D12 — `@toss/tds-react-native@2.0.3` root에 `Navbar` 단일 명칭 부재 확인 후 `PageNavbar`(extensions) 채택. frontend 실 사용(`pages/index.tsx:36-38`, `pages/recipe/generate.tsx:108-110`) 검증 PASS. `ReactNavigationNavbar`는 본 미니앱 Granite 컨텍스트에 부적합으로 기각 |
 | 2026-05-24 | §6.5 추가 컴포넌트 표 — NotFoundScreen·EmptyState·RecipeCard 행에 Phase 3 실 구현 시그니처 추가 (props·import 경로·합성 패턴·단일 사용 위치 정책) | Phase 3 baseline §A.2·§B.2·§B.3·§H.2 #13 + ADR-012 D16·D18 — `src/components/{NotFoundScreen,EmptyState,RecipeCard}.tsx` 완료. `NotFoundScreen`은 단일 컴포넌트 정책으로 Phase 4 PATCH/DELETE 404 재사용 보장. `EmptyState`는 props 4종으로 다양 빈 상태 재사용. `RecipeCard`는 저장된 Recipe 한정 `recipe.id` 사용. frontend 실 사용(`pages/recipe/[id].tsx:75`, `pages/my-recipes.tsx:124-130,131-139`) 검증 PASS |
 | 2026-05-25 | §6.5 추가 컴포넌트 표 갱신 — FilterTabs/DeleteConfirmDialog/FavoriteButton 실 구현 시그니처 + RecipeCard 행 Phase 4 확장 표기. **ConfirmDialog props 정정** (`confirmText/cancelText/onConfirm/onCancel`은 실재하지 않음 — `leftButton`/`rightButton` ReactElement + `onClose`/`onExited` 필수가 SSOT) | Phase 4 완료(ADR-013 D11·D22·D23) — `src/components/{FilterTabs,DeleteConfirmDialog,FavoriteButton}.tsx` + RecipeCard 확장. TDS 실재성 검증: SegmentedControl·ConfirmDialog 둘 다 실재 PASS. icon name(`icon-star-bold-mono`/`icon-star-mono`)은 토스 CDN 의존이라 dev fallback이 멈춤 트리거 |
+| 2026-05-29 | §6.10 Phase 6 신규 컴포넌트 절 추가 — `ThemePicker`(SegmentedControl 2축 합성) + `RecommendationCard`(Pressable + Txt + Badge) + AI 면책 문구 위치 동결 | Phase 6 — ADR-016 D44·D45·D52 동기. TDS 실재성: SegmentedControl·Pressable·Badge·Txt 모두 §6.5에서 이미 검증 PASS. 추천은 ephemeral(id 없음) — dishName URL 파라미터로 generate 화면 재사용 |
 | 2026-05-25 | §6.1 매핑 원칙 — **색상은 TDS `colors` 토큰 사용** 규약 추가 (hex 직접 사용 금지). NutritionPanel에 AI 면책 문구 추가 (`Txt typography="st11" color={colors.grey600}`) | Phase 5 완료(ADR-015 D39·D40) — hex 60+곳을 light 모드 정확 동등치(`colors.white`/`grey100`/`grey700`/`grey900`/`blue500`/`red50`/`red700`/`green50`/`green700`/`grey50`/`grey200`/`grey500`)로 일괄 교체. typecheck/lint PASS. 다크 모드 adaptive 대응(`colorsByPreference`)은 별 ADR로 분리(Phase 6 진화) |

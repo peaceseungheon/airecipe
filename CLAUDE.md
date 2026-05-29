@@ -70,7 +70,61 @@ AI 레시피 안내 — 앱인토스 미니앱 (React Native + Granite + TDS).
 
 ## 현재 단계
 
-**Phase 5(출시 준비) 완료 → 출시 외부 작업만 PENDING** (2026-05-25).
+**Phase 6(테마 기반 추천) 완료 → 백엔드 외부 작업 + 출시 외부 작업 PENDING** (2026-05-29).
+
+### Phase 6 — 테마 기반 요리 추천 (ADR-016, 본 차)
+
+Phase 5(출시 준비) 완료 후 신규 기능 — 테마(상황·날씨) 기반 요리 5개 추천 → 카드 탭 시 기존 `/recipe/generate` 재사용. **코드 측 ALL PASS** — Q1~Q12 매트릭스 12/12 PASS + D44~D52 9 결정 동결 + AC6.1~AC6.6 코드 측 6/6 PASS, 백엔드 미배포 상태에서 실 송출은 외부 작업 PENDING (`_workspace/03_qa_report.md`). typecheck PASS, lint 0 errors(Phase 3 누적 router.gen.ts warning 1건).
+
+9 결정 동결 (ADR-016 D44~D52): situation 6 + weather 5 두 축 고정 + 최소 1개 refine(D44) / `{ dishName, description, tags }` 카드 shape + 이미지 URL 미포함(D45) / 정확히 5개 length(5) 강제(D46) / 보호 엔드포인트 `X-Toss-User-Id` 필수 + 401 자동 재시도(D47) / 비-stream JSON(D48) / 라우트 `/recipe/recommend`(D49) / 진입 CTA 홈 1개(D50) / theme deps + refresh + 메모리 hash key 캐시(D51) / AI 면책 1줄 `typography="st11"` `colors.grey600`(D52 — Phase 5 D40 패턴).
+
+코드 산출 (Phase 6 동결 — Phase 1~5 누적 위에 추가):
+- `src/lib/zod/recommendations.ts` (신규) — situation/weather enum + refine + length(5).
+- `src/types/api.ts` (확장) — RecommendationsRequest/RecommendationsResponse + zod re-export.
+- `src/services/recipes.ts` (확장) — `getRecommendations` + `RecommendationsCallOptions` + 401 재시도 패턴 재사용.
+- `src/hooks/useRecommendations.ts` (신규) — theme deps + AbortController(이전 in-flight abort) + 메모리 hash key 캐시 + 한국어 에러 8종 매핑.
+- `src/components/ThemePicker.tsx` (신규) — TDS `SegmentedControl.Root` + `.Item` 2축 합성(상황 6·날씨 5). 동일 값 재탭 시 해제.
+- `src/components/RecommendationCard.tsx` (신규) — Pressable + Txt(dishName t5·description st9) + Badge tags. **추천은 ephemeral** — id 없음.
+- `src/pages/recipe/recommend.tsx` (신규) — Granite createRoute + 식별자 가드 + 분기 렌더(미선택/로딩/에러/정상) + AI 면책 1줄.
+- `pages/recipe/recommend.tsx` (신규) — re-export shim.
+- `src/router.gen.ts` (수동 갱신) — `/recipe/recommend` 등록(granite build 시 자동 재생성).
+- `src/pages/index.tsx` (확장) — "오늘의 추천 받기" Button CTA 1개 추가(D50).
+- `docs/adr/ADR-016-recommendations.md` (신규) — D44~D52 9 결정 동결.
+- `docs/appsintoss-port/01-FEATURES.md` §1.7 신설 + §1.8/1.9/1.10 renumber + 매트릭스 g) 행.
+- `docs/appsintoss-port/03-API-CONTRACT.md` §3.8 신설(엔드포인트 7) + §3.9~§3.13 renumber + §3.11.6 "5→6".
+- `docs/appsintoss-port/06-UI-MAPPING.md` §6.10 신설 — ThemePicker + RecommendationCard 합성 + AI 면책 패턴.
+- `docs/appsintoss-port/07-ROUTING.md` §7.3.6 신설 + 라우트 표 행 5 + Navbar 분산 표 + 변경 이력.
+- `docs/appsintoss-port/10-SPRINT-PLAN.md` §10.7 신설 + §10.8/10.10 renumber + 의존성 그래프.
+- `src/components/AGENTS.md` + `src/hooks/AGENTS.md` (표 행 추가) — ThemePicker·RecommendationCard·useRecommendations.
+
+### 외부 작업 PENDING — 백엔드 (별 저장소 `AIReceipe`, ADR-016)
+
+- `app/api/recommendations/route.ts` 구현 — AI 프롬프트(Gemini/Claude) + 응답 zod 검증.
+- 옵션 P 인증 미들웨어 적용 — `X-Toss-User-Id` → internal uuid 매핑 재사용.
+- CORS 화이트리스트에 본 엔드포인트 등록.
+- staging·prod 배포.
+- 미배포 시 미니앱은 401/404 → ApiClientError 카탈로그로 한국어 안내(자동).
+
+### 누적 미해결 (Phase 7 진화 — 별 ADR)
+
+Phase 5 누적 + 본 Phase 미적용:
+- 다크 모드 adaptive 토큰 (ADR-015 D39 보조)
+- AbortSignal cast 2곳 (ADR-011 D13)
+- 무한 스크롤 (Phase 3 인계)
+- 카드 측 삭제 UX (ADR-013 D22)
+- 다중 동시 PATCH 큐 (Phase 4 v1 한계)
+- 전면 광고 wiring (ADR-014 D30·D34)
+- Analytics SDK (ADR-014 D33)
+- 자유 텍스트 테마 입력 (ADR-016 D44 보조)
+- 추천 이미지 URL (ADR-016 D45 보조)
+- 개인화 추천 (ADR-016 D47 보조)
+- 추천 결과 위치 광고 (ADR-014 D34 후속)
+
+> 본 절은 Phase 6 갱신 — 이전 Phase(0~5) 상세 산출은 각 phase의 session log + 결정 트리 `docs/adr/ADR-009·010·011·012·013·014·015·016` 참조.
+
+---
+
+## (이전) Phase 5(출시 준비) 완료 → 출시 외부 작업만 PENDING (2026-05-25).
 
 ### Phase 5 — 출시 준비 (ADR-015, 본 차)
 
@@ -255,6 +309,7 @@ Phase별 수용 기준은 `docs/appsintoss-port/10-SPRINT-PLAN.md`. 결정 트�
 | 2026-05-25 | Phase 4 일시 보류 + Phase 4.5(토스 광고 SDK 기반) 완료 — "현재 단계" 절 재작성, Phase 4 재개 인계(_workspace_phase4_paused + ConfirmDialog 정정), Phase 4.5 산출 13 파일 + 누적 미해결 10항 명시. 팀 1개 동시 제약으로 메인 세션이 architect/api-client/frontend/qa 역할 통합 수행 — `airecipe-miniapp-phase4` 팀 미완 상태로 보존(api-client/frontend/qa 3명 shutdown 미응답 idle). | CLAUDE.md | Phase 4.5 마무리 — ADR-014 D25~D38 13 결정 동결 + 11-ADS.md 신규 SSOT + AGENTS.md 3종(src/lib 신규·components/hooks 보강) + 토스 광고 어댑터 격리 시범 적용 완료와 함께 본 문서 동기 갱신 |
 | 2026-05-25 | Phase 4 재개 + 완료 — "현재 단계" 절 재작성(Phase 4 완료 → Phase 5 진입 준비), 산출 10 파일(신규 5 + 확장 4 + Phase 3 그대로 1) + 누적 미해결 11항 갱신(useBackEvent 해결 표기). `_workspace_phase45` 보존 + `_workspace_phase4_paused` → `_workspace` 재개. ADR-013(D19~D24 6 결정 — 낙관적 안 a + PATCH refetch 회피 + DELETE 404 정규화 + 삭제 상세만 + ConfirmDialog 정정 + useToggleFavorite id 가변) 발행 + 06 §6.5 갱신(FilterTabs/DeleteConfirmDialog/FavoriteButton + ConfirmDialog props 정정) + AGENTS.md 3종 보강 | CLAUDE.md | Phase 4 마무리 — Q1~Q9 + D19~D24 + AC4.1~AC4.4 ALL PASS, typecheck/lint 0 errors. AC4.5는 백엔드 옵션 P 배포 PENDING. Phase 5 진입 준비. |
 | 2026-05-25 | Phase 5 완료 — "현재 단계" 절 재작성(Phase 5 출시 준비 완료 → 외부 작업만 PENDING). 산출 10 파일(hex → TDS colors 토큰 일괄 교체 + NutritionPanel AI 면책 + _404 NotFoundScreen 재사용) + 문서 4종(ADR-015 신규 + 06 §6.1/§6.9 + 09 §9.6 + components/AGENTS.md). `_workspace_phase4` 보존 + 새 `_workspace`로 진행. ADR-015(D39~D43 5 결정 — hex 토큰 교체 + AI 면책 + 에러 매핑 동결 + 빌드 스크립트 동결 + 출시 PENDING 분리) 발행. 누적 미해결 4항 해소(SDK 패키지/useBackEvent/hex/AI 면책) | CLAUDE.md | Phase 5 마무리 — Q1~Q10 + D39~D43 + AC5.1·5.4 코드 측 ALL PASS, typecheck/lint 0 errors. AC5.2·5.3은 콘솔/디바이스 외부 작업 PENDING. 출시 외부 작업 5항만 남음. |
+| 2026-05-29 | Phase 6 완료 — "현재 단계" 절 재작성(Phase 6 테마 기반 추천 완료 → 백엔드 외부 작업 + 출시 외부 작업 PENDING). 산출 12 파일(zod/types/services/hooks 확장 + ThemePicker·RecommendationCard 신규 + recommend.tsx 페이지 신규 + index.tsx CTA + router.gen.ts 수동 등록) + 문서 8종(ADR-016 신규 + 01 §1.7 + 03 §3.8 + 06 §6.10 + 07 §7.3.6 + 10 §10.7 + AGENTS.md 2종). `_workspace_phase5` 보존 + 새 `_workspace`로 진행. ADR-016(D44~D52 9 결정 — situation 6+weather 5 두 축 refine + items.length(5) + 보호 엔드포인트 401 재시도 + 비-stream JSON + `/recipe/recommend` + 홈 CTA + theme deps 캐시 + AI 면책) 발행. 팀 1개 동시 제약으로 architect 무산출 → Phase 4.5·5 선례에 따라 메인 세션이 architect/api-client/frontend/qa 역할 통합 수행 | CLAUDE.md | Phase 6 마무리 — Q1~Q12 + D44~D52 + AC6.1~AC6.6 코드 측 ALL PASS, typecheck/lint 0 errors. 백엔드 미배포 시 미니앱은 401/404 한국어 안내(자동). 누적 미해결 11항 갱신(추천 자유 텍스트·이미지·개인화·결과 광고 4항 추가). |
 
 ---
 

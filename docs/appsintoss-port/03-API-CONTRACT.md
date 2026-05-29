@@ -507,7 +507,101 @@ X-Toss-User-Id: <getAnonymousKey() hash>
 
 ---
 
-## 3.8 HTTP 상태 매트릭스 (한눈)
+## 3.8 엔드포인트 7 — `POST /api/recommendations` (인증, Phase 6, ADR-016)
+
+테마(상황·날씨) 기반 요리 5개 추천. 미니앱 사용 기능 (g) 테마 추천. **본 엔드포인트의 백엔드 구현은 별 저장소 `AIReceipe`의 외부 작업** — 미니앱 측은 본 절을 SSOT로 zod 계약·api-client·UI 구현.
+
+### 3.8.1 인증 (D47)
+
+`X-Toss-User-Id` 헤더 필수. 401 자동 재시도 1회(05 §5.4 패턴 재사용).
+
+### 3.8.2 요청 (D44)
+
+```http
+POST /api/recommendations HTTP/1.1
+Content-Type: application/json
+X-Toss-User-Id: <getAnonymousKey() hash>
+
+{
+  "theme": {
+    "situation": "dinner" | "lunch" | "midnight" | "gathering" | "solo" | "special" | null,
+    "weather": "hot" | "cold" | "rainy" | "sunny" | "chilly" | null
+  }
+}
+```
+
+**불변식:** `situation`과 `weather` 중 **최소 1개**는 non-null 필요. zod `refine`으로 검증.
+
+| 축 | 값 | 한국어 라벨 |
+|----|----|----------|
+| situation | `lunch` | 점심 |
+| situation | `dinner` | 저녁 |
+| situation | `midnight` | 야식 |
+| situation | `gathering` | 모임 |
+| situation | `solo` | 혼밥 |
+| situation | `special` | 특별한 날 |
+| weather | `hot` | 더운 날 |
+| weather | `cold` | 추운 날 |
+| weather | `rainy` | 비 오는 날 |
+| weather | `sunny` | 화창한 날 |
+| weather | `chilly` | 쌀쌀한 날 |
+
+### 3.8.3 응답 — 200 (D45, D46, D48)
+
+```ts
+// src/types/api.ts — RecommendationsResponse = ApiResponse<{ items, meta }>
+{
+  "data": {
+    "items": [
+      {
+        "dishName": string,        // max 60
+        "description": string,     // max 120
+        "tags": string[]           // 각 max 16, array max 5
+      }
+      // ... 정확히 5개 (D46 length(5))
+    ],
+    "meta": {
+      "theme": { situation?, weather? },   // echo
+      "generatedAt": string                // ISO 8601
+    }
+  }
+}
+```
+
+- `Content-Type: application/json` 단일 응답. 비-stream (D48).
+- 이미지 URL 미포함 (D45 토큰·CDN·저작권 비용 최소).
+- `items.length === 5` 강제 (D46). 위반 시 zod fail → 미니앱이 INTERNAL_ERROR로 정규화.
+
+### 3.8.4 에러
+
+`ApiErrorCode` 8종 카탈로그 재사용(신규 코드 없음 — `src/lib/zod/api.ts`).
+
+| HTTP | code | 조건 |
+|------|------|------|
+| 400 | `VALIDATION_ERROR` | `theme` 둘 다 null·미상 키·길이 초과 |
+| 401 | `UNAUTHORIZED` | 헤더 없음 → 미니앱이 1회 자동 재시도 |
+| 429 | `AI_RATE_LIMITED` | AI Provider 레이트 |
+| 500 | `INTERNAL_ERROR` | 서버 측 zod 응답 검증 실패 포함 |
+| 502 | `AI_PROVIDER_ERROR` | Gemini/Claude 응답 실패 |
+| 503 | `DB_ERROR` | 사용자 매핑·로그 저장 실패 (선택적) |
+
+### 3.8.5 CORS
+
+3.1.4 정책. preflight OPTIONS 시 `Access-Control-Allow-Methods: POST, OPTIONS` 포함.
+
+### 3.8.6 외부 작업 PENDING (ADR-016)
+
+| 항목 | 비고 |
+|------|------|
+| `app/api/recommendations/route.ts` 구현 | AI 프롬프트 — Gemini/Claude 응답 zod 검증 |
+| 옵션 P 인증 미들웨어 적용 | 기존 `X-Toss-User-Id` → internal uuid 매핑 재사용 |
+| CORS 화이트리스트 등록 | 본 엔드포인트 추가 |
+| staging·prod 배포 | 환경별 |
+| 미배포 시 동작 | 미니앱은 401/404 → ApiClientError 카탈로그로 한국어 안내 |
+
+---
+
+## 3.9 HTTP 상태 매트릭스 (한눈)
 
 | 엔드포인트 | 200 | 201 | 400 | 401 | 404 | 429 | 500 | 502 | 503 |
 |-----------|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
@@ -518,14 +612,15 @@ X-Toss-User-Id: <getAnonymousKey() hash>
 | POST /recipes | - | O | O | O | - | - | - | - | O |
 | PATCH /recipes/[id]/favorite | O | - | O | O | O | - | - | - | O |
 | DELETE /recipes/[id] | O | - | - | O | O | - | - | - | O |
+| POST /recommendations | O | - | O | O | - | O | O | O | O |
 
 > `*` 스트리밍은 HTTP 200 + `error` 청크로 에러 전달.  
 > `**` 스트리밍 모드에서는 AI 레이트리밋/Provider 에러도 200 + `error` 청크로 변환된다 (`src/app/api/recipes/generate/route.ts` 70~75행 `toChunkError`).  
-> 보호 5개 엔드포인트는 모두 `403 FORBIDDEN`을 발생시키지 않는다 (ADR-005, ApiErrorCode 예약).
+> 보호 6개 엔드포인트는 모두 `403 FORBIDDEN`을 발생시키지 않는다 (ADR-005, ApiErrorCode 예약).
 
 ---
 
-## 3.9 미니앱 fetch 클라이언트 권장 패턴 (의사 코드)
+## 3.10 미니앱 fetch 클라이언트 권장 패턴 (의사 코드)
 
 본 챕터는 미니앱 클라이언트의 정확한 구현을 강제하지 않는다 — 권장 패턴만 제시한다 (실제 구현은 frontend의 08-STREAMING, `src/hooks/api-client.ts` 참조).
 
@@ -558,7 +653,7 @@ async function authedFetch(path: string, init?: RequestInit) {
 
 ---
 
-## 3.10 경계면 불변식 (QA 체크리스트)
+## 3.11 경계면 불변식 (QA 체크리스트)
 
 QA가 03 챕터를 검증할 때 적용할 단언 (계약 6절 + 미니앱 컨텍스트):
 
@@ -567,7 +662,7 @@ QA가 03 챕터를 검증할 때 적용할 단언 (계약 6절 + 미니앱 컨�
 3. 응답 키는 모두 camelCase. snake_case 누출 없음 (특히 `created_at`, `is_favorite`, `cook_time_minutes`).
 4. 응답에 `userId` 키 없음 (ADR-001 매핑 표 — 서버 내부 격리용).
 5. `GeneratedRecipe`(미저장)와 `Recipe`(저장됨, id 포함)는 다른 타입. 저장 전 화면에 `id` 접근 금지.
-6. 보호 5개 엔드포인트는 `X-Toss-User-Id` 헤더 없으면 401. 공개 1개는 헤더 생략 허용.
+6. 보호 6개 엔드포인트는 `X-Toss-User-Id` 헤더 없으면 401. 공개 1개는 헤더 생략 허용.
 7. 404 분기는 ADR-005 통일: 없음·잘못된 id·타인 소유 모두 동일. 미니앱 UI는 단일 경로.
 8. 스트리밍 모드의 에러는 HTTP 200 + `error` 청크. HTTP 상태로 분기 금지.
 9. AI tool input_schema / Gemini responseSchema / zod / `GeneratedRecipe` 타입 4자 일치 (04-AI-PROVIDER 4.5).
@@ -580,7 +675,7 @@ QA가 03 챕터를 검증할 때 적용할 단언 (계약 6절 + 미니앱 컨�
 
 ---
 
-## 3.11 SSOT 참조
+## 3.12 SSOT 참조
 
 | 영역 | 경로 |
 |------|------|
@@ -597,10 +692,11 @@ QA가 03 챕터를 검증할 때 적용할 단언 (계약 6절 + 미니앱 컨�
 
 ---
 
-## 3.12 변경 이력
+## 3.13 변경 이력
 
 | 날짜 | 변경 | 사유 |
 |------|------|------|
 | 2026-05-22 | 초기 작성 (세션 #4 Task #2) | 미니앱 6개 엔드포인트·`X-Toss-User-Id` 인증·CORS 화이트리스트·옵션 P 후속 명세 |
 | 2026-05-22 | §3.4.2 잘못된 uuid 22P02 처리 노트 추가 | qa sweep 보완 2 — 404 수렴 사양과 실제 코드 경로(503) 갭 명시 |
-| 2026-05-22 | §3.5.5 Allow-Headers 표기에 `Accept` 추가, §3.9 의사 코드의 baseURL을 `import.meta.env.API_BASE_URL`로 교체 | qa Task #5 종합 sweep FAIL #6-A·#6-D — 09 SSOT(`API_BASE_URL`)·§3.1.4 표(3개 헤더)와의 정합 복원 |
+| 2026-05-22 | §3.5.5 Allow-Headers 표기에 `Accept` 추가, §3.10 의사 코드의 baseURL을 `import.meta.env.API_BASE_URL`로 교체 | qa Task #5 종합 sweep FAIL #6-A·#6-D — 09 SSOT(`API_BASE_URL`)·§3.1.4 표(3개 헤더)와의 정합 복원 |
+| 2026-05-29 | §3.8 `POST /api/recommendations` 신설 + §3.9~§3.12 renumber + §3.11.6 "5→6" 갱신 | Phase 6 — ADR-016 D44~D52 동기 + 외부 작업 PENDING 명시 |

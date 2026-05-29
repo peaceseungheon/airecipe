@@ -296,7 +296,57 @@ TDS 아이콘 버튼 + 다이얼로그(`@toss/tds-react-native`).
 
 ---
 
-## 1.7 기능 ↔ 자산 매트릭스 (한눈 보기)
+## 1.7 기능 g) 테마 기반 요리 추천 (Phase 6 — ADR-016)
+
+### 사용자 흐름
+
+1. 홈에서 "오늘의 추천 받기" CTA 탭 → `/recipe/recommend` 진입.
+2. ThemePicker로 상황(6종) + 날씨(5종) 중 최소 1개 선택.
+3. "추천받기" Button 탭 → `POST /api/recommendations { theme }` 호출.
+4. 응답 카드 5개(요리명·설명·태그) 렌더. 사용자가 카드 탭.
+5. `/recipe/generate?dishName=<요리명>` 네비 → 기존 SSE 생성 플로우 재사용.
+6. 재추천: ThemePicker 변경 시 자동 재호출(이전 in-flight abort) 또는 `refresh()` 액션.
+
+### 수용 기준 (AC6.* — 10-SPRINT-PLAN §10.7 동기)
+
+- AC6.1 테마 미선택 시 "추천받기" Button disabled.
+- AC6.2 응답 정확히 5개. zod `length(5)` 위반 시 INTERNAL_ERROR.
+- AC6.3 카드 탭 → `/recipe/generate?dishName=<선택>` 네비 + SearchForm prefilled.
+- AC6.4 테마 변경 시 이전 in-flight abort + 새 fetch + 결과 교체.
+- AC6.5 401/네트워크/AbortError 한국어 사용자 친화 메시지.
+- AC6.6 추천 결과 하단 AI 면책 1줄(ADR-015 D40 패턴).
+
+### 관련 API
+
+| 메서드 | 경로 | 인증 | 비고 |
+|--------|------|------|------|
+| POST | `/api/recommendations` | 필요(`X-Toss-User-Id`) | 비-stream JSON |
+
+요청: `{ theme: { situation?, weather? } }` (최소 1개).
+응답: `{ data: { items: [{dishName, description, tags}] × 5, meta: { theme, generatedAt } } }`.
+
+상세는 [03-API-CONTRACT.md §3.8](./03-API-CONTRACT.md).
+
+### 관련 화면
+
+- `/recipe/recommend` (신규).
+- `/recipe/generate` (확장 — `dishName` URL 파라미터 수신, Phase 2부터 이미 지원).
+- 홈 (`/`) — "오늘의 추천 받기" CTA 1개 추가(D50).
+
+### 관련 컴포넌트
+
+- `ThemePicker` (신규) — TDS `SegmentedControl.Root` + `.Item` 2개 축(상황·날씨).
+- `RecommendationCard` (신규) — TDS `Pressable` + `Txt`(요리명·설명) + `Badge`(tags).
+- `useRecommendations` (신규) — fetch + AbortController + theme hash 캐시(D51).
+
+### 신규 RN 구현 시 변경점
+
+- 백엔드 신규 엔드포인트(별 저장소 `AIReceipe`)는 외부 작업 PENDING(ADR-016).
+- 미니앱 측은 zod 계약·api-client 메서드·UI까지 동결.
+
+---
+
+## 1.8 기능 ↔ 자산 매트릭스 (한눈 보기)
 
 | 기능 | API | 인증 | 현재 화면 | 현재 컴포넌트 | 현재 훅 |
 |------|-----|------|----------|--------------|---------|
@@ -306,20 +356,22 @@ TDS 아이콘 버튼 + 다이얼로그(`@toss/tds-react-native`).
 | d) 목록 | `GET /api/recipes`, `GET /api/recipes/[id]` | 필요 | `/my-recipes`, `/recipe/[id]` | `RecipeCard`, `RecipeDisplay` | `useMyRecipes`, `useRecipe` |
 | e) 즐겨찾기 | `PATCH /api/recipes/[id]/favorite` | 필요 | 목록·상세 | `FavoriteButton` | (목록/상세 훅에 포함) |
 | f) 삭제 | `DELETE /api/recipes/[id]` | 필요 | 목록·상세 | (액션 버튼) | (목록/상세 훅에 포함) |
+| g) 테마 추천 | `POST /api/recommendations` | 필요 | `/recipe/recommend` | `ThemePicker`, `RecommendationCard` | `useRecommendations` |
 
-> 미니앱이 호출할 6개 API + 단건 조회 1개(GET /api/recipes/[id]) = **총 6개 엔드포인트**. 자세한 shape·zod·CORS는 [03-API-CONTRACT.md](./03-API-CONTRACT.md).
+> 미니앱이 호출할 API 총 **7개 엔드포인트** (Phase 0~5 6개 + Phase 6 추천 1개). 자세한 shape·zod·CORS는 [03-API-CONTRACT.md](./03-API-CONTRACT.md).
 
-## 1.8 미니앱에서 v1에 미구현되는 항목 (요약)
+## 1.9 미니앱에서 v1에 미구현되는 항목 (요약)
 
 - 회원가입·로그인 폼·비밀번호 재설정 → `getAnonymousKey()` 자동 식별 (ADR-009 D2)
 - 프로필 화면·계정 설정 → v1 범위 외
 - 검색·필터(요리명 검색) → v1 범위 외 (favorite 필터만)
-- 추천·공유 → v1 범위 외
+- 공유 → v1 범위 외 (추천은 Phase 6에서 도입 — §1.7)
 - 알림 → v1 범위 외
+- 자유 텍스트 테마 입력·추천 이미지·개인화 → Phase 7 진화 (ADR-016 누적 미해결)
 
-> v1 이후 확장은 별 ADR/Sprint로 처리. 본 묶음은 Sprint 1 6기능만 다룬다.
+> v1 이후 확장은 별 ADR/Sprint로 처리. 본 묶음은 Sprint 1 6기능 + Phase 6 추천을 다룬다.
 
-## 1.9 SSOT 참조
+## 1.10 SSOT 참조
 
 - API 계약: `_workspace/01_architect_api_contract.md`
 - 도메인 타입: `src/types/recipe.ts`, `src/types/api.ts`

@@ -167,6 +167,40 @@ function RecipeDetailPage() {
 }
 ```
 
+### 7.3.6 테마 추천 — `/recipe/recommend` → `pages/recipe/recommend.tsx` (Phase 6, ADR-016 D49)
+
+| 항목 | 미니앱 |
+|------|--------|
+| 경로 | `/recipe/recommend` (`pages/recipe/recommend.tsx`) |
+| 진입 보호 | **진입 시 식별자 보장** (D47 — 보호 엔드포인트) |
+| 핵심 UI | ThemePicker 2축 → "추천받기" Button → useRecommendations → RecommendationCard × 5 → AI 면책 1줄 |
+| Params 읽기 | URL 파라미터 없음 (홈 CTA에서 진입) |
+| 진입점 | 홈 `pages/index.tsx`에 "오늘의 추천 받기" Button 1개 (D50). 마이 목록은 미적용(시각 부담·광고 중복 회피) |
+| 카드 탭 → 생성 | `navigation.navigate('/recipe/generate', { dishName: item.dishName })` — 기존 SearchForm `initialDishName` 재사용(Phase 2부터 지원) |
+| 재추천 | ThemePicker 변경 시 자동 재호출(이전 in-flight abort) + 별도 "다시 받기" Button(D51). 캐시는 메모리 테마 hash key |
+
+```tsx
+// pages/recipe/recommend.tsx
+export const Route = createRoute('/recipe/recommend', {
+  validateParams: (p) => p as Record<string, never>,
+  component: RecommendPage,
+});
+
+function RecommendPage() {
+  const navigation = useNavigation();
+  const [theme, setTheme] = useState<RecommendationTheme>({});
+  const { items, isLoading, error, refresh } = useRecommendations(theme);
+
+  // ... ThemePicker / "추천받기" Button (테마 미선택 시 disabled) / 분기 렌더
+  // 카드 탭:
+  //   onPress: () => navigation.navigate('/recipe/generate', { dishName: item.dishName })
+  // 하단 AI 면책:
+  //   <Txt typography="st11" color={colors.grey600}>AI가 생성한 참고용 추천이에요...</Txt>
+}
+```
+
+> **이름 선택 사유 (D49)**: `/recipe/recommend`는 기존 `/recipe/*` 그룹과 일관성 유지. `/recommendations`(최상위 그룹 부담)·`/recipe/recommendations`(URL 길이) 기각.
+
 ### 7.3.5 layout (현재 `src/app/layout.tsx`) — **Granite 메커니즘으로 흡수**
 
 | 현재 layout 요소 | 미니앱 처리 |
@@ -196,6 +230,7 @@ function RecipeDetailPage() {
 | 2 | `/recipe/generate` | `src/app/recipe/generate/page.tsx` | `/recipe/generate` | `pages/recipe/generate.tsx` | 공개 |
 | 3 | `/my-recipes` | `src/app/my-recipes/page.tsx` | `/my-recipes` | `pages/my-recipes.tsx` | 식별자 보장 |
 | 4 | `/recipe/[id]` | `src/app/recipe/[id]/page.tsx` | `/recipe/[id]` | `pages/recipe/[id].tsx` | 식별자 보장 |
+| 5 | — (신규, Phase 6) | — | `/recipe/recommend` | `pages/recipe/recommend.tsx` | 식별자 보장 |
 | - | `/auth/login` | `src/app/auth/login/page.tsx` | — | **제외** | — |
 | - | `/auth/signup` | `src/app/auth/signup/page.tsx` | — | **제외** | — |
 | - | (layout) | `src/app/layout.tsx` | — | Granite ThemeProvider + 화면별 Navbar | — |
@@ -421,6 +456,7 @@ function GeneratePage() {
 | `/recipe/generate` | `<Navbar left={<Navbar.BackButton onPress={navigation.goBack} />} title="레시피 생성" />` |
 | `/my-recipes` | `<Navbar left={<Navbar.BackButton onPress={navigation.goBack} />} title="마이 레시피" />` |
 | `/recipe/[id]` | `<Navbar left={<Navbar.BackButton onPress={navigation.goBack} />} title={recipe?.dishName ?? "레시피"} />` |
+| `/recipe/recommend` (Phase 6) | `<Navbar left={<Navbar.BackButton onPress={navigation.goBack} />} title="오늘의 추천" />` |
 
 **하단 탭바 대안**: 홈/마이만으로 구성된 단순 미니앱이므로 v1은 탭바 없이 **스택 네비게이션**만으로 충분. 향후 화면 수가 늘면 하단 탭 도입 검토.
 

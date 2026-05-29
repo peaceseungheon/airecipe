@@ -15,12 +15,15 @@ import {
   apiResponseSchema,
 } from '../lib/zod/api';
 import { generatedRecipeSchema, recipeSchema } from '../lib/zod/recipe';
+import { recommendationsResponseSchema } from '../lib/zod/recommendations';
 import type {
   DeleteRecipeResponse,
   GenerateRecipeRequest,
   GetRecipeResponse,
   RecipeListQuery,
   RecipeListResponse,
+  RecommendationsRequest,
+  RecommendationsResponse,
   SaveRecipeRequest,
   StreamChunk,
   ToggleFavoriteRequest,
@@ -192,6 +195,33 @@ export async function deleteRecipe(
       method: 'DELETE',
       tossUserId: auth.tossUserId,
       refreshTossUserId: auth.refreshTossUserId,
+    },
+  );
+  return wrapped.data;
+}
+
+/**
+ * POST /api/recommendations — 보호, 비-stream. Phase 6 / 03 §3.8 / ADR-016 D44~D48.
+ * 정확히 5개 items + meta(theme echo + generatedAt ISO).
+ * AbortController는 signal 옵션으로 전달 — apiFetch가 fetch에 주입.
+ */
+export interface RecommendationsCallOptions extends AuthedCallOptions {
+  signal?: AbortSignal;
+}
+
+export async function getRecommendations(
+  req: RecommendationsRequest,
+  auth: RecommendationsCallOptions,
+): Promise<RecommendationsResponse['data']> {
+  const wrapped = await apiFetch(
+    '/api/recommendations',
+    apiResponseSchema(recommendationsResponseSchema),
+    {
+      method: 'POST',
+      body: req,
+      tossUserId: auth.tossUserId,
+      refreshTossUserId: auth.refreshTossUserId,
+      signal: auth.signal,
     },
   );
   return wrapped.data;

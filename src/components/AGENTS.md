@@ -20,6 +20,8 @@ Phase 2의 레시피 생성 화면(`/recipe/generate`)과 홈(`/`)이 사용하�
 | `FilterTabs.tsx` (Phase 4) | 마이 레시피 "전체/즐겨찾기" 필터 — TDS `SegmentedControl.Root` + `.Item` 2-state. props `{ value: 'all'\|'favorite', onChange }`. 부모(my-recipes)가 query 변환·page 1 리셋 | 06 §6.5, ADR-013 D2·D11 |
 | `DeleteConfirmDialog.tsx` (Phase 4) | 삭제 확인 다이얼로그 — TDS `ConfirmDialog` 합성. props `{ open, recipeName, onConfirm, onCancel, pending? }`. **leftButton/rightButton ReactElement 필수**(ConfirmDialog.Button = ComponentProps<typeof Button>). 취소 `type="light" style="weak"`, 삭제 `type="danger" style="fill" loading={pending}` | 06 §6.5, ADR-013 D3·D23 |
 | `RecipeCard.tsx` 확장 (Phase 4) | Phase 3 위에 `onToggleFavorite?`/`favoritePending?` 활성화 — header에 `<FavoriteButton>` 합성. `onDelete?`는 자리표시 유지(카드 측 삭제 미활성 — D22) | 06 §6.4.4, ADR-013 D7·D22 |
+| `ThemePicker.tsx` (Phase 6) | 추천용 테마(상황 6 + 날씨 5) 선택 — TDS `SegmentedControl.Root` + `.Item` 2축 합성. props `{ value: RecommendationTheme, onChange }`. 한 번 더 같은 값 탭 시 해제(null). 한국어 라벨은 03 §3.8.2 SSOT | 06 §6.10, ADR-016 D44 |
+| `RecommendationCard.tsx` (Phase 6) | 추천 카드 1장 — Pressable + Txt(dishName t5 / description st9) + Badge tags. props `{ item: RecommendationItem, onPress }`. 추천은 ephemeral(id 없음) — `item.dishName`만 부모로 전달 | 06 §6.10, ADR-016 D45 |
 
 ## 규약 (강제)
 

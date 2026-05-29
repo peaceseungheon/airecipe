@@ -275,7 +275,59 @@ Phase 5  출시 준비 (TDS 점검·콘솔 등록·검수 체크리스트)
 
 ---
 
-## 10.7 의존성 그래프 (한 화면)
+## 10.7 Phase 6 — 테마 기반 요리 추천 (기능 g, ADR-016)
+
+### 목적
+테마(상황·날씨) 선택 → 5개 요리 추천 → 카드 탭 시 기존 생성 화면 재사용.
+
+### 입력
+- 03-API-CONTRACT §3.8 (`POST /api/recommendations`)
+- 06-UI-MAPPING §6.10 (ThemePicker, RecommendationCard)
+- 07-ROUTING §7.3.6 (`/recipe/recommend`)
+- ADR-016 (D44~D52 9 결정)
+
+### 출력
+- `src/lib/zod/recommendations.ts` (신규)
+- `src/services/recipes.ts` 확장 — `getRecommendations` 메서드
+- `src/hooks/useRecommendations.ts` (신규)
+- `src/components/ThemePicker.tsx`, `src/components/RecommendationCard.tsx` (신규)
+- `src/pages/recipe/recommend.tsx` (신규)
+- `src/pages/index.tsx` 확장 — "오늘의 추천 받기" CTA 1개 추가
+
+### 작업 체크리스트
+- [ ] 03 §3.8 zod 스키마 동결 → `src/lib/zod/recommendations.ts`.
+- [ ] `getRecommendations` 메서드 + 401 자동 재시도 (Phase 1·3·4 패턴 재사용).
+- [ ] ThemePicker(SegmentedControl 2축) + RecommendationCard(Pressable+Txt+Badge).
+- [ ] useRecommendations 훅 — theme deps + AbortController + refresh().
+- [ ] `/recipe/recommend` 라우트 + Navbar 백 + 분기 렌더(로딩/에러/빈/정상).
+- [ ] 홈 CTA 추가(D50).
+- [ ] AI 면책 1줄(D52 — Phase 5 D40 패턴).
+- [ ] typecheck PASS + lint 0 errors.
+
+### 의존 챕터
+- 03-API-CONTRACT §3.8
+- 06-UI-MAPPING §6.10
+- 07-ROUTING §7.3.6
+- ADR-016, ADR-015 D40 (면책 패턴)
+
+### 의존 외부 자산 (PENDING)
+- 백엔드 신규 엔드포인트 — 별 저장소 `AIReceipe`.
+- CORS 화이트리스트 등록.
+- staging·prod 배포.
+
+### 수용 기준
+- AC6.1. 테마 미선택 시 "추천받기" Button disabled.
+- AC6.2. 응답 정확히 5개(zod `length(5)` 강제). 위반 시 INTERNAL_ERROR.
+- AC6.3. 카드 탭 → `/recipe/generate?dishName=<선택>` 네비 + SearchForm prefilled.
+- AC6.4. 테마 변경 시 이전 in-flight abort + 새 fetch + 결과 교체.
+- AC6.5. 401/네트워크/AbortError 한국어 사용자 친화 메시지.
+- AC6.6. 추천 결과 하단 AI 면책 1줄(`typography="st11"`, `colors.grey600`).
+
+> AC6.* 코드 측 통과 + 백엔드 미배포 상태에서는 401/404 한국어 안내(ADR-016 외부 작업 PENDING). 실 송출 검증은 백엔드 배포 후.
+
+---
+
+## 10.8 의존성 그래프 (한 화면)
 
 ```
 Phase 0 (스캐폴딩)                 ── 09-ENV-CONFIG
@@ -294,9 +346,12 @@ Phase 4 (즐겨찾기·삭제·404 통일)   ── 03-API-CONTRACT(4/5), ADR-00
    │
    ▼
 Phase 5 (출시)                     ── 09-ENV-CONFIG 9.6, 검수 가이드
+   │
+   ▼
+Phase 6 (테마 추천)                ── 03-API-CONTRACT §3.8, 06-UI-MAPPING §6.10, 07-ROUTING §7.3.6, ADR-016
 ```
 
-## 10.8 위험·완화
+## 10.9 위험·완화
 
 | 위험 | 영향 | 완화 |
 |------|------|------|
@@ -308,9 +363,9 @@ Phase 5 (출시)                     ── 09-ENV-CONFIG 9.6, 검수 가이드
 | 도메인 화이트리스트 미등록 | 외부 호출 거부 | Phase 0에서 콘솔 등록 우선 |
 | TDS 미사용 | 검수 반려 | Phase 2부터 TDS 강제 — 커스텀 컴포넌트도 TDS 위에 |
 
-## 10.9 SSOT 참조
+## 10.10 SSOT 참조
 
-- ADR-009 (포팅 결정)
+- ADR-009 (포팅 결정), ADR-010~016 (Phase 1~6 결정)
 - 본 묶음 00~09 챕터 전체
 - 검수 가이드: `checklist/app-nongame.md`
 - 출시 절차: `development/deploy.md`

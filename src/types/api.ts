@@ -94,6 +94,24 @@ export type ToggleFavoriteResponse = ApiResponse<Recipe>;
 
 export type DeleteRecipeResponse = ApiResponse<{ id: string }>;
 
+// ─── POST /api/recommendations (03 §3.8) — Phase 6 ─────────────────────────
+
+import type {
+  RecommendationTheme,
+  RecommendationsResponse as RecommendationsResponseInner,
+} from '../lib/zod/recommendations';
+
+export type {
+  RecommendationItem,
+  RecommendationTheme,
+} from '../lib/zod/recommendations';
+
+export interface RecommendationsRequest {
+  theme: RecommendationTheme;
+}
+
+export type RecommendationsResponse = ApiResponse<RecommendationsResponseInner>;
+
 // ─── 스트리밍 청크 (03 §3.2.4) — Phase 1은 타입만 ──────────────────────────
 
 export type StreamChunk =

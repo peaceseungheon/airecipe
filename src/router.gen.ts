@@ -4,6 +4,7 @@ import { Route as _IndexRoute } from '../pages/';
 import { Route as _RecipeGenerateRoute } from '../pages/recipe/generate';
 import { Route as _MyRecipesRoute } from '../pages/my-recipes';
 import { Route as _RecipeIdRoute } from '../pages/recipe/[id]';
+import { Route as _RecipeRecommendRoute } from '../pages/recipe/recommend';
 
 declare module '@granite-js/react-native' {
   interface RegisterScreenInput {
@@ -11,6 +12,7 @@ declare module '@granite-js/react-native' {
     '/recipe/generate': (typeof _RecipeGenerateRoute)['_inputType'];
     '/my-recipes': (typeof _MyRecipesRoute)['_inputType'];
     '/recipe/[id]': (typeof _RecipeIdRoute)['_inputType'];
+    '/recipe/recommend': (typeof _RecipeRecommendRoute)['_inputType'];
   }
 
   interface RegisterScreen {
@@ -18,5 +20,6 @@ declare module '@granite-js/react-native' {
     '/recipe/generate': (typeof _RecipeGenerateRoute)['_outputType'];
     '/my-recipes': (typeof _MyRecipesRoute)['_outputType'];
     '/recipe/[id]': (typeof _RecipeIdRoute)['_outputType'];
+    '/recipe/recommend': (typeof _RecipeRecommendRoute)['_outputType'];
   }
 }

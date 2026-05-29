@@ -59,6 +59,7 @@ export function formatTossUserIdMask(hash: TossUserId | undefined): string;  // 
 | `useDeleteRecipe.ts` (Phase 4) | DELETE 삭제 — `{ remove: () => Promise<boolean>, isPending, error, reset }`. id 고정(상세 화면 1곳 호출). **404 성공 정규화** (D21) — `NOT_FOUND` catch → invalidate + true 반환. 메시지 0건. | 03 §3.7, ADR-013 D21, baseline §B D6·D10 |
 | `useMyRecipes.ts` 확장 (Phase 4) | Phase 3 위에 `mutate: (next: Recipe) => void` 추가 — data 안 id 매칭 항목 교체. 낙관적 UI · 호출 측 prev 보관 패턴(D19) | ADR-013 D19, baseline §B D4 |
 | `useRecipeDetail.ts` 확장 (Phase 4) | Phase 3 위에 `mutate: (next: Recipe) => void` 추가 — PATCH 응답 Recipe로 직접 갱신(refetch GET 회피 — D20) | ADR-013 D20, baseline §B D5 |
+| `useRecommendations.ts` (Phase 6) | 테마 기반 추천 — `{ items, isLoading, error, refresh }`. theme deps + AbortController(이전 in-flight abort) + 401 자동 재시도(refresh 주입) + 메모리 hash key 캐시. 테마 미선택 시 호출 보류 | 03 §3.8, ADR-016 D47·D51, baseline §useRecommendations |
 
 ## Phase 2·3 추가 규약 (Phase 1 규약 위에 누적)
 

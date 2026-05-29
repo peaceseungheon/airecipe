@@ -8,7 +8,12 @@ export {
   saveRecipe,
   toggleFavorite,
   deleteRecipe,
+  getRecommendations,
 } from './recipes';
-export type { AuthedCallOptions, GenerateOptions } from './recipes';
+export type {
+  AuthedCallOptions,
+  GenerateOptions,
+  RecommendationsCallOptions,
+} from './recipes';
 export { streamRecipe } from './sse-client';
 export type { StreamRecipeOptions } from './sse-client';
