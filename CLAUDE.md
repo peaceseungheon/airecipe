@@ -70,7 +70,30 @@ AI 레시피 안내 — 앱인토스 미니앱 (React Native + Granite + TDS).
 
 ## 현재 단계
 
-**Phase 6(테마 기반 추천) 완료 → 백엔드 외부 작업 + 출시 외부 작업 PENDING** (2026-05-29).
+**Phase 6 + 진입 폴백 hotfix 완료 → 백엔드 외부 작업 + 출시 외부 작업 PENDING** (2026-05-29).
+
+### 진입 폴백 hotfix (본 차 — Phase 6 직후)
+
+Phase 6 commit 직후 사용자가 dev 띄워 처음 진입 검증 → **앱 진입 시 NotFoundScreen("레시피를 찾을 수 없어요")이 표시되고 닫기 버튼 무동작** 보고. 사용자 응답 + `navigation.getState` 진단 로그로 4 root cause 확정 + fix 적용 후 정상 동작 검증 완료.
+
+**4 root cause + fix**:
+
+| # | root cause | fix |
+|---|-----------|-----|
+| 1 | **appName 미스매치** — commit `87625a4`에서 `airecipe-miniapp` → `airecipe`로 변경. 콘솔 등록 deep link prefix는 `airecipe-miniapp` 그대로라 진입 deep link `intoss://airecipe-miniapp` strip 결과 `"-miniapp"` 잔여 → 어떤 라우트와도 매칭 안 됨 → wildcard `*` → `/_404` 폴백 (`navigation.getState`로 확정) | `granite.config.ts` `appName: 'airecipe-miniapp'`로 원복 |
+| 2 | **NotFoundScreen 닫기 무동작** — TDS ErrorPage 좌측은 하드코딩 "고객센터 문의", 우측은 "닫기"인데 기존 코드가 `onPressLeftButton={onBack}`만 바인딩 → CS 버튼에 onBack 잘못 매핑 + 닫기는 핸들러 없음 | `onBack`을 `onPressRightButton`에 정확 바인딩 + `onContactSupport?`/`title?`/`subtitle?` prop화 |
+| 3 | **`pages/*.tsx` shim self re-export** — `from 'pages/index'` 절대 경로 (tsc baseUrl=src 의존) → 명시적 상대 경로로 정정해 fragile 제거 | `from '../src/pages/...'` |
+| 4 | **`_404.tsx` 카피 부적합 + handleBack 결함** — "레시피를 찾을 수 없어요"가 진입 폴백에 부적합 + canGoBack 폴백 분기가 무한 _404 가능성 | 카피 진입 폴백용 분리("원하시는 화면을 찾지 못했어요") + `navigate('/', {})` try-catch + `__DEV__` console.warn 진단 로그(향후 진단 용이) |
+
+코드 산출:
+- `granite.config.ts` (원복) — appName `airecipe-miniapp`.
+- `src/components/NotFoundScreen.tsx` (정정) — TDS 카피 매핑 SSOT 동결 + props 확장.
+- `pages/_404.tsx` (개선) — 카피 분리 + try-catch + `__DEV__` `navigation.getState` JSON 출력.
+- `pages/index.tsx`/`my-recipes.tsx`/`recipe/generate.tsx`/`recipe/[id].tsx`/`recipe/recommend.tsx` shim 5개 — 상대 경로(`../src/pages/...`).
+- `src/router.gen.ts` — Granite plugin-router로 정규 순서 재생성.
+- `docs/appsintoss-port/06-UI-MAPPING.md` §6.5 NotFoundScreen 행 — TDS 카피 매핑 정정.
+
+**검수 정책 인계** (출시 전 검증 필수): 콘솔 등록 deep link prefix ↔ `granite.config.ts` `appName` 1:1 동기화. 변경 시 commit 전 dev 진입 검증 의무. 별 ADR 추가 검토.
 
 ### Phase 6 — 테마 기반 요리 추천 (ADR-016, 본 차)
 
@@ -310,6 +333,7 @@ Phase별 수용 기준은 `docs/appsintoss-port/10-SPRINT-PLAN.md`. 결정 트�
 | 2026-05-25 | Phase 4 재개 + 완료 — "현재 단계" 절 재작성(Phase 4 완료 → Phase 5 진입 준비), 산출 10 파일(신규 5 + 확장 4 + Phase 3 그대로 1) + 누적 미해결 11항 갱신(useBackEvent 해결 표기). `_workspace_phase45` 보존 + `_workspace_phase4_paused` → `_workspace` 재개. ADR-013(D19~D24 6 결정 — 낙관적 안 a + PATCH refetch 회피 + DELETE 404 정규화 + 삭제 상세만 + ConfirmDialog 정정 + useToggleFavorite id 가변) 발행 + 06 §6.5 갱신(FilterTabs/DeleteConfirmDialog/FavoriteButton + ConfirmDialog props 정정) + AGENTS.md 3종 보강 | CLAUDE.md | Phase 4 마무리 — Q1~Q9 + D19~D24 + AC4.1~AC4.4 ALL PASS, typecheck/lint 0 errors. AC4.5는 백엔드 옵션 P 배포 PENDING. Phase 5 진입 준비. |
 | 2026-05-25 | Phase 5 완료 — "현재 단계" 절 재작성(Phase 5 출시 준비 완료 → 외부 작업만 PENDING). 산출 10 파일(hex → TDS colors 토큰 일괄 교체 + NutritionPanel AI 면책 + _404 NotFoundScreen 재사용) + 문서 4종(ADR-015 신규 + 06 §6.1/§6.9 + 09 §9.6 + components/AGENTS.md). `_workspace_phase4` 보존 + 새 `_workspace`로 진행. ADR-015(D39~D43 5 결정 — hex 토큰 교체 + AI 면책 + 에러 매핑 동결 + 빌드 스크립트 동결 + 출시 PENDING 분리) 발행. 누적 미해결 4항 해소(SDK 패키지/useBackEvent/hex/AI 면책) | CLAUDE.md | Phase 5 마무리 — Q1~Q10 + D39~D43 + AC5.1·5.4 코드 측 ALL PASS, typecheck/lint 0 errors. AC5.2·5.3은 콘솔/디바이스 외부 작업 PENDING. 출시 외부 작업 5항만 남음. |
 | 2026-05-29 | Phase 6 완료 — "현재 단계" 절 재작성(Phase 6 테마 기반 추천 완료 → 백엔드 외부 작업 + 출시 외부 작업 PENDING). 산출 12 파일(zod/types/services/hooks 확장 + ThemePicker·RecommendationCard 신규 + recommend.tsx 페이지 신규 + index.tsx CTA + router.gen.ts 수동 등록) + 문서 8종(ADR-016 신규 + 01 §1.7 + 03 §3.8 + 06 §6.10 + 07 §7.3.6 + 10 §10.7 + AGENTS.md 2종). `_workspace_phase5` 보존 + 새 `_workspace`로 진행. ADR-016(D44~D52 9 결정 — situation 6+weather 5 두 축 refine + items.length(5) + 보호 엔드포인트 401 재시도 + 비-stream JSON + `/recipe/recommend` + 홈 CTA + theme deps 캐시 + AI 면책) 발행. 팀 1개 동시 제약으로 architect 무산출 → Phase 4.5·5 선례에 따라 메인 세션이 architect/api-client/frontend/qa 역할 통합 수행 | CLAUDE.md | Phase 6 마무리 — Q1~Q12 + D44~D52 + AC6.1~AC6.6 코드 측 ALL PASS, typecheck/lint 0 errors. 백엔드 미배포 시 미니앱은 401/404 한국어 안내(자동). 누적 미해결 11항 갱신(추천 자유 텍스트·이미지·개인화·결과 광고 4항 추가). |
+| 2026-05-29 | 진입 폴백 hotfix — "현재 단계" 절 hotfix 절 신설 + 4 root cause 표. 사용자 보고("앱 진입 시 NotFoundScreen + 닫기 무동작") → `navigation.getState` 진단 로그로 root cause 확정 → 4 fix 적용 후 정상 동작 검증. (1) `granite.config.ts` appName `airecipe-miniapp` 원복(commit 87625a4 역행 — 콘솔 등록 deep link prefix와 동기) (2) `NotFoundScreen.tsx` 우측 닫기에 onBack 정확 바인딩 + props 확장(`onContactSupport?`/`title?`/`subtitle?`) (3) `pages/*.tsx` shim 5종 상대 경로 정정 (4) `_404.tsx` 진입 폴백 카피 분리 + try-catch + `__DEV__` `navigation.getState` JSON 진단 로그. 06 §6.5 NotFoundScreen 행 TDS 카피 매핑 정정. `_workspace_phase6` 보존 + 새 `_workspace` hotfix 사이클 | CLAUDE.md | hotfix 마무리 — typecheck PASS, lint 0 errors. 검수 정책 인계: 콘솔 등록 deep link prefix ↔ `appName` 1:1 동기화 출시 전 검증 필수. |
 
 ---
 

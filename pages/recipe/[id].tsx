@@ -1,1 +1,1 @@
-export { Route } from 'pages/recipe/[id]';
+export { Route } from '../../src/pages/recipe/[id]';
