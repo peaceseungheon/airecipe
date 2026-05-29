@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__plugin_context7_context7__query-docs",
+      "mcp__apps-in-toss__get_doc",
+      "mcp__apps-in-toss__search_tds_rn_docs",
+      "mcp__apps-in-toss__search_docs",
+      "Bash(pnpm add *)"
+    ]
+  }
+}
