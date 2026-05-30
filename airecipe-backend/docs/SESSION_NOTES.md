@@ -301,6 +301,39 @@ backend Task #3 §F에서 `npm run build` + `npm run lint` + `tsc --noEmit` 모�
 
 ---
 
+## 세션 #7 — 2026-05-30
+
+### 목적
+사용자 요청으로 AI 기본 Provider를 **Kimi(Moonshot AI)** 로 전환. Kimi는 OpenAI 호환 API라 ADR-008의 Factory + Adapter 격리에 무리 없이 편입. **응답 계약(`GeneratedRecipe`·`RecommendationItem[]`) 불변** → 미니앱·웹 프론트·API 계약 소비자 무영향. 본 세션은 architect(문서/계약 정합성) 담당분 — 코드 구현은 recipe-backend가 병렬 진행.
+
+### 핵심 결정 (ADR-012)
+- **신규 Kimi 어댑터 추가** (레시피 생성·추천 두 경로 각각). 구조화 출력은 OpenAI 호환 `response_format: { type: "json_object" }` → 기존 zod 검증(`recipe-schema.ts`·`recommendation-schema.ts`)이 단일 최종 게이트.
+- **`openai` npm SDK + `baseURL` 방식**: `baseURL=https://api.moonshot.ai/v1`(env 오버라이드), 모델 `kimi-k2`(env 오버라이드).
+- **기본 Provider `gemini` → `kimi`**. 두 Factory의 `AIProviderKind`에 `"kimi"` 추가, `DEFAULT_PROVIDER="kimi"`.
+- **Gemini·Claude는 삭제 없이 롤백 보존**. `AI_PROVIDER=gemini`(또는 `claude`) 한 줄로 즉시 원복.
+- 인터페이스(`AIRecipeProvider`·`AIRecommendationProvider`) 불변 — Service·Route·UI·미니앱 무변경(LSP/DIP).
+- 환경변수: `KIMI_API_KEY`·`KIMI_MODEL`(기본 `kimi-k2`)·`KIMI_BASE_URL`(기본 `https://api.moonshot.ai/v1`).
+
+### 산출물 (architect 분)
+**ADR**: 신규 `docs/adr/ADR-012-kimi-moonshot-provider.md` (Context/Decision/근거/대안 A~D/결과 + 환경변수표 + ADR-002/008/011 관계).
+**문서 갱신**: `docs/adr/ADR-008` 후속 ADR에 ADR-012 링크 1줄 추가. `docs/SESSION_NOTES.md`(본 항목). `CLAUDE.md` 변경 이력 1행.
+
+### 함정 메모 (다음 세션 주의)
+- **OpenAI 호환 `json_object`는 스키마/길이를 SDK 레벨에서 강제하지 못함** (Gemini `responseSchema`·Claude tool use와 다름). 모델이 형식을 어길 수 있으므로 **zod가 유일한 최종 검증**. 추천 5개 강제는 서버 `.length(5)`(ADR-011)가 보증 — Kimi에서도 동일하게 유효해야 함.
+- 구조화 출력 스키마가 Provider별 3종(responseSchema/tool input_schema/json_object 프롬프트 지시)으로 늘어남 → 모두 동일 도메인 타입·zod로 수렴해야 하는 수동 동기화 부담 한 갈래 증가.
+- 새 의존성 `openai` 1개 추가. ADR-008의 "보존 Provider 정리 검토"와 함께 Kimi 안정화 후 정리 별도 ADR.
+
+### 다음 검증 필요 (세션 #8)
+- recipe-backend 구현 완료 후 QA: 두 Factory `AIProviderKind`/`DEFAULT_PROVIDER`에 `kimi` 반영 + 신규 Kimi 어댑터가 인터페이스 만족 + `.env.local.example`에 `KIMI_*` 등재 + ADR-012 문서 ↔ 구현 정합.
+- 실 Kimi(Moonshot) 키로 동적 통합 테스트 — 200 + `GeneratedRecipe`/items5, `json_object` 형식 위반 시 zod 실패 → 적절한 에러 코드 매핑 확인.
+- 롤백 경로(`AI_PROVIDER=gemini`/`claude`) 회귀 무손상 확인.
+
+### SSOT 참조 (세션 #7)
+- `docs/adr/ADR-012-kimi-moonshot-provider.md` — 본 세션 결정 진실 공급원
+- `docs/adr/ADR-008` — Factory·`AI_PROVIDER` 토글 토대(본 ADR이 직접 후속)
+
+---
+
 ## 다음 세션에서 할 일
 
 ### 🔴 즉시 필요 (환경 설정 — 개발 시작 전 필수)

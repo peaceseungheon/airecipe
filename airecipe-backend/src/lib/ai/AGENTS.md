@@ -1,45 +1,50 @@
-# src/lib/ai/ — AI 통합 (Gemini 기본, Claude 비활성 보존)
+# src/lib/ai/ — AI 통합 (Kimi 기본, Gemini·Claude 보존)
 
-AI Provider를 도메인 인터페이스 뒤로 격리하는 계층 (Adapter + Factory 패턴, ADR-002 + ADR-008).
+AI Provider를 도메인 인터페이스 뒤로 격리하는 계층 (Adapter + Factory 패턴, ADR-002 + ADR-008 + ADR-012).
 
 ## 책임
-레시피 생성 + 영양 분석을 AI Provider로 수행하고, 결과를 검증된 `GeneratedRecipe`로 반환한다. Service는 이 계층의 추상(`AIRecipeProvider`)에만 의존하며 어떤 SDK가 쓰이는지 모른다(DIP). 현재 두 구현체가 공존하며 `AI_PROVIDER` 환경변수로 선택된다 — 기본 Gemini, 롤백용 Claude.
+레시피 생성 + 영양 분석을 AI Provider로 수행하고, 결과를 검증된 `GeneratedRecipe`로 반환한다. Service는 이 계층의 추상(`AIRecipeProvider`)에만 의존하며 어떤 SDK가 쓰이는지 모른다(DIP). 현재 세 구현체가 공존하며 `AI_PROVIDER` 환경변수로 선택된다 — 기본 Kimi(Moonshot AI, OpenAI 호환), 롤백용 Gemini·Claude. **응답 타입(`GeneratedRecipe`·`RecommendationItem[]`)은 Provider와 무관하게 동일하다(미니앱·프론트 계약 불변).**
 
 ## 핵심 규약
-- **SDK 격리**: `@google/genai`·`@anthropic-ai/sdk` import는 각각 `gemini-recipe-provider.ts`·`claude-recipe-provider.ts`에만. 다른 계층은 `AIRecipeProvider` 인터페이스만 사용.
+- **SDK 격리**: `openai`·`@google/genai`·`@anthropic-ai/sdk` import는 각각 `kimi-*-provider.ts`·`gemini-*-provider.ts`·`claude-*-provider.ts`에만. 다른 계층은 `AIRecipeProvider`/`AIRecommendationProvider` 인터페이스만 사용. (Kimi는 OpenAI 호환이므로 공식 `openai` SDK를 `baseURL: https://api.moonshot.ai/v1`로 구성해 사용한다.)
 - **Factory가 단일 선택 지점**: Provider 선택 분기는 `ai-recipe-provider.factory.ts`에만 존재. Composition Root(`composition.ts`)는 Factory의 결과를 주입받는다. Service·Route·UI에 Provider 분기를 흘리지 말 것.
 - **두 구조화 출력 스키마는 동일한 도메인 타입으로 수렴**:
   - Claude tool use `input_schema` (`prompts/recipe-tool-schema.ts`)
   - Gemini `responseSchema` (`prompts/recipe-response-schema.ts`)
-  - 두 스키마 모두 `GeneratedRecipe`(`src/types/recipe.ts`) 필드명과 일치해야 한다. 어긋나면 AI→UI 경계면 버그(계약 6절 불변식 6).
-- **AI 응답은 경계 검증**: Provider 출력을 `recipe-schema.ts`(zod)로 파싱. 형태 불일치는 `AIProviderError(provider_error)`. zod는 Provider-agnostic, 단일 검증점.
-- **프롬프트 캐싱**: 시스템 고정부에 Claude는 `cache_control: ephemeral` 적용(`prompts/prompt-factory.ts`). Gemini는 별도 `cachedContents` API가 있으나 현재 미사용(YAGNI; ADR-008 결과 참조).
+  - 세 스키마 모두 `GeneratedRecipe`(`src/types/recipe.ts`) 필드명과 일치해야 한다. 어긋나면 AI→UI 경계면 버그(계약 6절 불변식 6). Kimi(JSON 모드)는 스키마를 강제하지 않으므로 프롬프트(`buildSystemTextJson`/`buildUserPromptJson`)로 형태를 지시한다.
+- **AI 응답은 경계 검증**: Provider 출력을 `recipe-schema.ts`(zod)로 파싱. 형태 불일치는 `AIProviderError(provider_error)`. zod는 Provider-agnostic, 단일 검증점. (Kimi는 json_object 모드의 스키마 미강제 특성상 이 zod 경계가 특히 중요하다.)
+- **프롬프트 캐싱**: 시스템 고정부에 Claude는 `cache_control: ephemeral` 적용(`prompts/prompt-factory.ts`). Gemini는 별도 `cachedContents` API가 있으나 현재 미사용(YAGNI; ADR-008 결과 참조). Kimi(OpenAI 호환)는 명시적 캐싱 미적용.
 - **재시도/타임아웃은 이 계층**: 각 SDK의 retry/timeout 옵션 사용. 일시적 오류(429/5xx)는 지수 백오프. 에러는 `AIProviderError(rate_limited|provider_error)`로 분류 → Service가 ApiErrorCode로 매핑.
 
 ## 진입점/주요 파일
 | 파일 | 역할 |
 |------|------|
 | `ai-recipe-provider.ts` | `AIRecipeProvider` 인터페이스 + `AIProviderError` (불변 계약) |
-| `ai-recipe-provider.factory.ts` | `AI_PROVIDER` 환경변수로 구현체 선택 (Factory, ADR-008) |
-| `gemini-recipe-provider.ts` | Google GenAI SDK 구현체 (`@google/genai`, 기본) |
-| `claude-recipe-provider.ts` | Anthropic SDK 구현체 (`@anthropic-ai/sdk`, 비활성 보존·롤백용) |
+| `ai-recipe-provider.factory.ts` | `AI_PROVIDER` 환경변수로 구현체 선택 (Factory, ADR-008/012) |
+| `kimi-recipe-provider.ts` | Moonshot AI(Kimi) 구현체 (`openai` SDK + baseURL, OpenAI 호환 JSON 모드, **기본**) |
+| `gemini-recipe-provider.ts` | Google GenAI SDK 구현체 (`@google/genai`, 롤백용·보존) |
+| `claude-recipe-provider.ts` | Anthropic SDK 구현체 (`@anthropic-ai/sdk`, 롤백용·보존) |
 | `recipe-schema.ts` | AI 출력 zod 검증 (= `GeneratedRecipe`, Provider-agnostic) |
-| `prompts/prompt-factory.ts` | 시스템 고정부(캐싱)/사용자 변수부 분리 |
+| `prompts/prompt-factory.ts` | 시스템 고정부(캐싱)/사용자 변수부 분리 (Kimi JSON 모드용 `buildSystemTextJson`/`buildUserPromptJson` 포함) |
 | `prompts/recipe-response-schema.ts` | Gemini `responseSchema` (JSON Schema) |
 | `prompts/recipe-tool-schema.ts` | Claude `emit_recipe` tool 스키마 |
 | `ai-recommendation-provider.ts` | `AIRecommendationProvider` 인터페이스 + `RecommendInput` (ISP, ADR-011) |
-| `ai-recommendation-provider.factory.ts` | `AI_PROVIDER` 환경변수로 추천 구현체 선택 (Factory, ADR-011/008) |
-| `gemini-recommendation-provider.ts` | Google GenAI 추천 어댑터 (`@google/genai`, 기본) |
+| `ai-recommendation-provider.factory.ts` | `AI_PROVIDER` 환경변수로 추천 구현체 선택 (Factory, ADR-011/008/012) |
+| `kimi-recommendation-provider.ts` | Moonshot AI(Kimi) 추천 어댑터 (`openai` SDK + baseURL, **기본**) |
+| `gemini-recommendation-provider.ts` | Google GenAI 추천 어댑터 (`@google/genai`, 롤백) |
 | `claude-recommendation-provider.ts` | Anthropic 추천 어댑터 (`@anthropic-ai/sdk`, 롤백) |
 | `recommendation-schema.ts` | 추천 도메인 zod(enum·item·응답, 미니앱 1:1 미러) + `parseRecommendationItems`(`.length(5)`) |
-| `prompts/recommendation-prompt-factory.ts` | 추천 시스템 지침 SSOT + 라벨 매핑 + 사용자 프롬프트 |
+| `prompts/recommendation-prompt-factory.ts` | 추천 시스템 지침 SSOT + 라벨 매핑 + 사용자 프롬프트 (Kimi용 `buildRecommendSystemTextJson` 포함) |
 | `prompts/recommendation-response-schema.ts` | Gemini 추천 `responseSchema` |
 | `prompts/recommendation-tool-schema.ts` | Claude 추천 tool 스키마 (`emit_recommendations`) |
 
 ## 환경변수 매트릭스
 | 변수 | 용도 | 기본값 |
 |------|------|--------|
-| `AI_PROVIDER` | Provider 선택 (`"gemini"` \| `"claude"`) | `gemini` |
+| `AI_PROVIDER` | Provider 선택 (`"kimi"` \| `"gemini"` \| `"claude"`) | `kimi` |
+| `KIMI_API_KEY` | Kimi(Moonshot) 호출 키 | (필수, `AI_PROVIDER=kimi`일 때 = 기본) |
+| `KIMI_MODEL` | Kimi 모델 오버라이드 | `kimi-k2` |
+| `KIMI_BASE_URL` | Kimi 엔드포인트 오버라이드 | `https://api.moonshot.ai/v1` |
 | `GEMINI_API_KEY` | Gemini 호출 키 | (필수, `AI_PROVIDER=gemini`일 때) |
 | `GEMINI_MODEL` | Gemini 모델 오버라이드 | `gemini-3.1-flash-lite` |
 | `ANTHROPIC_API_KEY` | Claude 호출 키 | (필수, `AI_PROVIDER=claude`일 때) |
@@ -48,10 +53,11 @@ AI Provider를 도메인 인터페이스 뒤로 격리하는 계층 (Adapter + F
 모든 키는 **서버 환경변수 전용** — `NEXT_PUBLIC_` 접두사 금지, 클라이언트 번들에 노출하지 말 것.
 
 ## 롤백 절차
-한 줄: `AI_PROVIDER=claude` 설정 + `ANTHROPIC_API_KEY` 존재 확인 후 재배포. 코드 변경 없음.
+기본은 Kimi다. 한 줄 롤백: `AI_PROVIDER=gemini`(+`GEMINI_API_KEY`) 또는 `AI_PROVIDER=claude`(+`ANTHROPIC_API_KEY`) 설정 후 재배포. 코드 변경 없음(ADR-012).
 
 ## 캐싱 차이 노트
-- **Claude**: `cache_control: ephemeral`을 시스템 프롬프트 고정부에 부착. 5분 TTL 자동 캐싱 (적용 중).
+- **Kimi**(기본): OpenAI 호환 경로. 명시적 프롬프트 캐싱 미적용. 구조화 출력은 `response_format: json_object` + 프롬프트 형태 지시 + 서버 zod로 강제(json_object는 스키마 자체를 강제하지 않음).
+- **Claude**: `cache_control: ephemeral`을 시스템 프롬프트 고정부에 부착. 5분 TTL 자동 캐싱.
 - **Gemini**: `cachedContents` 별도 API 사용 필요. 호출량이 적은 현 단계에서는 도입 비용 > 절감액. 호출량이 의미 있게 증가하면 별도 ADR로 도입 결정(YAGNI 유보).
 
 ## 주의

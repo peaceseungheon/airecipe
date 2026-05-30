@@ -1,12 +1,12 @@
 # AIReceipe
 
-AI 기반 요리 레시피 안내 웹앱. 요리 이름을 입력하면 AI(기본 Gemini, Claude로 롤백 가능)가 레시피와 영양 정보를 생성하고, 사용자가 자신의 레시피로 저장·관리할 수 있다.
+AI 기반 요리 레시피 안내 웹앱. 요리 이름을 입력하면 AI(기본 Kimi, Gemini·Claude로 롤백 가능)가 레시피와 영양 정보를 생성하고, 사용자가 자신의 레시피로 저장·관리할 수 있다.
 
 > **상태:** Sprint 1 MVP 완료 (2026-05-21) — 레시피 생성·영양 분석·저장·즐겨찾기·인증.
 
 ## 주요 기능 (Sprint 1)
 
-- **AI 레시피 생성** — 요리 이름 입력 → AI Provider(Gemini `responseSchema` 기본 / Claude tool use 롤백)로 구조화된 레시피(재료·조리법·영양) 반환. SSE 스트리밍 지원.
+- **AI 레시피 생성** — 요리 이름 입력 → AI Provider(Kimi JSON 모드 기본 / Gemini `responseSchema`·Claude tool use 롤백)로 구조화된 레시피(재료·조리법·영양) 반환. SSE 스트리밍 지원.
 - **영양 정보 분석** — 1인분 기준 칼로리·탄수화물·단백질·지방·식이섬유 자동 산출.
 - **마이 레시피** — 생성 결과를 Supabase에 저장, 소유자 격리(RLS) 보장.
 - **즐겨찾기** — 멱등 토글(목표값 명시 방식).
@@ -19,7 +19,7 @@ AI 기반 요리 레시피 안내 웹앱. 요리 이름을 입력하면 AI(기�
 | 프레임워크 | Next.js 16 (App Router) + React 19 + TypeScript 5 |
 | 스타일링 | Tailwind CSS 4 |
 | 데이터 | Supabase (PostgreSQL + Auth + RLS) |
-| AI | Google Gemini (`gemini-3.1-flash-lite` 기본, `@google/genai`, `responseSchema`) — Claude(`@anthropic-ai/sdk`, tool use + prompt caching)로 즉시 롤백 가능 |
+| AI | Kimi / Moonshot AI (`kimi-k2` 기본, `openai` SDK + `baseURL`, OpenAI 호환 JSON 모드) — Gemini(`@google/genai`, `responseSchema`)·Claude(`@anthropic-ai/sdk`, tool use + prompt caching)로 즉시 롤백 가능 |
 | 상태 관리 | SWR + React hooks |
 | 검증 | zod |
 
@@ -28,13 +28,14 @@ AI 기반 요리 레시피 안내 웹앱. 요리 이름을 입력하면 AI(기�
 ```
 [UI 컴포넌트] → [훅] → (HTTP) → [Route Handler] → [Service] → [Repository] → [Supabase]
                                                        │
-                                                       └→ [AIRecipeProvider 추상] ← Factory ─┬→ [GeminiRecipeProvider] (기본)
-                                                                                              └→ [ClaudeRecipeProvider] (비활성 보존, 롤백용)
+                                                       └→ [AIRecipeProvider 추상] ← Factory ─┬→ [KimiRecipeProvider] (기본)
+                                                                                              ├→ [GeminiRecipeProvider] (롤백용, 보존)
+                                                                                              └→ [ClaudeRecipeProvider] (롤백용, 보존)
 ```
 
 - **Repository / Mapper** (ADR-001) — Supabase 격리, snake↔camel 단일 변환점.
-- **Adapter + Facade + Factory** (ADR-002, ADR-008) — AI SDK는 어댑터(`GeminiRecipeProvider`/`ClaudeRecipeProvider`)에만 격리, `RecipeGenerationService.generate()`가 생성+영양 분석을 단일 진입점으로 묶음, Provider 선택은 `ai-recipe-provider.factory.ts`가 `AI_PROVIDER` 환경변수로 수행.
-- **Gemini 기본 + Claude 비활성 보존** (ADR-008) — 운영 중 `AI_PROVIDER=claude` 한 줄로 즉시 롤백.
+- **Adapter + Facade + Factory** (ADR-002, ADR-008, ADR-012) — AI SDK는 어댑터(`KimiRecipeProvider`/`GeminiRecipeProvider`/`ClaudeRecipeProvider`)에만 격리, `RecipeGenerationService.generate()`가 생성+영양 분석을 단일 진입점으로 묶음, Provider 선택은 `ai-recipe-provider.factory.ts`가 `AI_PROVIDER` 환경변수로 수행.
+- **Kimi 기본 + Gemini·Claude 보존** (ADR-008, ADR-012) — 운영 중 `AI_PROVIDER=gemini` 또는 `=claude` 한 줄로 즉시 롤백.
 - **소유권 위반 시 404 수렴** (ADR-005) — RLS 특성과 IDOR 정보 누설 방지.
 - **proxy.ts 전환** (ADR-007) — Next.js 16 규약, 페이지 보호는 `src/proxy.ts`가 담당.
 
@@ -88,11 +89,16 @@ NEXT_PUBLIC_SUPABASE_URL=https://<project>.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon-key>
 SUPABASE_SERVICE_ROLE_KEY=<service-role-key>   # 서버 전용, 클라이언트 노출 금지
 
-# AI Provider 선택 ("gemini" 기본 | "claude" 롤백) — ADR-008
-AI_PROVIDER=gemini
+# AI Provider 선택 ("kimi" 기본 | "gemini" 롤백 | "claude" 롤백) — ADR-008, ADR-012
+AI_PROVIDER=kimi
 
-# Gemini (기본 Provider)
-GEMINI_API_KEY=<api-key>                       # 서버 전용. AI_PROVIDER=gemini일 때 필수
+# Kimi / Moonshot AI (기본 Provider — ADR-012, OpenAI 호환)
+KIMI_API_KEY=<api-key>                         # 서버 전용. AI_PROVIDER=kimi(기본)일 때 필수
+# KIMI_MODEL=kimi-k2                           # 선택 (기본값)
+# KIMI_BASE_URL=https://api.moonshot.ai/v1     # 선택 (기본값, 글로벌 엔드포인트)
+
+# Gemini (롤백용 — AI_PROVIDER=gemini일 때 필수)
+# GEMINI_API_KEY=<api-key>                     # 서버 전용
 # GEMINI_MODEL=gemini-3.1-flash-lite           # 선택 (기본값)
 
 # Claude (롤백용 — AI_PROVIDER=claude일 때 필수)
@@ -100,9 +106,9 @@ GEMINI_API_KEY=<api-key>                       # 서버 전용. AI_PROVIDER=gemi
 # ANTHROPIC_MODEL=claude-haiku-4-5-20251001    # 선택. 품질 부족 시 claude-sonnet-4-6 / claude-opus-4-7
 ```
 
-> `NEXT_PUBLIC_*`은 브라우저 번들에 포함된다. `SUPABASE_SERVICE_ROLE_KEY`·`GEMINI_API_KEY`·`ANTHROPIC_API_KEY`는 절대 `NEXT_PUBLIC_` 접두사를 붙이지 말 것.
+> `NEXT_PUBLIC_*`은 브라우저 번들에 포함된다. `SUPABASE_SERVICE_ROLE_KEY`·`KIMI_API_KEY`·`GEMINI_API_KEY`·`ANTHROPIC_API_KEY`는 절대 `NEXT_PUBLIC_` 접두사를 붙이지 말 것.
 >
-> **롤백 절차**: `AI_PROVIDER=claude` 설정 + `ANTHROPIC_API_KEY` 존재 확인 후 재배포. 코드 변경 없음(ADR-008).
+> **롤백 절차**: 기본은 Kimi다. Gemini로 롤백하려면 `AI_PROVIDER=gemini` + `GEMINI_API_KEY`, Claude로 롤백하려면 `AI_PROVIDER=claude` + `ANTHROPIC_API_KEY`를 설정하고 재배포한다. 코드 변경 없음(ADR-008, ADR-012).
 
 ### 3. Supabase 스키마 적용
 

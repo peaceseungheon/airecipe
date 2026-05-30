@@ -6,18 +6,20 @@
  * - 모델·키 등 Provider 고유 설정은 각 어댑터의 생성자가 자체 환경변수로 읽는다(SRP).
  * - 싱글턴 캐싱은 본 Factory의 책임이 아니다 — composition.ts가 담당.
  *
- * 매트릭스(세션 #3, 2026-05-22):
- * - `AI_PROVIDER` 미설정 또는 "gemini" → GeminiRecipeProvider (기본)
- * - `AI_PROVIDER=claude` → ClaudeRecipeProvider (롤백 경로, 비활성 보존)
+ * 매트릭스(ADR-008 후속, 2026-05-30: Kimi 추가 + 기본 전환):
+ * - `AI_PROVIDER` 미설정 또는 "kimi" → KimiRecipeProvider (기본)
+ * - `AI_PROVIDER=gemini` → GeminiRecipeProvider (롤백 경로, 보존)
+ * - `AI_PROVIDER=claude` → ClaudeRecipeProvider (롤백 경로, 보존)
  * - 그 외 값 → AIProviderError 명시적 throw (silent fallback 금지)
  */
 import { AIProviderError, type AIRecipeProvider } from "@/lib/ai/ai-recipe-provider";
 import { ClaudeRecipeProvider } from "@/lib/ai/claude-recipe-provider";
 import { GeminiRecipeProvider } from "@/lib/ai/gemini-recipe-provider";
+import { KimiRecipeProvider } from "@/lib/ai/kimi-recipe-provider";
 
-export type AIProviderKind = "gemini" | "claude";
+export type AIProviderKind = "gemini" | "claude" | "kimi";
 
-const DEFAULT_PROVIDER: AIProviderKind = "gemini";
+const DEFAULT_PROVIDER: AIProviderKind = "kimi";
 
 /**
  * 환경변수 기반 Provider 조립.
@@ -28,6 +30,8 @@ export function createAIRecipeProvider(): AIRecipeProvider {
   const kind: string = raw && raw.length > 0 ? raw : DEFAULT_PROVIDER;
 
   switch (kind) {
+    case "kimi":
+      return new KimiRecipeProvider();
     case "gemini":
       return new GeminiRecipeProvider();
     case "claude":
@@ -35,7 +39,7 @@ export function createAIRecipeProvider(): AIRecipeProvider {
     default:
       throw new AIProviderError(
         "provider_error",
-        `지원하지 않는 AI_PROVIDER: ${kind}. "gemini" 또는 "claude"만 허용됩니다.`,
+        `지원하지 않는 AI_PROVIDER: ${kind}. "gemini" | "claude" | "kimi"만 허용됩니다.`,
       );
   }
 }

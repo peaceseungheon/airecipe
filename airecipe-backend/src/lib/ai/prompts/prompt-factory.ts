@@ -59,3 +59,28 @@ export function buildSystemText(): string {
 export function buildUserPrompt(params: GenerateParams): string {
   return `요리 이름: ${params.dishName}\n인분: ${params.servings}인분\n\n위 요리의 레시피와 ${params.servings}인분을 기준으로 한 1인분 영양 정보를 생성해 emit_recipe 도구로 반환하세요.`;
 }
+
+/**
+ * Kimi(OpenAI 호환) JSON 모드용 시스템 지침 (ADR-008 후속: Kimi 추가).
+ *
+ * RECIPE_SYSTEM_INSTRUCTIONS(SSOT)는 마지막 줄이 "emit_recipe 도구" 호출을 지시하지만,
+ * OpenAI 호환 경로는 도구가 아닌 response_format: json_object로 출력을 강제한다.
+ * json_object 모드는 스키마를 강제하지 않으므로 공통 본문에 JSON 형태 지시를 보강한다.
+ * 형태의 SSOT는 GeneratedRecipe(=recipe-schema.ts zod) — 여기서는 키 목록만 재서술한다.
+ */
+export function buildSystemTextJson(): string {
+  return `${RECIPE_SYSTEM_INSTRUCTIONS}
+
+[출력 형식] 반드시 다음 키를 가진 단일 JSON 객체로만 응답하십시오. 코드 블록·설명 텍스트 없이 JSON만 출력합니다.
+- dishName(string), description(string), servings(number), cookTimeMinutes(number)
+- difficulty("easy"|"medium"|"hard")
+- ingredients: [{ name(string), quantity(number), unit(string) }, ...] (1개 이상)
+- steps: [{ order(number, 1부터), instruction(string) }, ...] (1개 이상)
+- tips: string[] (없으면 빈 배열)
+- nutrition: { calories(number), carbohydrates(number), protein(number), fat(number), fiber(number), healthNote(string) }`;
+}
+
+/** Kimi(OpenAI 호환) JSON 모드용 사용자 프롬프트 — 도구 언급 없이 JSON 출력만 지시. */
+export function buildUserPromptJson(params: GenerateParams): string {
+  return `요리 이름: ${params.dishName}\n인분: ${params.servings}인분\n\n위 요리의 레시피와 ${params.servings}인분을 기준으로 한 1인분 영양 정보를 위 [출력 형식]의 JSON 객체로 생성하세요.`;
+}

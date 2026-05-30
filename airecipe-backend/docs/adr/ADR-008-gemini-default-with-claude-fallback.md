@@ -70,3 +70,4 @@
 ## 후속 ADR
 
 - [ADR-009](ADR-009-appsintoss-port-architecture.md) — 앱인토스 미니앱은 백엔드를 호출만 하므로 Provider 선택을 인지하지 않는다. 본 ADR의 Factory·환경변수 토글은 그대로 살아남는다.
+- [ADR-012](ADR-012-kimi-moonshot-provider.md) — 본 ADR의 Factory·`AI_PROVIDER` 토글을 그대로 연장해 Kimi(Moonshot AI) 어댑터를 추가하고 기본 Provider를 `gemini` → `kimi`로 전환한다. Gemini는 (Claude와 함께) 롤백 보존 경로가 된다.

@@ -81,3 +81,16 @@ export function buildRecommendSystemBlocks(): Anthropic.Messages.TextBlockParam[
 export function buildRecommendSystemText(): string {
   return RECOMMEND_SYSTEM_INSTRUCTIONS;
 }
+
+/**
+ * Kimi(OpenAI 호환) JSON 모드용 시스템 지침 (ADR-008 후속: Kimi 추가).
+ *
+ * response_format: json_object는 스키마를 강제하지 않으므로 출력 형태를 본문에 보강한다.
+ * 형태의 SSOT는 recommendation-schema.ts(zod, items 정확히 5개) — 여기서는 키만 재서술한다.
+ */
+export function buildRecommendSystemTextJson(): string {
+  return `${RECOMMEND_SYSTEM_INSTRUCTIONS}
+
+[출력 형식] 반드시 다음 형태의 단일 JSON 객체로만 응답하십시오. 코드 블록·설명 텍스트 없이 JSON만 출력합니다.
+{ "items": [{ "dishName": string(60자 이내), "description": string(120자 이내), "tags": string[](최대 5개, 각 16자 이내) }, ... 정확히 5개] }`;
+}
