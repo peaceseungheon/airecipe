@@ -162,6 +162,10 @@ npm run dev
 
 상세는 [`AGENTS.md`](AGENTS.md), 디자인 결정 근거는 [`docs/adr/`](docs/adr/).
 
+## 배포
+
+Vercel 배포 절차·환경변수·트러블슈팅은 [`docs/DEPLOY-vercel.md`](docs/DEPLOY-vercel.md) 참고. monorepo이므로 Vercel **Root Directory를 `airecipe-backend`로 지정**하는 것이 핵심이다.
+
 ## 다음 작업
 
 [`docs/SESSION_NOTES.md`](docs/SESSION_NOTES.md)에 누적 기록과 다음 우선순위(Sprint 2 후보: 재료 기반 추천 · 검색·필터 · 소셜 공유 · 레시피 수정)가 있다. 세션 시작 시 반드시 이 파일을 먼저 읽는다.
