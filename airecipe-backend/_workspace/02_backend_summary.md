@@ -137,3 +137,57 @@ Route(HTTP I/O·검증·인증) → Service(로직) → Repository(데이터) �
 4. `/api/recipes/generate?stream=1` SSE: Gemini 스트리밍 시 `text` 청크가 부분 JSON 조각으로 흐를 때 프론트 표시 UX(현재 Route는 raw 전달). 필요 시 후속 스프린트에서 onText 억제 토글 검토.
 5. 에러 매핑: Gemini ApiError.status=429 → `AI_RATE_LIMITED`(429), 기타 SDK 오류 → `AI_PROVIDER_ERROR`(502), AbortController 타임아웃(60s 초과) → `AI_PROVIDER_ERROR`로 수렴되는지.
 
+
+---
+
+## 2026-05-29 — POST /api/recommendations (테마 기반 요리 5개 추천, ADR-011)
+
+미니앱이 소비 측까지 완성했으나 백엔드 미구현이던 추천 엔드포인트를 baseline §3 명세대로 구현했다. 신규 패턴 발명 없이 기존 generate(공개 AI) + recipes(보호) 패턴의 교집합으로 조립.
+
+### 엔드포인트
+| 항목 | 값 |
+|------|----|
+| 경로/메서드 | `POST /api/recommendations` (+ `OPTIONS` preflight) |
+| 인증 | 보호 (옵션 P, `requireUser` — X-Toss-User-Id 또는 쿠키). 미인증 401 |
+| 요청 | `{ theme: { situation?, weather? } }` — 최소 1축(refine), enum 6/5종 |
+| 응답(200) | `{ data: { items: [5], meta: { theme(echo), generatedAt(ISO) } } }` |
+| 응답 형식 | 비-stream 단일 JSON (`Content-Type: application/json`) |
+| AI 통합 | Gemini 기본 + Claude 롤백, 추천 전용 Factory(`AI_PROVIDER`) |
+| 구조화 출력 | Gemini responseSchema / Claude tool use(`emit_recommendations`) |
+| 5개 보증 | 서버 zod `.length(5)` (provider는 검증된 items[5]만 반환) |
+| 상태 | 무상태(D-R8) — DB write·마이그레이션·리포지토리 0건 |
+
+### 에러 매핑 (미니앱 §3.8.4와 1:1)
+- 400 VALIDATION_ERROR (JSON 파싱/theme 누락/잘못된 enum)
+- 401 UNAUTHORIZED (인증 우선 — 본문 무관하게 헤더 없으면 401)
+- 429 AI_RATE_LIMITED / 502 AI_PROVIDER_ERROR (AIProviderError kind별)
+- 500 INTERNAL_ERROR (기타). `AI_ERROR` 코드 미사용.
+
+### 응답 shape (recipe-frontend 통지용)
+- 래핑: `{ data: { items, meta } }` (ApiResponse<T> 래퍼).
+- `items[]`: `{ dishName(1~60), description(1~120), tags(0~5, 각 1~16) }` × **정확히 5개**.
+- `meta`: `{ theme(요청 echo), generatedAt(camelCase, 서버 생성 ISO 문자열) }`.
+- 동기 단일 JSON(스트리밍 아님). 미니앱 `recommendationsResponseSchema.parse(json.data)`와 정합 확인 완료.
+
+### 신규 파일 (11)
+- `src/lib/ai/recommendation-schema.ts` — 도메인 zod(enum·item·응답 미러) + `parseRecommendationItems`
+- `src/lib/ai/ai-recommendation-provider.ts` — 인터페이스(ISP) + RecommendInput
+- `src/lib/ai/ai-recommendation-provider.factory.ts` — AI_PROVIDER 스위치
+- `src/lib/ai/gemini-recommendation-provider.ts` / `claude-recommendation-provider.ts`
+- `src/lib/ai/prompts/recommendation-prompt-factory.ts` / `recommendation-response-schema.ts` / `recommendation-tool-schema.ts`
+- `src/services/recommendation.service.ts` — items 위임 + meta 조립 + 에러 매핑
+- `src/app/api/recommendations/route.ts`
+- `docs/api/recommendations.md`
+
+### 변경 파일 (6)
+- `src/lib/validation.ts` — `recommendationsRequestSchema` 추가(theme import)
+- `src/lib/composition.ts` — lazy 싱글턴 `getRecommendationService()` (미사용 dead import `UserSource` 제거)
+- `src/types/api.ts` — 추천 타입 re-export + `RecommendationsApiResponse`
+- `src/lib/ai/AGENTS.md` · `src/services/AGENTS.md` · `src/app/api/AGENTS.md` · `src/types/AGENTS.md`
+
+### 검증 결과 (실측)
+- `npx tsc --noEmit` → exit 0 (타입 0)
+- `npx next lint` → "No ESLint warnings or errors"
+- `npx next build` → Compiled successfully, `ƒ /api/recommendations` 라우트 등재
+- 계약 미러: enum 순서·값 diff 일치, 길이 제약(60/120/16/5·length(5)·min(1)) 일치
+- 런타임 미러(Node): 백엔드 5-item 응답이 미니앱 schema 통과 / 4개·17자 태그·빈 theme 거부 확인

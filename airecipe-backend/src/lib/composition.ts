@@ -20,6 +20,8 @@ import { createAIRecipeProvider } from "@/lib/ai/ai-recipe-provider.factory";
 import { SupabaseRecipeRepository } from "@/repositories/supabase-recipe.repository";
 import { RecipeGenerationService } from "@/services/recipe-generation.service";
 import { RecipeService } from "@/services/recipe.service";
+import { createAIRecommendationProvider } from "@/lib/ai/ai-recommendation-provider.factory";
+import { RecommendationService } from "@/services/recommendation.service";
 import type { AuthSource } from "@/types/user";
 
 /**
@@ -28,6 +30,7 @@ import type { AuthSource } from "@/types/user";
  * - Provider 선택은 Factory(AI_PROVIDER) — composition 은 추상에만 의존(DIP).
  */
 let _generationService: RecipeGenerationService | null = null;
+let _recommendationService: RecommendationService | null = null;
 
 export function getRecipeGenerationService(): RecipeGenerationService {
   if (!_generationService) {
@@ -52,4 +55,14 @@ export async function getRecipeService(
       ? createSupabaseServiceRoleClient()
       : await createSupabaseServerClient();
   return new RecipeService(new SupabaseRecipeRepository(supabase));
+}
+
+/** 추천 — 테마 기반 요리 추천 서비스 (AI Provider 주입, ADR-011). 무상태 → 싱글턴. */
+export function getRecommendationService(): RecommendationService {
+  if (!_recommendationService) {
+    _recommendationService = new RecommendationService(
+      createAIRecommendationProvider(),
+    );
+  }
+  return _recommendationService;
 }

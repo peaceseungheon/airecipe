@@ -11,7 +11,7 @@
 |------|------|
 | `recipe.ts` | `Difficulty`, `Ingredient`, `RecipeStep`, `NutritionInfo`, `GeneratedRecipe`, `Recipe` |
 | `user.ts` | `User`, `SavedRecipe`(= Recipe 별칭) |
-| `api.ts` | `ApiResponse<T>`, `ApiListResponse<T>`, `ApiError`, `ApiErrorCode`, 엔드포인트별 Request/Response, `StreamChunk` |
+| `api.ts` | `ApiResponse<T>`, `ApiListResponse<T>`, `ApiError`, `ApiErrorCode`, 엔드포인트별 Request/Response, `StreamChunk` + 추천 타입 re-export(ADR-011, 런타임 zod는 lib/ai/recommendation-schema.ts) |
 | `index.ts` | 배럴 re-export — 소비자는 `@/types`에서 import |
 
 ## 핵심 규약

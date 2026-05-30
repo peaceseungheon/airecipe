@@ -111,3 +111,19 @@ export type ToggleFavoriteResponse = ApiResponse<Recipe>;
 // ── DELETE /api/recipes/[id] ─────────────────────────────────
 
 export type DeleteRecipeResponse = ApiResponse<{ id: string }>;
+
+// ── POST /api/recommendations (ADR-011) ──────────────────────
+// 추천 도메인 타입을 계약 SSOT로 re-export (런타임 zod는 lib/ai/recommendation-schema.ts).
+import type { RecommendationsResponse } from "@/lib/ai/recommendation-schema";
+
+export type {
+  RecommendationsRequest,
+  RecommendationsResponse,
+  RecommendationItem,
+  RecommendationTheme,
+  SituationKey,
+  WeatherKey,
+} from "@/lib/ai/recommendation-schema";
+
+/** 추천 성공 응답 래퍼 별칭. */
+export type RecommendationsApiResponse = ApiResponse<RecommendationsResponse>;

@@ -258,6 +258,49 @@ backend Task #3 §F에서 `npm run build` + `npm run lint` + `tsc --noEmit` 모�
 
 ---
 
+## 세션 #6 — 2026-05-30
+
+### 목적
+미니앱이 `POST /api/recommendations` 호출 시 **404** 반환 → 원인은 백엔드 라우트 미구현(미니앱 ADR-016에서 "백엔드 외부 작업 PENDING"으로 예고). 미니앱은 이미 이 엔드포인트를 소비하도록 완성(Phase 6)돼 있어, 백엔드를 **미니앱 동결 계약에 맞춰 추종 구현**. 미니앱 무변경.
+
+### 팀 구성
+4인 팀: architect / backend / qa (frontend는 본 작업 무관 — 웹앱 UI 변경 없음). Skill 중복 호출로 architect 2회 스폰됐으나 둘 다 동일하게 ADR-011 + baseline으로 수렴, 마지막 에이전트가 Bash 교차검증으로 정합 확인.
+
+### 핵심 결정 (ADR-011, D-R1~D-R10)
+- **계약 출처**: 추천 계약 SSOT는 미니앱 측 3파일(`airecipe-miniapp/src/lib/zod/recommendations.ts`, `docs/appsintoss-port/03-API-CONTRACT.md §3.8`, `docs/adr/ADR-016`). 백엔드는 이를 1:1 추종(백엔드 ADR 번호는 별개 체계 → ADR-011).
+- 요청 `{ theme: { situation?, weather? } }` — situation 6·weather 5 enum, 최소 1축 refine. 응답 `{ data: { items[5], meta: { theme(echo), generatedAt(ISO) } } }`.
+- **보호 엔드포인트** — `requireUser(request)`(ADR-010) 재사용. 무상태(D-R8)라 반환값 미사용, 401 차단만 목적. 신규 인증 코드 0.
+- **AI 5개 강제의 최종 보증은 서버 zod `.length(5)`** (`parseRecommendationItems`) — Gemini `responseSchema`/Claude tool use는 보조(배열 고정 길이 강제 불가).
+- 별도 인터페이스 `AIRecommendationProvider`(ISP) + Gemini/Claude 어댑터 + Factory(`AI_PROVIDER`, ADR-008 패턴). 모델 default는 generate와 동일(`gemini-3.1-flash-lite`/`claude-haiku-4-5-20251001`).
+- DB write/마이그레이션/리포지토리 0건(무상태, D-R8).
+
+### 산출물
+**ADR**: 신규 `docs/adr/ADR-011-recommendations.md` (D-R1~D-R10 + 롤백 R1~R4).
+**코드 (신규 11)**: `src/app/api/recommendations/route.ts`, `src/services/recommendation.service.ts`, `src/lib/ai/recommendation-schema.ts`, `ai-recommendation-provider.ts`(인터페이스), `ai-recommendation-provider.factory.ts`, `gemini-recommendation-provider.ts`, `claude-recommendation-provider.ts`, `prompts/recommendation-{prompt-factory,response-schema,tool-schema}.ts`, `docs/api/recommendations.md`.
+**코드 (변경 4)**: `src/lib/validation.ts`(`recommendationsRequestSchema`), `src/lib/composition.ts`(`getRecommendationService()` lazy 싱글턴), `src/types/api.ts`(추천 타입 re-export), AGENTS.md 4종.
+**운영**: `_workspace/01_architect_baseline.md`(433줄, 13파일 명세 + Q1~Q14), `_workspace/02_backend_summary.md`, `_workspace/03_qa_report.md`.
+
+### QA 결과 (recipe-qa)
+**Q1~Q14 14/14 PASS, FAIL 0**. 계약 미러(enum·길이 제약 node 스크립트 diff MATCH), 응답 shape ↔ 미니앱 `recommendationsResponseSchema` 통과, camelCase 100%/snake_case 0, 서버 zod 5개 강제 경로 확인, requireUser 최상단, 에러 카탈로그(`AI_ERROR` 미존재), CORS(OPTIONS 204 + X-Toss-User-Id). `tsc --noEmit` exit 0 / `eslint` 0 / `next build`에 `ƒ /api/recommendations` 등재.
+
+### 함정 메모 (다음 세션 주의)
+- `ServiceError(code, message, cause?)` — statusCode 인자 없음. HTTP는 `api-response.ts`의 `STATUS_BY_CODE`가 code로 도출.
+- **`AI_ERROR` 코드는 존재하지 않음**. AI 실패는 `AIProviderError(kind, msg)` → 서비스가 `AI_RATE_LIMITED`/`AI_PROVIDER_ERROR` 매핑.
+- `withCors(response, request)` — 두 번째 인자 request.
+
+### 다음 검증 필요 (세션 #7)
+- **실 AI 키로 동적 통합 테스트** — provider 모킹 또는 staging 실호출로 200+items5, AI 4/6개·길이위반→502 확인(QA가 키 부재로 정적 분석 대체).
+- `APPSINTOSS_ALLOWED_ORIGINS` staging/prod 등록 — 미니앱 실 출처(추천 엔드포인트도 동일 화이트리스트 적용).
+- 미니앱은 백엔드 배포 후 자동 정상 동작(코드 변경 불요).
+
+### SSOT 참조 (세션 #6)
+- `docs/adr/ADR-011-recommendations.md` — 본 세션 결정 진실 공급원
+- `_workspace/01_architect_baseline.md` — 구현 명세 + Q1~Q14
+- `_workspace/03_qa_report.md` — QA 14/14 PASS
+- 미니앱 계약: `airecipe-miniapp/src/lib/zod/recommendations.ts` (추종 대상 SSOT)
+
+---
+
 ## 다음 세션에서 할 일
 
 ### 🔴 즉시 필요 (환경 설정 — 개발 시작 전 필수)

@@ -19,6 +19,7 @@
 |------|------|
 | `recipe-generation.service.ts` | AI 생성 Facade (generate / generateStream) |
 | `recipe.service.ts` | 영속성 (list / save / setFavorite / delete) |
+| `recommendation.service.ts` | 추천 — items 위임 + meta(theme echo / generatedAt) 조립 (AIRecommendationProvider 주입, ADR-011) |
 | `service-error.ts` | `ServiceError`(code: ApiErrorCode) |
 
 ## 주의

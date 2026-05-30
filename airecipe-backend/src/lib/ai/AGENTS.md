@@ -27,6 +27,14 @@ AI Provider를 도메인 인터페이스 뒤로 격리하는 계층 (Adapter + F
 | `prompts/prompt-factory.ts` | 시스템 고정부(캐싱)/사용자 변수부 분리 |
 | `prompts/recipe-response-schema.ts` | Gemini `responseSchema` (JSON Schema) |
 | `prompts/recipe-tool-schema.ts` | Claude `emit_recipe` tool 스키마 |
+| `ai-recommendation-provider.ts` | `AIRecommendationProvider` 인터페이스 + `RecommendInput` (ISP, ADR-011) |
+| `ai-recommendation-provider.factory.ts` | `AI_PROVIDER` 환경변수로 추천 구현체 선택 (Factory, ADR-011/008) |
+| `gemini-recommendation-provider.ts` | Google GenAI 추천 어댑터 (`@google/genai`, 기본) |
+| `claude-recommendation-provider.ts` | Anthropic 추천 어댑터 (`@anthropic-ai/sdk`, 롤백) |
+| `recommendation-schema.ts` | 추천 도메인 zod(enum·item·응답, 미니앱 1:1 미러) + `parseRecommendationItems`(`.length(5)`) |
+| `prompts/recommendation-prompt-factory.ts` | 추천 시스템 지침 SSOT + 라벨 매핑 + 사용자 프롬프트 |
+| `prompts/recommendation-response-schema.ts` | Gemini 추천 `responseSchema` |
+| `prompts/recommendation-tool-schema.ts` | Claude 추천 tool 스키마 (`emit_recommendations`) |
 
 ## 환경변수 매트릭스
 | 변수 | 용도 | 기본값 |

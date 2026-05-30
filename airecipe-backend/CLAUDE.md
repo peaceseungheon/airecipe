@@ -21,3 +21,4 @@ AI 기반 요리 레시피 안내 웹앱 (Next.js + TypeScript). 핵심 요구�
 |------|----------|------|------|
 | 2026-05-21 | 초기 구성 (4인 팀 + 5 스킬 + 오케스트레이터) | 전체 | Next.js+TS 레시피 앱, 디자인 패턴·문서화 강조 |
 | 2026-05-22 | 앱인토스 포팅 사양서 11챕터 + ADR-009 작성 (세션 #4) | `docs/appsintoss-port/`·`docs/adr/ADR-009` | 신규 RN+Granite 미니앱을 별 저장소로 개발하기 위한 단일 LLM-소비형 포팅 사양 — 현재 코드 무수정 |
+| 2026-05-30 | `POST /api/recommendations` 신규 구현 (테마 기반 요리 5개 추천) + ADR-011 발행 | `src/app/api/recommendations/`·`src/services/recommendation.service.ts`·`src/lib/ai/*-recommendation-*`·`docs/adr/ADR-011`·`docs/api/recommendations.md` | 미니앱 404 원인 = 백엔드 라우트 미구현(ADR-016 "외부 작업 PENDING"). 미니앱 동결 계약(03 §3.8/ADR-016) 추종 구현. requireUser 보호 + AI 어댑터+Factory(Gemini/Claude) + 서버 zod `.length(5)` 5개 강제. QA Q1~Q14 14/14 PASS, typecheck/lint/build 통과. 미니앱 무변경 |

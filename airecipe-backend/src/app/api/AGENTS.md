@@ -22,6 +22,7 @@ HTTP I/O만: 입력 파싱·검증, 인증 확인, Service 호출, 응답 래핑
 | POST | `recipes` | 필요 (헤더/쿠키) | 201 `{data: Recipe}` |
 | PATCH | `recipes/[id]/favorite` | 필요 (헤더/쿠키) | `{data: Recipe}` |
 | DELETE | `recipes/[id]` | 필요 (헤더/쿠키) | `{data: {id}}` |
+| POST | `recommendations` | 필요 (헤더/쿠키) | `{data: {items[5], meta}}` (AI, JSON, ADR-011) |
 | OPTIONS | (모든 라우트) | 무관 | 204 + CORS 헤더(화이트리스트만) |
 
 ## 주의

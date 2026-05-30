@@ -5,6 +5,7 @@
  */
 import { z } from "zod";
 import { ServiceError } from "@/services/service-error";
+import { recommendationThemeSchema } from "@/lib/ai/recommendation-schema";
 import { generatedRecipeSchema } from "@/lib/ai/recipe-schema";
 
 // POST /api/recipes/generate
@@ -22,6 +23,11 @@ export const saveRecipeRequestSchema = z.object({
 // PATCH /api/recipes/[id]/favorite
 export const toggleFavoriteRequestSchema = z.object({
   isFavorite: z.boolean(),
+});
+
+// POST /api/recommendations — 테마 기반 요리 추천 요청 (ADR-011)
+export const recommendationsRequestSchema = z.object({
+  theme: recommendationThemeSchema,
 });
 
 // GET /api/recipes 쿼리 (문자열 → 의미 타입 강제 변환)
