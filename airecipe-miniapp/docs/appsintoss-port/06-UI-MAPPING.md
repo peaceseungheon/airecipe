@@ -283,8 +283,8 @@ import { PageNavbar } from '@toss/tds-react-native';
 
 | 파일 | 사용 형태 |
 |------|----------|
-| `src/pages/index.tsx:36-38` | `<PageNavbar><PageNavbar.Title>AI 레시피</PageNavbar.Title></PageNavbar>` |
-| `src/pages/recipe/generate.tsx:108-110` | 동일 패턴 + 화면 타이틀 |
+| `pages/index.tsx` | `<PageNavbar><PageNavbar.Title>AI 레시피</PageNavbar.Title></PageNavbar>` (라우트 구현은 `pages/`, ADR-018) |
+| `pages/recipe/generate.tsx` | 동일 패턴 + 화면 타이틀 |
 
 **공통 래퍼(`AppNavbar.tsx`)는 만들지 않는다** (Phase 2 baseline §B.2 — YAGNI). Phase 3에서 화면이 늘면 그때 추출 검토.
 

@@ -1,5 +1,7 @@
 # ADR-014 — 토스 광고(앱인토스 SDK) 도입과 의존성 격리
 
+> 전방 참조(2026-05-30): 본문이 인용하는 광고 시범 적용 위치 `src/pages/my-recipes.tsx`는 [ADR-018](./ADR-018-route-pages-consolidation.md)로 라우팅 루트 `pages/my-recipes.tsx`로 통합됨. SDK 격리 grep 가드(11-ADS) 경로도 `pages/**`로 갱신. 아래 시점 기록은 보존한다.
+
 - 상태: Accepted
 - 일자: 2026-05-25
 - 결정자: orchestrator(메인 세션 — 팀 1개 동시 제약으로 architect-as-orchestrator 합의)

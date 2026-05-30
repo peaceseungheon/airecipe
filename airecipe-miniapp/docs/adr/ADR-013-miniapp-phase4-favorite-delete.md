@@ -1,5 +1,7 @@
 # ADR-013 — Phase 4 즐겨찾기·삭제·404 통일 (낙관적 UI · DELETE 404 정규화 · ConfirmDialog 정정)
 
+> 전방 참조(2026-05-30): 본문이 인용하는 라우트 구현 위치 `src/pages/{my-recipes,recipe/[id]}.tsx`는 [ADR-018](./ADR-018-route-pages-consolidation.md)로 라우팅 루트 `pages/`로 통합됨. 아래 시점 기록은 보존한다.
+
 - 상태: Accepted
 - 일자: 2026-05-25
 - 결정자: orchestrator(메인 세션 — 팀 1개 동시 제약으로 architect-as-orchestrator)

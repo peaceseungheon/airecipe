@@ -291,8 +291,8 @@ Phase 5  출시 준비 (TDS 점검·콘솔 등록·검수 체크리스트)
 - `src/services/recipes.ts` 확장 — `getRecommendations` 메서드
 - `src/hooks/useRecommendations.ts` (신규)
 - `src/components/ThemePicker.tsx`, `src/components/RecommendationCard.tsx` (신규)
-- `src/pages/recipe/recommend.tsx` (신규)
-- `src/pages/index.tsx` 확장 — "오늘의 추천 받기" CTA 1개 추가
+- `pages/recipe/recommend.tsx` (신규) — 라우트 구현은 `pages/` (ADR-018)
+- `pages/index.tsx` 확장 — "오늘의 추천 받기" CTA 1개 추가
 
 ### 작업 체크리스트
 - [ ] 03 §3.8 zod 스키마 동결 → `src/lib/zod/recommendations.ts`.

@@ -24,10 +24,10 @@
 
 ### `pages/` — Granite 파일 기반 라우팅
 
-- **책임**: 각 화면의 진입점. `intoss://airecipe-miniapp/<path>` 자동 매핑.
-- **핵심 규약**: `createRoute('/...')` 패턴. 비즈니스 로직은 두지 않는다 — 화면 컴포넌트(`src/components/` 또는 인라인)만 참조.
-- **주요 파일**: `index.tsx`(홈), `_404.tsx`(404), `_app.tsx`(특수, 실제는 `src/_app.tsx`).
-- **SSOT**: `docs/appsintoss-port/07-ROUTING.md`.
+- **책임**: 각 화면의 라우트 구현 정본. `intoss://airecipe-miniapp/<path>` 자동 매핑. 라우트 구현은 이 디렉터리 단일 계층(ADR-018 — 이전 `src/pages/` shim 2계층 제거).
+- **핵심 규약**: `createRoute('/...')` 패턴. 비즈니스 로직은 화면 결합만 — presentational은 `src/components/`로 위임(`../src/...`/`../../src/...` 참조). `src/pages/` 신규 생성 금지.
+- **주요 파일**: `index.tsx`(홈), `my-recipes.tsx`, `recipe/{generate,recommend,[id]}.tsx`, `_404.tsx`(404). 상세는 `pages/AGENTS.md`.
+- **SSOT**: `docs/appsintoss-port/07-ROUTING.md` + `pages/AGENTS.md`.
 
 ### `src/_app.tsx` — 앱 컨테이너
 
@@ -76,7 +76,7 @@
 
 - **책임**: 미니앱·공통 결정 기록.
 - **현재 보유**: ADR-001(Supabase), ADR-002(AI Adapter), ADR-005(소유권 404), ADR-008(Gemini 기본), ADR-009(앱인토스 포팅 결정).
-- **신규 ADR**: ADR-010 이후 — 미니앱 측 결정(예: 옵션 P 마이그레이션 SQL, 캐싱 전략).
+- **신규 ADR**: ADR-010 이후 — 미니앱 측 결정. 최신: ADR-017(하단 탭바), ADR-018(라우트 구현 `pages/` 통합·`src/pages/` shim 제거).
 
 ### `granite.config.ts` — 앱 설정
 
@@ -113,7 +113,7 @@
 
 ## 흔한 함정
 
-- `pages/` vs `src/pages/` 혼동 — 메인 라우팅은 루트 `pages/`. `src/pages/`는 스캐폴딩 산출물.
+- 라우팅 루트는 루트 `pages/` 단일 계층 — 라우트 구현이 곧 여기 산다 (ADR-018). `src/pages/`(구 shim)는 제거됨. `src/pages/` 재생성 금지.
 - `import.meta.env`는 빌드 시점 인라인 — 런타임 변경 불가.
 - TDS 컴포넌트 시그니처는 SDK 버전 의존 — AppsInToss MCP로 확인.
 - API 응답 shape 변경은 본 저장소에서 결정 금지 — 백엔드 저장소(`AIReceipe`)에서 결정.

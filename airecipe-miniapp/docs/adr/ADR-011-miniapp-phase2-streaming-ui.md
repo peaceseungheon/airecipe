@@ -1,5 +1,7 @@
 # 0011. 미니앱 Phase 2 — 스트리밍·UI 규약 (SSE 어댑터 분리·AsyncGenerator·에러 청크 단일 매핑·text 청크 미표시·PageNavbar 채택·AbortSignal cast 2곳 한시 통과)
 
+> 전방 참조(2026-05-30): 본문이 인용하는 라우트 구현 위치 `src/pages/{index,recipe/generate}.tsx`는 [ADR-018](./ADR-018-route-pages-consolidation.md)로 라우팅 루트 `pages/`로 통합됨. 아래 시점 기록은 보존한다.
+
 - 상태: 채택됨
 - 날짜: 2026-05-24
 - 적용 대상: 본 저장소(`airecipe-miniapp`) 클라이언트 한정 결정

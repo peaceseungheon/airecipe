@@ -1,5 +1,7 @@
 # ADR-017 — 하단 탭바([홈 / 마이 레시피]) 도입: 커스텀 고정 하단 바 채택
 
+> 전방 참조(2026-05-30): 본문이 인용하는 `src/pages/{index,my-recipes}.tsx`(BottomTabBar 마운트 화면)는 [ADR-018](./ADR-018-route-pages-consolidation.md)로 라우팅 루트 `pages/`로 통합됨. BottomTabBar 결정(D53~D62)은 불변. 아래 시점 기록은 보존한다.
+
 - 상태: Accepted
 - 날짜: 2026-05-29
 - 관련: [ADR-009](./ADR-009-appsintoss-port-architecture.md)(포팅 아키텍처), [ADR-012](./ADR-012-miniapp-phase3-routing-cache-404.md)(라우팅·캐시·404), [ADR-016](./ADR-016-recommendations.md)(추천), `docs/appsintoss-port/07-ROUTING.md §7.8`

@@ -1,5 +1,7 @@
 # ADR-016 — Phase 6 테마 기반 요리 추천 (`POST /api/recommendations`)
 
+> 전방 참조(2026-05-30): 본문이 인용하는 신규 페이지 `src/pages/recipe/recommend.tsx`·홈 확장 `src/pages/index.tsx`는 [ADR-018](./ADR-018-route-pages-consolidation.md)로 라우팅 루트 `pages/`로 통합됨. 아래 시점 기록은 보존한다.
+
 - 상태: Accepted
 - 일자: 2026-05-26
 - 결정자: orchestrator(메인 세션 — architect 팀원 무산출로 통합 수행, Phase 4.5·5 선례)

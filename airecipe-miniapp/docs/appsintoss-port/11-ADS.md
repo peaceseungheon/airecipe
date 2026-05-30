@@ -109,7 +109,7 @@ else                              → toss(config)
 | `src/lib/ads/index.ts` | 환경 분기 → `ads` 객체 export | 0 |
 | `src/components/AppInlineAd.tsx` | `ads.InlineAdSlot` 위임 | 0 |
 | `src/hooks/useFullScreenAd.ts` | `ads.showFullScreen` 위임 | 0 |
-| `src/pages/**`, `src/components/**` 그 외 | `<AppInlineAd>`/`useFullScreenAd()` 사용 | 0 |
+| `pages/**`(라우트 구현 — ADR-018), `src/components/**` 그 외 | `<AppInlineAd>`/`useFullScreenAd()` 사용 | 0 |
 
 검증: `grep -rn "from ['\"]@apps-in-toss/framework['\"]" src/ | grep -i "InlineAd\|loadFullScreen\|showFullScreen"` → `adapter.toss.tsx` 1행만.
 

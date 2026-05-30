@@ -70,7 +70,14 @@ AI 레시피 안내 — 앱인토스 미니앱 (React Native + Granite + TDS).
 
 ## 현재 단계
 
-**하단 탭바 도입(ADR-017) 완료 → 디바이스 진입 실증 + 백엔드/출시 외부 작업 PENDING** (2026-05-29).
+**라우트 구현을 라우팅 루트 `pages/`로 통합(ADR-018) + 하단 탭바(ADR-017) → 디바이스 진입 실증 + 백엔드/출시 외부 작업 PENDING** (2026-05-30).
+
+### 라우트 `pages/` 통합 — `src/pages/` shim 제거 (ADR-018, 2026-05-30)
+
+사용자 요청("`src/pages/` 파일들을 라우팅 루트 `pages/`에 통합")에 따라, `pages/`(shim 재export) + `src/pages/`(실구현) 2계층을 **루트 `pages/` 단일 계층**으로 통합. `require.context('./pages')`·자동 생성 `src/router.gen.ts`(`from '../pages/'`)가 본디 루트 `pages/`를 가리키므로 Granite 메커니즘상 안전. `_404.tsx`가 이미 쓰던 `../src/components/...` 패턴으로 5개 라우트 정렬. **미니앱 단독·백엔드 무변경.**
+- 대상: `pages/{index,my-recipes}.tsx`·`pages/recipe/{generate,recommend,[id]}.tsx`(실구현 승격), `src/pages/**` 삭제, `pages/AGENTS.md` 신규(구 `src/pages/AGENTS.md` 이관), `router.gen.ts` 불변(자동 생성).
+- 사유: 이중 진실(2계층) 제거·fragile shim 경로 결합 제거·화면 추가 단순화(한 파일). ADR-010/012의 "구현은 `src/pages/`" 관례를 ADR-018이 대체.
+- 산출: `docs/adr/ADR-018-route-pages-consolidation.md` 신규, ADR-010/011/012/013/014/016/017 전방 참조 주석, 06/10/11 SSOT + 루트/미니앱 `AGENTS.md` 경로 갱신.
 
 ### 하단 탭바 — [홈 / 마이 레시피] 2탭 (ADR-017, 본 차)
 
@@ -85,8 +92,8 @@ AI 레시피 안내 — 앱인토스 미니앱 (React Native + Granite + TDS).
 
 코드 산출:
 - `src/components/BottomTabBar.tsx` (신규) — 단일 하단 탭바 SSOT.
-- `src/pages/index.tsx` — AccessoryTextButton 제거 + `<BottomTabBar active="home" />` + scrollContent paddingBottom.
-- `src/pages/my-recipes.tsx` — `<BottomTabBar active="my" />` 항상 노출(목록/필터/페이지네이션/즐겨찾기/광고 로직 무변경) + paddingBottom.
+- `pages/index.tsx` — AccessoryTextButton 제거 + `<BottomTabBar active="home" />` + scrollContent paddingBottom.
+- `pages/my-recipes.tsx` — `<BottomTabBar active="my" />` 항상 노출(목록/필터/페이지네이션/즐겨찾기/광고 로직 무변경) + paddingBottom.
 - `granite.config.ts` — appName 원복(D62).
 - `docs/adr/ADR-017-bottom-tab-navigation.md` (신규) — D53~D62.
 - `docs/appsintoss-port/07-ROUTING.md` §7.8.1 신설 + `06-UI-MAPPING.md` §6.1 색 규약 정합 + `src/components/AGENTS.md` BottomTabBar 행.

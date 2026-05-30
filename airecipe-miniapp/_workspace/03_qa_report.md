@@ -144,3 +144,64 @@ grep -rl st11 node_modules/.pnpm/@toss+tds-typography@0.0.3/node_modules/@toss/t
 grep -n "export \* from './components/txt'" \
   node_modules/@toss/tds-react-native/dist/esm/index.d.ts  # Txt export (L49)
 ```
+
+---
+
+# 03b — 라우트 통합 검증 (ADR-018: src/pages → pages 통합)
+
+> 작성: miniapp-qa (독립 재검증). 날짜: 2026-05-30.
+> 검증 대상: arch-consolidate(ADR-018·문서·pages/AGENTS.md) + fe-consolidate(shim 5개 실구현 교체·src/pages 삭제).
+> 방법: 보고 불신 — 직접 실행·grep 교차 검증. 정답 기준 = 기존 pages/_404.tsx.
+
+## 결론 요약 — 라우트 통합
+
+**전체 결과: GO. FAIL 0건. MINOR(비차단) 1건.**
+7개 검증 항목 PASS. typecheck 0 errors / lint 0 errors(기지 warning 1건). 경계면(파일경로↔라우트경로↔router.gen↔navigation) 전부 정합.
+
+## 항목별 결과
+
+### 1. 라우팅 루트 일관성 — PASS
+- `require.context.ts`: `require.context('./pages')` — 루트 pages/ 스캔 확인.
+- `src/router.gen.ts`: 5개 라우트 모두 `from '../pages/...'` import (index/my-recipes/recipe/[id]/recipe/generate/recipe/recommend).
+- 파일↔라우트 1:1 매핑 (createRoute 인용 — 파일:라인):
+  - `/` ← pages/index.tsx:24 `createRoute('/')`
+  - `/my-recipes` ← pages/my-recipes.tsx:43 `createRoute('/my-recipes')`
+  - `/recipe/:id` ← pages/recipe/[id].tsx:39 `createRoute('/recipe/:id')` (router.gen `'/recipe/:id'` 선언과 일치)
+  - `/recipe/generate` ← pages/recipe/generate.tsx:45 `createRoute('/recipe/generate')`
+  - `/recipe/recommend` ← pages/recipe/recommend.tsx:30 `createRoute('/recipe/recommend')`
+- navigation.navigate 호출 값 전부 등록 라우트 키와 매칭: `/`, `/recipe/generate`, `/recipe/recommend`, `/recipe/:id`, `/my-recipes`. 미등록 라우트로의 navigate 0건.
+  - 주: navigate는 런타임 형(`/recipe/:id`), 07-ROUTING 산문은 파일 규약형(`/recipe/[id]`) — Granite 규약상 동일 라우트, createRoute/router.gen이 `:id`로 통일돼 정합.
+
+### 2. shim 잔재 0 — PASS
+- grep `export { Route } from`·`../src/pages`·`from '../../src/pages` → pages/ 전체 0건.
+- 5개 파일 모두 실제 컴포넌트 구현(createRoute + 화면 함수 + TDS import). re-export shim 아님.
+- `_404.tsx` 불변 — 원래 실구현(NotFoundScreen 결합) 유지.
+
+### 3. import 깊이 정합 — PASS
+- pages/*.tsx의 모든 `../src/...`(depth1) / `../../src/...`(depth2) import를 실모듈로 해석 → 26건 전부 존재(끊긴 import 0).
+  - top-level(index/my-recipes): `../src/{components,hooks,lib}/...` ✓
+  - recipe 하위([id]/generate/recommend): `../../src/{components,hooks,lib}/...` ✓
+- `_404.tsx` 정답 패턴(`../src/components/NotFoundScreen`)과 동일 깊이 규약 일치.
+
+### 4. src/pages 완전 부재 — PASS
+- `find` 결과 pages 디렉터리는 루트 `./pages`만. src/pages 디렉터리·파일 0건.
+
+### 5. 살아있는 src 코드의 src/pages 참조 0건 — PASS
+- 살아있는 `.ts/.tsx`(workspace/node_modules/.granite/router.gen 제외) 내 `src/pages` 참조 0건.
+- 살아있는 문서: AGENTS.md(27/28/79/116)·pages/AGENTS.md(24)의 `src/pages` 표기는 전부 "shim 제거·신규 생성 금지" 서술(ADR-018 인지) — stale 경로 표기 아님, 정상.
+- 06/10/11 SSOT: `src/pages` 참조 0건 (ADR-018 line 80 문서 갱신 완료). 07-ROUTING도 전부 `pages/...` 표기(line 27 `src/app/...`는 백엔드 경로, 무관).
+- 역사적 ADR(010~017)의 `src/pages` 인용은 전부 ADR-018 전방참조 주석 동반 또는 시점 기록 — 정책상 허용.
+
+### 6. 빌드 게이트 — PASS
+- `pnpm typecheck` → exit 0, 0 errors.
+- `pnpm lint` → exit 0, `0 errors, 1 warning`. warning = `src/router.gen.ts:1 Unused eslint-disable directive` — ADR-010 §6.4 기지(자동생성) 누적 warning. 신규 error/warning 0.
+
+### 7. 문서 정합 — PASS
+- `pages/AGENTS.md` 존재. 헤더 `# pages — Granite 파일 기반 라우팅...` (요건 `# pages...` 충족).
+- `../docs/...` 상대 링크 표본(ADR-005/009~018, 07-ROUTING, 08-STREAMING) 전부 실파일 가리킴 — 끊김 0.
+- `docs/adr/ADR-018-route-pages-consolidation.md` 존재.
+
+## MINOR (비차단, arch-consolidate 권고)
+- CLAUDE.md:95-96 — ADR-017(하단 탭바) 섹션이 BottomTabBar 수정 파일을 `src/pages/index.tsx`·`src/pages/my-recipes.tsx`로 표기. ADR-017 사이클의 시점 기록(바로 위 75-80 ADR-018 섹션이 대체 명시)이라 정책상 허용 범위지만, "현재 단계" 블록 하위라 `pages/`로 갱신하면 더 깔끔. 코드·빌드·라우팅 무영향. 책임: arch-consolidate(문서). 차단 아님.
+
+## 최종 판정: **GO** (라우트 통합 — 경계면 전부 정합, 빌드 통과, FAIL 0)

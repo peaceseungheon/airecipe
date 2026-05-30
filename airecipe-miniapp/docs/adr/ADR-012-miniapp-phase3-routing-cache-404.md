@@ -1,5 +1,7 @@
 # 0012. 미니앱 Phase 3 — 저장·목록·상세 규약 (라우팅 ·/my-recipes·/recipe/[id]·캐시 무효화 Context+bump·404 단일 컴포넌트·저장 후 상세 직진)
 
+> 전방 참조(2026-05-30): 본문 D14·D16 등이 명시한 라우트 **구현 위치 `src/pages/...`**는 [ADR-018](./ADR-018-route-pages-consolidation.md)로 라우팅 루트 `pages/`로 통합되며 대체됨. 라우트 경로·`createRoute`·404 단일 컴포넌트 등 그 외 규약은 불변. 아래 시점 기록은 보존한다.
+
 - 상태: 채택됨
 - 날짜: 2026-05-24
 - 적용 대상: 본 저장소(`airecipe-miniapp`) 클라이언트 한정 결정
