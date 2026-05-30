@@ -9,6 +9,75 @@ AI 기반 요리 레시피 안내 서비스. 두 서브프로젝트로 구성된
 
 각 서브프로젝트의 상세 규칙·진행 상황은 해당 디렉토리의 `CLAUDE.md`를 따른다. 서브프로젝트에서 작업할 때는 그 디렉토리를 기준으로 한다(빌드·테스트·경로).
 
+## 작업 대원칙 (Claude 행동 지침)
+
+> 흔한 LLM 코딩 실수를 줄이기 위한 행동 지침. 프로젝트별 지침과 함께 적용한다.
+>
+> **Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
+
+### 1. Think Before Coding
+
+**Don't assume. Don't hide confusion. Surface tradeoffs.**
+
+Before implementing:
+
+- State your assumptions explicitly. If uncertain, ask.
+- If multiple interpretations exist, present them - don't pick silently.
+- If a simpler approach exists, say so. Push back when warranted.
+- If something is unclear, stop. Name what's confusing. Ask.
+
+### 2. Simplicity First
+
+**Minimum code that solves the problem. Nothing speculative.**
+
+- No features beyond what was asked.
+- No abstractions for single-use code.
+- No "flexibility" or "configurability" that wasn't requested.
+- No error handling for impossible scenarios.
+- If you write 200 lines and it could be 50, rewrite it.
+
+Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
+
+### 3. Surgical Changes
+
+**Touch only what you must. Clean up only your own mess.**
+
+When editing existing code:
+
+- Don't "improve" adjacent code, comments, or formatting.
+- Don't refactor things that aren't broken.
+- Match existing style, even if you'd do it differently.
+- If you notice unrelated dead code, mention it - don't delete it.
+
+When your changes create orphans:
+
+- Remove imports/variables/functions that YOUR changes made unused.
+- Don't remove pre-existing dead code unless asked.
+
+The test: Every changed line should trace directly to the user's request.
+
+### 4. Goal-Driven Execution
+
+**Define success criteria. Loop until verified.**
+
+Transform tasks into verifiable goals:
+
+- "Add validation" → "Write tests for invalid inputs, then make them pass"
+- "Fix the bug" → "Write a test that reproduces it, then make it pass"
+- "Refactor X" → "Ensure tests pass before and after"
+
+For multi-step tasks, state a brief plan:
+
+```
+1. [Step] → verify: [check]
+2. [Step] → verify: [check]
+3. [Step] → verify: [check]
+```
+
+Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
+
+**These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
+
 ## 하네스 (에이전트 팀)
 
 하네스는 **이 루트 `.claude/`에서 단일 관리**한다. 두 도메인 팀이 공존하며, 최상위 라우터가 작업을 분배한다.
@@ -25,3 +94,4 @@ AI 기반 요리 레시피 안내 서비스. 두 서브프로젝트로 구성된
 | 날짜 | 변경 내용 | 사유 |
 |------|----------|------|
 | 2026-05-29 | 두 독립 저장소(backend·miniapp)를 단일 monorepo로 통합(이력 보존), 하네스를 루트 `.claude/`로 이전 — 두 팀 유지 + `airecipe-router` 추가, 충돌 워커 스킬 3종 도메인 접미사 분리 | 단일 저장소 관리 + 하네스 중앙화 |
+| 2026-05-30 | `CLAUDE2.md`의 행동 대원칙(Think Before Coding·Simplicity First·Surgical Changes·Goal-Driven Execution)을 원문 보존하여 "작업 대원칙" 섹션으로 통합 | 행동 지침 단일화 |
