@@ -15,7 +15,7 @@
  */
 import type { NextRequest } from "next/server";
 import { getRecipeGenerationService } from "@/lib/composition";
-import { failFromError, ok } from "@/lib/api-response";
+import { failFromError, logApiError, ok } from "@/lib/api-response";
 import { withCors, corsPreflightResponse, buildCorsHeaders } from "@/lib/cors";
 import { generateRequestSchema, parseOrThrow } from "@/lib/validation";
 import { encodeSSE } from "@/lib/sse";
@@ -102,6 +102,9 @@ export async function POST(request: NextRequest) {
 export const OPTIONS = corsPreflightResponse;
 
 function toChunkError(err: unknown): { code: ApiErrorCode; message: string } {
+  // SSE는 HTTP 200 + error 청크라 응답만으론 서버에서 원인을 볼 수 없다 →
+  // JSON 경로(failFromError)와 동일하게 콘솔에 구조적으로 로깅한다.
+  logApiError(err);
   if (err instanceof ServiceError) {
     return { code: err.code, message: err.message };
   }
