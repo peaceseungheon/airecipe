@@ -22,6 +22,7 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import { createRoute, useNavigation } from '@granite-js/react-native';
 import { Button, PageNavbar, Txt, colors } from '@toss/tds-react-native';
 
+import { BottomTabBar } from '../../src/components/BottomTabBar';
 import { DeleteConfirmDialog } from '../../src/components/DeleteConfirmDialog';
 import { FavoriteButton } from '../../src/components/FavoriteButton';
 import { NotFoundScreen } from '../../src/components/NotFoundScreen';
@@ -121,13 +122,19 @@ function RecipeDetailPage() {
             식별자를 확인하는 중이에요…
           </Txt>
         </View>
+        <BottomTabBar active="none" />
       </View>
     );
   }
 
   // 404 단일 컴포넌트 정책 (baseline §H.2 #13).
   if (notFound) {
-    return <NotFoundScreen onBack={handleBack} />;
+    return (
+      <View style={styles.root}>
+        <NotFoundScreen onBack={handleBack} />
+        <BottomTabBar active="none" />
+      </View>
+    );
   }
 
   return (
@@ -212,6 +219,8 @@ function RecipeDetailPage() {
         ) : null}
       </ScrollView>
 
+      <BottomTabBar active="none" />
+
       {recipe ? (
         <DeleteConfirmDialog
           open={confirmOpen}
@@ -233,6 +242,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 20,
     gap: 24,
+    paddingBottom: 24,
   },
   center: {
     paddingVertical: 60,

@@ -11,8 +11,10 @@
  */
 
 import React, { useCallback, useEffect } from 'react';
+import { StyleSheet, View } from 'react-native';
 import { useNavigation } from '@granite-js/react-native';
 
+import { BottomTabBar } from '../src/components/BottomTabBar';
 import { NotFoundScreen } from '../src/components/NotFoundScreen';
 
 export default function NotFoundPage() {
@@ -46,10 +48,17 @@ export default function NotFoundPage() {
   }, [navigation]);
 
   return (
-    <NotFoundScreen
-      title="원하시는 화면을 찾지 못했어요"
-      subtitle="홈으로 이동해서 다시 시도해주세요."
-      onBack={handleBack}
-    />
+    <View style={styles.root}>
+      <NotFoundScreen
+        title="원하시는 화면을 찾지 못했어요"
+        subtitle="홈으로 이동해서 다시 시도해주세요."
+        onBack={handleBack}
+      />
+      <BottomTabBar active="none" />
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  root: { flex: 1 },
+});

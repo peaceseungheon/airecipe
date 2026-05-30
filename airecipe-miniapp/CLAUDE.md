@@ -86,7 +86,7 @@ AI 레시피 안내 — 앱인토스 미니앱 (React Native + Granite + TDS).
 핵심 결정 (ADR-017 D53~D62):
 - **방식 (C) 커스텀 고정 하단 탭바** — Granite 탭 네비게이터 1급 미지원(`@granite-js/react-native@1.0.28` export 부재, Router는 NativeStack만 마운트) + TDS 하단 탭 전용 컴포넌트 없음 실증 → TDS 프리미티브(`Txt`/`colors`) + RN `Pressable`/`View` 합성. (A)Granite 1급·(B)`@react-navigation/bottom-tabs` 기각.
 - **단일 SSOT** `BottomTabBar` props `{ active: 'home'|'my' }` — 탭 노출 화면이 직접 마운트, 탭 누름 → `navigation.navigate(path, {})`. **새 라우트·router.gen.ts 변경 0**(D55).
-- 노출 범위 `/`·`/my-recipes`만(D56). 홈 `AccessoryTextButton "마이 레시피"` 제거(D58, 중복). "오늘의 추천" CTA 유지.
+- 노출 범위: ~~`/`·`/my-recipes`만(D56)~~ **→ 전 화면(D63, 2026-05-30 — 아래 절 참조).** 홈 `AccessoryTextButton "마이 레시피"` 제거(D58, 중복). "오늘의 추천" CTA 유지.
 - 활성 탭 색 `colors.orange500`(`#FF6B00`) — brand `#FF6B35` 최근접 실재 토큰(D59). `colors.primary` 부재(TS2339)·`blue500` 브랜드 이질 기각. hex 금지(ADR-015 D39).
 - **appName 회귀 동시 수정(D62)** — `granite.config.ts` `appName: 'airecipe' → 'airecipe-miniapp'`. monorepo 병합(`05ef27c`)이 직전 hotfix 원복값을 되돌린 실재 회귀, 미수정 시 진입 `/_404` 폴백.
 
@@ -100,6 +100,17 @@ AI 레시피 안내 — 앱인토스 미니앱 (React Native + Granite + TDS).
 - 변경 0: `src/router.gen.ts`·`src/_app.tsx`·api-client/hooks/zod/types·스택 화면·`_404`·shim 5종.
 
 **외부 작업 PENDING**: 디바이스/샌드박스 dev 진입 실증(appName 수정 후 홈 정상 진입 + 하단 탭 동작 + iOS SafeArea 하단 겹침). 후속 진화: 탭 아이콘(D60), SafeArea `insets.bottom` 훅(현재 `paddingBottom: 12` 상수 폴백, D61).
+
+### 하단 탭바 전 화면 노출 (ADR-017 D63, 2026-05-30 — D56 대체)
+
+사용자 요청("BottomTabBar가 모든 화면에서 보였으면")에 따라 노출 범위를 `/`·`/my-recipes` 2화면(D56)에서 **전 화면(홈/마이 + 생성/추천/상세/_404)**으로 확대. **미니앱 단독·백엔드 무변경(api-client/zod/types/router.gen.ts 변경 0).** typecheck/lint PASS, QA 7/7 GO(FAIL 0).
+
+- **`active` 센티넬 `'none'` 도입(D63a)** — `BottomTabBarProps.active: 'home'|'my'|'none'`. 비-탭 화면은 `'none'`(어떤 탭도 비활성·`selected:false`·grey500). `handlePress` no-op 가드·`isActive`·접근성 모두 `'none'`에서 자동 정합 → `BottomTabBar.tsx`는 타입·JSDoc만 확장, 로직 무변경.
+- **early-return 분기 마운트(D63b)** — 식별자 가드(my-recipes·recommend·[id])·404 분기([id])·_404 폴백 등 별도 JSX 트리 반환 분기에 각각 마운트.
+- **404/폴백 패턴(D63c)** — `NotFoundScreen`(TDS `ErrorPage`, 전체화면)을 쓰는 [id] 404 분기·`_404.tsx`는 `<View flex:1>`로 감싸 탭바를 형제 배치.
+- **D55 재포커스 불변(D63d)** — 비-탭 화면(push 진입)에서 탭 누름 시 `navigate`는 탭 루트로 pop-to(스택 안 깊어짐).
+- **paddingBottom 24(D63e)** — generate/recommend/[id]의 `scrollContent`에 신규 추가(홈/마이 기존값 통일, 콘텐츠 가림 방지).
+- 산출: `BottomTabBar.tsx`(active 타입), `pages/recipe/{generate,recommend,[id]}.tsx`·`pages/_404.tsx`(탭바 마운트 + paddingBottom), ADR-017 §2.1 D63 + `_workspace/01_architect_baseline.md` + 07 §7.8.1 + `src/components/AGENTS.md` 갱신.
 
 > `_workspace_hotfix_entry_fallback/`(직전 진입 폴백 hotfix) 보존 + 새 `_workspace`(본 차). 이전 단계 상세는 아래 절 + `docs/adr/ADR-009~017` 참조.
 
@@ -370,6 +381,7 @@ Phase별 수용 기준은 `docs/appsintoss-port/10-SPRINT-PLAN.md`. 결정 트�
 | 2026-05-29 | Phase 6 완료 — "현재 단계" 절 재작성(Phase 6 테마 기반 추천 완료 → 백엔드 외부 작업 + 출시 외부 작업 PENDING). 산출 12 파일(zod/types/services/hooks 확장 + ThemePicker·RecommendationCard 신규 + recommend.tsx 페이지 신규 + index.tsx CTA + router.gen.ts 수동 등록) + 문서 8종(ADR-016 신규 + 01 §1.7 + 03 §3.8 + 06 §6.10 + 07 §7.3.6 + 10 §10.7 + AGENTS.md 2종). `_workspace_phase5` 보존 + 새 `_workspace`로 진행. ADR-016(D44~D52 9 결정 — situation 6+weather 5 두 축 refine + items.length(5) + 보호 엔드포인트 401 재시도 + 비-stream JSON + `/recipe/recommend` + 홈 CTA + theme deps 캐시 + AI 면책) 발행. 팀 1개 동시 제약으로 architect 무산출 → Phase 4.5·5 선례에 따라 메인 세션이 architect/api-client/frontend/qa 역할 통합 수행 | CLAUDE.md | Phase 6 마무리 — Q1~Q12 + D44~D52 + AC6.1~AC6.6 코드 측 ALL PASS, typecheck/lint 0 errors. 백엔드 미배포 시 미니앱은 401/404 한국어 안내(자동). 누적 미해결 11항 갱신(추천 자유 텍스트·이미지·개인화·결과 광고 4항 추가). |
 | 2026-05-29 | 하단 탭바 도입 — "현재 단계" 절 재작성(하단 탭바 절 신설). 산출 파일: `src/components/BottomTabBar.tsx`(신규 단일 SSOT) + `index.tsx`/`my-recipes.tsx`(BottomTabBar 통합 + 홈 AccessoryTextButton 제거) + `granite.config.ts`(appName 회귀 동시 수정) + ADR-017 신규(D53~D62) + 07 §7.8.1 신설 + 06 §6.1 색 규약 정합 + AGENTS.md. 방식 (C) 커스텀 고정 하단 탭바(Granite·TDS 탭 1급 미지원 실증), 활성색 `colors.orange500`. `_workspace_hotfix_entry_fallback` 보존 + 새 `_workspace`. 백엔드 무변경(api-client no-op). architect/frontend/qa 팀원 스폰 — SendMessage `summary` 누락으로 색 결정 통지 1회 실패 후 agentId 재개로 정정. | 사용자 요청(마이 레시피 탭) — 07 §7.8 "향후 하단 탭 검토"의 실행. Q1~Q12 12/12 PASS, typecheck/lint 통과. 디바이스 진입 실증 PENDING. |
 | 2026-05-29 | 진입 폴백 hotfix — "현재 단계" 절 hotfix 절 신설 + 4 root cause 표. 사용자 보고("앱 진입 시 NotFoundScreen + 닫기 무동작") → `navigation.getState` 진단 로그로 root cause 확정 → 4 fix 적용 후 정상 동작 검증. (1) `granite.config.ts` appName `airecipe-miniapp` 원복(commit 87625a4 역행 — 콘솔 등록 deep link prefix와 동기) (2) `NotFoundScreen.tsx` 우측 닫기에 onBack 정확 바인딩 + props 확장(`onContactSupport?`/`title?`/`subtitle?`) (3) `pages/*.tsx` shim 5종 상대 경로 정정 (4) `_404.tsx` 진입 폴백 카피 분리 + try-catch + `__DEV__` `navigation.getState` JSON 진단 로그. 06 §6.5 NotFoundScreen 행 TDS 카피 매핑 정정. `_workspace_phase6` 보존 + 새 `_workspace` hotfix 사이클 | CLAUDE.md | hotfix 마무리 — typecheck PASS, lint 0 errors. 검수 정책 인계: 콘솔 등록 deep link prefix ↔ `appName` 1:1 동기화 출시 전 검증 필수. |
+| 2026-05-30 | BottomTabBar 전 화면 노출 (ADR-017 D63 — D56 대체) — "현재 단계" 하단 탭바 절에 D63 서브절 추가 + D56 노출 범위 정정(취소선). `active` 센티넬 `'none'` 도입(D63a, 로직 무변경·타입만 확장), early-return 분기 마운트(D63b), 404/_404 View 래퍼 패턴(D63c), D55 재포커스 불변(D63d), generate/recommend/[id] paddingBottom 24(D63e). 6개 페이지 전 분기 마운트. 산출: `BottomTabBar.tsx`·`pages/recipe/{generate,recommend,[id]}.tsx`·`pages/_404.tsx` + ADR-017 §2.1 D63 + `_workspace/01_architect_baseline.md` + 07 §7.8.1 + `src/components/AGENTS.md`. **백엔드 무변경.** 07 §7.8.1 본문 활성색 문구를 `colors.orange500`로 정합(QA 비차단 지적 반영). | 사용자 요청("모든 화면 노출"). QA 7/7 GO(FAIL 0), typecheck/lint PASS. |
 
 ---
 

@@ -469,15 +469,22 @@ function GeneratePage() {
 - `@react-navigation/bottom-tabs`는 미설치(`package.json`/lock 0건)이며 루트 네비게이터 주입 슬롯도 없다.
 - TDS에는 하단 탭바 전용 컴포넌트가 없다. `Tab`(상단 세그먼트)·`tab-view Tabs`(스와이프 콘텐츠)는 용도가 다름. → **TDS 프리미티브(`Txt`/`colors`/선택적 `Icon`) + RN `Pressable`/`View`로 합성.**
 
-**채택(C — 커스텀 고정 하단 탭바):** NativeStack 위에 `BottomTabBar` 단일 컴포넌트를 두고, **탭이 보여야 하는 화면(`/`·`/my-recipes`)이 직접 마운트**한다. 탭 누름 → `navigation.navigate(path, {})`. **새 라우트·router.gen.ts 변경 0개.**
+**채택(C — 커스텀 고정 하단 탭바):** NativeStack 위에 `BottomTabBar` 단일 컴포넌트를 두고, **각 화면이 직접 마운트**한다. 탭 누름 → `navigation.navigate(path, {})`. **새 라우트·router.gen.ts 변경 0개.**
 
-| 화면 | 하단 탭바 | 상단 Navbar |
-|------|----------|-------------|
-| `/` (홈) | `<BottomTabBar active="home" />` 렌더 | `PageNavbar` Title만 (AccessoryTextButton "마이 레시피" **제거** — D58) |
-| `/my-recipes` (마이) | `<BottomTabBar active="my" />` 렌더 | `PageNavbar` BackButton + "마이 레시피" |
-| `/recipe/generate`·`/recipe/[id]`·`/recipe/recommend`·`/_404` | **미렌더** (몰입형 진입, BackButton으로 복귀 — D56) | 기존 유지 |
+> ⚠️ **노출 범위 전 화면 확대 (ADR-017 D63, 2026-05-30 — D56 대체):** 사용자 요청("모든 화면 노출")으로 비-탭 화면(생성/추천/상세/_404)에도 탭바를 마운트한다. 비-탭 화면은 `active="none"`(활성 탭 없음 센티넬 — 두 탭 모두 비활성색 `grey500`·`selected:false`). early-return 분기(식별자 가드·404)에도 마운트. `BottomTabBarProps.active`는 `'home'|'my'|'none'`. 아래 표는 D63 반영본이다.
 
-**활성 색** = TDS `colors.primary` 계열 토큰, 비활성 = `colors.grey500`. hex 직접 사용 금지(ADR-015 D39). 아이콘은 `Icon.name`이 자유 문자열이라 실재 검증 시에만 추가, 미검증 시 라벨 only(D60). 하단 SafeArea 패딩 + ScrollView `paddingBottom` 확보(D61).
+| 화면 | 하단 탭바 (D63) | 상단 Navbar |
+|------|----------------|-------------|
+| `/` (홈) | `<BottomTabBar active="home" />` | `PageNavbar` Title만 (AccessoryTextButton "마이 레시피" **제거** — D58) |
+| `/my-recipes` (마이) | `<BottomTabBar active="my" />` (식별자 가드 분기 + 정상 분기) | `PageNavbar` BackButton + "마이 레시피" |
+| `/recipe/generate` | `<BottomTabBar active="none" />` (정상 분기 — ScrollView 형제) | 기존 유지 |
+| `/recipe/recommend` | `<BottomTabBar active="none" />` (식별자 가드 + 정상 분기) | 기존 유지 |
+| `/recipe/[id]` | `<BottomTabBar active="none" />` (식별자 가드 + 404 분기 + 정상 분기) | 기존 유지 |
+| `/_404` | `<BottomTabBar active="none" />` (`View` 래퍼로 `NotFoundScreen`과 형제) | `NotFoundScreen`(ErrorPage) |
+
+> 비-탭 화면은 push로 진입했으므로 탭 누름 시 `navigate`는 탭 루트로 **재포커스(pop-to)**한다 — 스택을 깊게 만들지 않음(D63d, D55 불변).
+
+**활성 색** = TDS `colors.orange500`(`#FF6B00`, brand `#FF6B35` 최근접 실재 토큰 — D59), 비활성 = `colors.grey500`. ⚠️ `colors.primary`는 `@toss/tds-colors@0.1.0`에 **부재**(TS2339)라 사용 불가(§3.3). hex 직접 사용 금지(ADR-015 D39). 아이콘은 `Icon.name`이 자유 문자열이라 실재 검증 시에만 추가, 미검증 시 라벨 only(D60). 하단 SafeArea 패딩 + ScrollView `paddingBottom` 확보(D61).
 
 > ⚠️ **appName 회귀 동시 수정(D62)**: 현재 `granite.config.ts:7` `appName: 'airecipe'`는 hotfix가 원복했어야 할 `'airecipe-miniapp'`이 monorepo 병합으로 되돌아간 회귀 상태다. 진입 deep link prefix와 미스매치 → `/_404` 폴백. 탭바 도입 전 `'airecipe-miniapp'`로 원복 필수. 콘솔 등록 deep link prefix ↔ `appName` 1:1 동기는 출시 전 검증 의무.
 
@@ -513,3 +520,4 @@ function GeneratePage() {
 |------|------|------|
 | 2026-05-22 | 초기 작성 (세션 #4) | App Router 7화면 → Granite 5화면 매핑 + proxy 가드 식별자 단일 조건으로 단순화 + 딥링크/백버튼 |
 | 2026-05-29 | §7.8.1 신설 — 하단 탭바([홈/마이 레시피]) 도입. Granite/TDS 실증 검증(탭 네비게이터 1급 부재 → 커스텀 고정 하단 바 채택) + 홈 AccessoryTextButton 제거 + appName 회귀 동시 수정 명시. ADR-017 D53~D62. | 사용자 요청(마이 레시피 탭) — §7.8 "향후 검토"의 실행 |
+| 2026-05-30 | §7.8.1 노출 범위 표 갱신 — **전 화면 확대(ADR-017 D63, D56 대체).** 비-탭 화면(생성/추천/상세/_404)에도 `<BottomTabBar active="none" />` 마운트, early-return 분기 포함, `active:'home'\|'my'\|'none'`. D55 재포커스 불변 명시. | 사용자 요청("모든 화면 노출") |

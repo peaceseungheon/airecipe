@@ -22,7 +22,7 @@ Phase 2의 레시피 생성 화면(`/recipe/generate`)과 홈(`/`)이 사용하�
 | `RecipeCard.tsx` 확장 (Phase 4) | Phase 3 위에 `onToggleFavorite?`/`favoritePending?` 활성화 — header에 `<FavoriteButton>` 합성. `onDelete?`는 자리표시 유지(카드 측 삭제 미활성 — D22) | 06 §6.4.4, ADR-013 D7·D22 |
 | `ThemePicker.tsx` (Phase 6) | 추천용 테마(상황 6 + 날씨 5) 선택 — TDS `SegmentedControl.Root` + `.Item` 2축 합성. props `{ value: RecommendationTheme, onChange }`. 한 번 더 같은 값 탭 시 해제(null). 한국어 라벨은 03 §3.8.2 SSOT | 06 §6.10, ADR-016 D44 |
 | `RecommendationCard.tsx` (Phase 6) | 추천 카드 1장 — Pressable + Txt(dishName t5 / description st9) + Badge tags. props `{ item: RecommendationItem, onPress }`. 추천은 ephemeral(id 없음) — `item.dishName`만 부모로 전달 | 06 §6.10, ADR-016 D45 |
-| `BottomTabBar.tsx` (탭바) | 하단 탭바([홈/마이 레시피]) **단일 SSOT**. RN `Pressable`/`View` + TDS `Txt`+`colors`(+선택 `Icon`). props `{ active: 'home'\|'my' }` — 화면이 자신의 활성 탭 명시 전달. 탭 전환 `navigation.navigate('/'\|'/my-recipes', {})`. **`/`·`/my-recipes` 두 화면만 마운트**(스택/추천/_404 미렌더). 색은 TDS 토큰만(hex 금지). | 07 §7.8.1, ADR-017 D53~D62 |
+| `BottomTabBar.tsx` (탭바) | 하단 탭바([홈/마이 레시피]) **단일 SSOT**. RN `Pressable`/`View` + TDS `Txt`+`colors`(+선택 `Icon`). props `{ active: 'home'\|'my'\|'none' }` — 화면이 자신의 활성 탭 명시 전달, 비-탭 화면은 `'none'`(활성 탭 없음 — 두 탭 비활성색·`selected:false`). 탭 전환 `navigation.navigate('/'\|'/my-recipes', {})`. **전 화면 마운트**(홈/마이 + 생성/추천/상세/_404, early-return 분기 포함 — D63b). 색은 TDS 토큰만(hex 금지). | 07 §7.8.1, ADR-017 D53~D63 |
 
 ## 규약 (강제)
 

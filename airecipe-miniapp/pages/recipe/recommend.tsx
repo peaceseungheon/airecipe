@@ -21,6 +21,7 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import { createRoute, useNavigation } from '@granite-js/react-native';
 import { Button, PageNavbar, Txt, colors } from '@toss/tds-react-native';
 
+import { BottomTabBar } from '../../src/components/BottomTabBar';
 import { RecommendationCard } from '../../src/components/RecommendationCard';
 import { ThemePicker } from '../../src/components/ThemePicker';
 import { useRecommendations } from '../../src/hooks/useRecommendations';
@@ -57,6 +58,7 @@ function RecommendPage() {
             식별자를 확인하는 중이에요…
           </Txt>
         </View>
+        <BottomTabBar active="none" />
       </View>
     );
   }
@@ -146,6 +148,8 @@ function RecommendPage() {
           </View>
         ) : null}
       </ScrollView>
+
+      <BottomTabBar active="none" />
     </View>
   );
 }
@@ -158,6 +162,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 20,
     gap: 20,
+    paddingBottom: 24,
   },
   intro: {
     gap: 6,

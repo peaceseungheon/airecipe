@@ -1,211 +1,152 @@
-# 01 — Architect Baseline: 하단 탭바([홈 / 마이 레시피]) 도입
+# 01 — Architect Baseline: BottomTabBar 전 화면 노출 (ADR-017 D63)
 
-> Phase 3 SSOT 우선 설계 (architect 단독 선행). 기준 디렉토리 `airecipe-miniapp/`.
-> 발행 ADR: **ADR-017** (D53~D62). 07-ROUTING §7.8.1 갱신 완료.
-> 날짜: 2026-05-29
+> 사용자 요청(2026-05-30): "`src/components/BottomTabBar.tsx`가 모든 화면에서 보였으면 좋겠어."
+> 본 baseline은 ADR-017 D56(노출 범위 `/`·`/my-recipes` 한정)을 **D63으로 대체**하는 결정·스펙을 동결한다. 구현은 frontend.
 
----
-
-## A. 실증 검증 결과 (블로커 게이트 — frontend 착수 전 필독)
-
-### A.1 채택 방식 = (C) 커스텀 고정 하단 탭바
-
-| 후보 | 판정 | 코드 근거 (파일:라인) |
-|------|------|----------------------|
-| (A) Granite 1급 탭 라우팅 | **기각** | `node_modules/@granite-js/react-native/dist/index.d.ts:1-23` — 탭 네비게이터 export 0건. `src/router/Router.tsx:24,203` — Router는 항상 `<StackNavigator.Navigator>`만 마운트(네비게이터 주입 props 없음). `dist/router/createRoute.d.ts:7-15` — `screenOptions`는 `NativeStackNavigationOptions`만. `dist/router/utils/mergeParentLayoutScreen.d.ts` — `_layout`은 `FC<{children}>` 래퍼이지 탭 네비게이터 아님. |
-| (B) `@react-navigation/bottom-tabs` 직접 | **기각** | `package.json`/`pnpm-lock.yaml` 0건(미설치). 루트 네비게이터(StackNavigator) 고정이라 주입 슬롯 없음. 중첩 시 deep link 매칭(`getScreenPathMapConfig`)·진입 폴백 파손 + 번들/검수 리스크. |
-| **(C) 커스텀 고정 하단 탭바** | **채택** | TDS 프리미티브로 합성 가능(A.2). NativeStack 계약 유지, 새 라우트 0개, deep link 무영향. |
-
-**한 줄 근거**: Granite Router는 NativeStack을 고정 마운트하고 탭 네비게이터 export가 전무하며 TDS에 하단 탭바 전용 컴포넌트도 없으므로, 유일하게 계약-정합한 방법은 TDS 프리미티브 + RN Pressable로 합성한 고정 하단 바를 탭 노출 화면이 직접 렌더하는 것이다.
-
-### A.2 TDS 실재성 (검증 완료)
-
-| 사용 항목 | 실재 | 근거 |
-|-----------|------|------|
-| `Txt` | OK | `dist/esm/components/txt/Txt.d.ts`, 기존 전반 사용 |
-| `colors` | OK | `dist/esm/index.d.ts:64` (`export { colors } from '@toss/tds-colors'`) |
-| `Icon` | OK (단, `name: string` 자유 문자열) | `dist/esm/components/icon/Icon.d.ts:1-12` — `{ name: string; size?; color?; type? }`. ⚠️ 열거 아님 → 실재 검증된 name만(D60) |
-| `PressableEffect` | OK | `dist/esm/interactions/pressable-effect/index.d.ts` |
-| RN `Pressable`/`View` | OK | 기존 RecipeCard 등에서 사용 |
-| `Tab`(상단 세그먼트) | 부적합 | `dist/esm/components/tab/Tab.d.ts` — 하단 바 아님 |
-| `tab-view Tabs`(스와이프) | 부적합 | `dist/esm/extensions/tab-view/Tabs.d.ts` — 콘텐츠 TabView |
-
-**하단 탭바 전용 TDS 컴포넌트는 없다.** → `Txt`+`colors`(+선택적 `Icon`) + RN `Pressable`/`View` 합성.
-
-### A.3 ⚠️ appName 진입 폴백 회귀 (확인 — 본 작업에 포함, D62)
-
-- 현재: `granite.config.ts:7` → `appName: 'airecipe'`.
-- hotfix가 원복했어야 할 값: `'airecipe-miniapp'` (`_workspace_hotfix_entry_fallback/03_qa_report.md:21,101`, CLAUDE.md hotfix 표 #1).
-- monorepo 병합(`05ef27c`)이 hotfix 이전 값을 재도입 → **진입 시 `/_404` 폴백 회귀 상태**.
-- 탭바 도입과 별개로 앱이 홈 진입조차 못 하므로 **본 작업에서 동시 수정**.
+SSOT 인용: `docs/adr/ADR-017-bottom-tab-navigation.md`(D53~D63), `docs/appsintoss-port/07-ROUTING.md §7.8.1`, `docs/appsintoss-port/06-UI-MAPPING.md §6.1`. 백엔드 무변경(03-API-CONTRACT 영향 0).
 
 ---
 
-## B. Frontend 구현 명세 (그대로 따라 구현)
+## A. 결정 요약 (요구사항 1~4 판정)
 
-### B.1 [신규] `src/components/BottomTabBar.tsx` — 단일 SSOT 컴포넌트 (D57)
+### A.1 — active prop 비활성 상태 설계 (요구사항 1) → **`active: TabKey | 'none'`**
 
-```tsx
-import React, { useCallback } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
-import { useNavigation } from '@granite-js/react-native';
-import { Txt, colors } from '@toss/tds-react-native';
+비-탭 화면(generate/recommend/[id]/_404)은 활성 탭이 없다. `BottomTabBar.tsx`의 `active` prop 타입을 `TabKey` → `TabKey | 'none'`으로 확장하고, 탭 화면은 기존대로 `'home'|'my'`를, 비-탭 화면은 `'none'`을 전달한다.
 
-export type TabKey = 'home' | 'my';
+**내부 로직 점검(변경 불필요 — 타입만 확장하면 정합):**
 
-export interface BottomTabBarProps {
-  /** 현재 화면이 자신의 활성 탭을 명시 전달 (런타임 상태 의존 제거 — D57/§3.4) */
-  active: TabKey;
+| 지점 | 현재 코드 | `active==='none'` 시 동작 | 판정 |
+|------|-----------|---------------------------|------|
+| `handlePress` no-op 가드 | `if (key === active) return` | `'home'!=='none'` ∧ `'my'!=='none'` → 가드 미발동, 두 탭 모두 정상 navigate | ✅ 정확 |
+| 활성 판정 | `const isActive = tab.key === active` | 두 탭 모두 `false` | ✅ 어떤 탭도 강조 안 됨(의도) |
+| accessibilityState | `selected: isActive` | 두 탭 모두 `selected:false` | ✅ 비-탭 화면에서 "선택된 탭 없음" 정확 표현 |
+| 색 | `isActive ? orange500 : grey500` | 두 탭 모두 `grey500` | ✅ 전부 비활성색 |
+
+→ **`TABS` 배열·`map` 렌더·`navigate` 로직 전부 무변경.** `BottomTabBarProps.active` 타입과 JSDoc만 확장. `'none'`은 "활성 탭 없음" 센티넬일 뿐 탭 항목이 아니므로 `TABS`에 추가하지 않는다(렌더 영향 0).
+
+### A.2 — D55 재포커스 의미 (요구사항 3) → **의도대로. 변경 없음.**
+
+서브 화면은 `navigation.navigate('/recipe/...')`로 **push** 진입한다. 서브 화면에서 홈/마이 탭을 누르면 `navigation.navigate('/' | '/my-recipes', {})`가 호출된다. NativeStack에서 `navigate`는 **대상 라우트가 스택에 이미 있으면 그 라우트로 pop-to(재포커스), 없으면 push**한다. `/`·`/my-recipes`는 탭 진입점(스택 하부)이므로 탭 누름은 **스택을 깊게 만들지 않고 해당 탭 루트로 복귀**한다. 이는 탭 UX의 기대 동작과 정확히 일치 — D55 유지, 추가 결정 불필요.
+
+> 참고: `[id]`/`generate`/`recommend`는 자체 PageNavbar BackButton(또는 goBack 폴백)을 보유한다. 탭바의 navigate와 BackButton은 공존 가능하며 충돌하지 않는다(BackButton=한 단계 pop, 탭=탭 루트로 pop-to).
+
+### A.3 — _404 노출 타당성 (요구사항 4) → **노출(포함).**
+
+사용자가 "모든 화면" 명시. `_404`는 (1) 진입 deep link 미스매치 폴백, (2) 잘못된 경로 진입 시 표시된다. 탭바를 노출하면 사용자가 막다른 길에서 **탭으로 즉시 정상 화면(홈/마이)에 복귀**할 수 있어 UX상 이득이며, 요구사항의 "모든 화면"에도 부합한다. 활성 탭은 `'none'`.
+
+다만 `_404`는 `NotFoundScreen`(TDS `ErrorPage`)을 렌더하는 구조라 마운트 방식이 다른 페이지와 다르다(§B.5 참조). `ErrorPage`는 전체 화면을 차지하는 TDS 컴포넌트이므로, 탭바는 `ErrorPage`와 형제로 `View` 래퍼 하단에 배치한다. → **포함하되 마운트 패턴은 §B.5 전용 스펙을 따른다.**
+
+### A.4 — 마운트 지점·중복 마운트 (요구사항 2) → **§B 페이지별 스펙 표.**
+
+각 페이지는 `root` View(flex:1) 안에 `PageNavbar` + `ScrollView`(+오버레이) 구조다. 탭바는 **`ScrollView` 형제로 `root` View의 최하단**에 둔다(고정 바). 단, 일부 페이지는 **early-return 분기**(식별자 가드·404)가 있어 그 분기에도 별도 마운트가 필요하다(my-recipes의 식별자 가드가 이미 line 122에 중복 마운트한 선례 답습). 분기별 마운트 필요 여부는 §B 표의 "마운트 위치" 열에 정확히 명시한다.
+
+---
+
+## B. 페이지별 마운트 스펙 (frontend 구현 표)
+
+> 공통 규약:
+> - 탭바는 항상 `root` View(`flex:1`)의 **직속 자식, `ScrollView`/`ErrorPage` 다음 형제**로 배치(화면 하단 고정).
+> - early-return 하는 분기는 **각 분기의 `root` View 안에도** 동일하게 마운트(분기는 서로 다른 JSX 트리이므로 누락 시 그 분기에서 탭바가 사라짐).
+> - `scrollContent.paddingBottom`은 탭바 높이(대략 `paddingTop 8 + 라인 ~18 + paddingBottom 12 + border` ≈ 40~50px)에 가림 방지 여유를 더해 **24** 유지(현행 홈/마이 값과 통일). 탭바 자체가 `root` 하단 고정이고 ScrollView는 그 위 영역을 차지하므로, RN 레이아웃상 ScrollView 콘텐츠 최하단이 탭바에 가리지 않으려면 paddingBottom 확보가 필요. 기존 미적용 3개 페이지(generate/recommend/[id])는 **paddingBottom 24 신규 추가**.
+
+| # | 파일 | active 값 | 마운트 위치 (분기) | scrollContent.paddingBottom |
+|---|------|-----------|---------------------|------------------------------|
+| 1 | `pages/index.tsx` | `"home"` | 정상 1곳(이미 line 76) — 변경 없음 | 24 (이미 적용) |
+| 2 | `pages/my-recipes.tsx` | `"my"` | (a) 식별자 가드 분기(이미 line 122) (b) 정상 분기(이미 line 251) — 변경 없음 | 24 (이미 적용) |
+| 3 | `pages/recipe/generate.tsx` | `"none"` | 정상 1곳 — `</ScrollView>`(line 238) 다음, `root` View 닫기 전. early-return 없음(전 분기가 단일 ScrollView 내부) | **24 신규 추가** (현재 미적용) |
+| 4 | `pages/recipe/recommend.tsx` | `"none"` | (a) 식별자 가드 분기(line 49~62 `root` View 안, `</View>` 닫기 전) (b) 정상 분기 — `</ScrollView>`(line 148) 다음 | **24 신규 추가** (양 분기 scrollContent + 가드 분기는 ScrollView 없음 → 추가 paddingBottom 불요, 탭바만) |
+| 5 | `pages/recipe/[id].tsx` | `"none"` | (a) 식별자 가드 분기(line 113~126, `</View>` 닫기 전) (b) 404 분기(line 129~131 — `return <NotFoundScreen .../>`만 반환 → §B.4 처리) (c) 정상 분기 — `</ScrollView>`(line 213) 다음, `DeleteConfirmDialog` 형제 위치 그대로 | **24 신규 추가**(정상 분기 scrollContent) |
+| 6 | `pages/_404.tsx` | `"none"` | §B.5 — `NotFoundScreen`을 `View` 래퍼로 감싸고 탭바를 형제로 추가 | N/A (ScrollView 없음) |
+
+### B.1 — generate.tsx (#3)
+
+- import: `import { BottomTabBar } from '../../src/components/BottomTabBar';`
+- `</ScrollView>`(line 238) 다음 줄, `</View>`(root 닫기) 직전에 `<BottomTabBar active="none" />` 추가.
+- `styles.scrollContent`에 `paddingBottom: 24,` 추가.
+
+### B.2 — recommend.tsx (#4)
+
+- import 동일.
+- **식별자 가드 분기**(line 49~62): `</View>`(center) 다음, `root` `</View>` 직전에 `<BottomTabBar active="none" />` 추가. (이 분기는 ScrollView 없음 → paddingBottom 불요.)
+- **정상 분기**: `</ScrollView>`(line 148) 다음, root `</View>` 직전에 `<BottomTabBar active="none" />` 추가.
+- `styles.scrollContent`에 `paddingBottom: 24,` 추가.
+
+### B.3 — [id].tsx (#5)
+
+- import 동일.
+- **식별자 가드 분기**(line 113~126): `</View>`(center) 다음, root `</View>` 직전에 `<BottomTabBar active="none" />`.
+- **404 분기**(line 129~131): §B.4 처리 — `NotFoundScreen`을 `root` View로 감싸고 탭바 형제 추가.
+- **정상 분기**: `</ScrollView>`(line 213) 다음 — 현재 `DeleteConfirmDialog`가 ScrollView 형제로 있음. `<BottomTabBar active="none" />`를 `</ScrollView>`와 `DeleteConfirmDialog` 사이(또는 그 다음)에 형제로 추가. 다이얼로그는 오버레이라 순서 무관하나 가독성 위해 탭바를 ScrollView 직후에 둔다.
+- `styles.scrollContent`에 `paddingBottom: 24,` 추가.
+
+### B.4 — [id].tsx 404 분기 (특수)
+
+현재:
+```
+if (notFound) {
+  return <NotFoundScreen onBack={handleBack} />;
 }
-
-const TABS: { key: TabKey; label: string; path: '/' | '/my-recipes' }[] = [
-  { key: 'home', label: '홈', path: '/' },
-  { key: 'my', label: '마이 레시피', path: '/my-recipes' },
-];
-
-export function BottomTabBar({ active }: BottomTabBarProps) {
-  const navigation = useNavigation();
-
-  const handlePress = useCallback(
-    (key: TabKey, path: '/' | '/my-recipes') => {
-      if (key === active) return;          // 동일 탭 재탭 no-op
-      navigation.navigate(path, {});        // D55 — navigate(재포커스)
-    },
-    [navigation, active],
-  );
-
+```
+변경:
+```
+if (notFound) {
   return (
-    <View style={styles.bar}>
-      {TABS.map((tab) => {
-        const isActive = tab.key === active;
-        return (
-          <Pressable
-            key={tab.key}
-            style={styles.item}
-            onPress={() => handlePress(tab.key, tab.path)}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: isActive }}
-            accessibilityLabel={tab.label}
-          >
-            <Txt
-              typography="st11"
-              color={isActive ? colors.orange500 : colors.grey500}
-            >
-              {tab.label}
-            </Txt>
-          </Pressable>
-        );
-      })}
+    <View style={styles.root}>
+      <NotFoundScreen onBack={handleBack} />
+      <BottomTabBar active="none" />
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  bar: {
-    flexDirection: 'row',
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.grey200,
-    backgroundColor: colors.white,
-    paddingBottom: 12,   // SafeArea 폴백 (D61) — useSafeAreaInsets 실재 확인 시 교체
-    paddingTop: 8,
-  },
-  item: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 6,
-  },
-});
 ```
+`NotFoundScreen`(=`ErrorPage`)이 `flex:1`로 화면을 채우고 탭바가 하단 형제로 고정된다. `styles.root`는 이미 `flex:1` 존재 → 재사용.
 
-**검증 필수 (frontend):**
-1. 활성 색 = **`colors.orange500`(`#FF6B00`)** — QA 실증 확정(D59). `colors.primary`는 `@toss/tds-colors@0.1.0` **부재**(TS2339)이므로 사용 금지, `colors.blue500`은 브랜드 이질로 기각. **hex 직접 사용 금지.**
-2. `colors.orange500`/`grey200`/`grey500`/`white` — 실재 확인됨(orange500=`#FF6B00`).
-3. `Txt typography="st11"` — 기존 AI 면책 라인이 동일 레벨 사용(실재).
-4. (선택) 아이콘 추가 시 `Icon name` 실재성 AppsInToss MCP `search_tds_rn_docs`로 확인 후에만(D60). 미확인 시 라벨 only로 출하.
-5. SafeArea: `react-native-safe-area-context`/Granite 인셋 훅 실재 확인 후 `paddingBottom`을 `insets.bottom`으로. 미확인 시 위 상수 폴백 유지.
+### B.5 — _404.tsx (특수)
 
-### B.2 [수정] `src/pages/index.tsx` (홈)
-
-- D58: `PageNavbar.AccessoryButtons`/`AccessoryTextButton "마이 레시피"` 블록 **제거**. `handleOpenMyRecipes` 콜백도 제거. `PageNavbar`는 `Title`만 유지.
-- "오늘의 추천 받기" CTA(`handleOpenRecommend`)·SearchForm은 **유지**.
-- 화면 최하단에 `<BottomTabBar active="home" />` 추가. `root` 컨테이너는 `flex:1`이므로 ScrollView 아래에 형제로 배치(탭바가 항상 하단 고정).
-- ScrollView `contentContainerStyle`에 `paddingBottom: 24` 정도 추가(탭바 가림 방지 — D61).
-- import: `import { BottomTabBar } from '../components/BottomTabBar';`. `PageNavbar` 제거로 미사용 import 정리(`Button`은 추천 CTA에서 계속 사용).
-
-구조:
-```tsx
-<View style={styles.root}>
-  <PageNavbar><PageNavbar.Title>AI 레시피</PageNavbar.Title></PageNavbar>
-  <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-    {/* intro + SearchForm + 추천 CTA (기존) */}
-  </ScrollView>
-  <BottomTabBar active="home" />
-</View>
+`NotFoundScreen`만 반환하던 구조를 `View` 래퍼 + 탭바 형제로 변경:
 ```
-
-### B.3 [수정] `src/pages/my-recipes.tsx` (마이)
-
-- **화면 로직 변경 최소화** (목록/필터/페이지네이션/즐겨찾기/광고 그대로).
-- 최하단에 `<BottomTabBar active="my" />` 추가. 현재 구조의 최외곽 `View(flex:1)` 안, 콘텐츠(ScrollView 등) 다음 형제로.
-- ScrollView/콘텐츠 `paddingBottom` 확보(탭바 가림 방지).
-- 상단 `PageNavbar`의 BackButton은 유지(탭바와 별개 — 상세에서 돌아온 경우 등). 단 마이가 탭 진입의 종착이므로 BackButton 동작은 기존 그대로.
-- import: `import { BottomTabBar } from '../components/BottomTabBar';`.
-
-> 주의: 식별자 가드(`useTossUserId`)로 로딩/에러 분기가 화면 전체를 차지하는 경우에도 탭바는 보이는 게 자연스럽다. 분기 렌더가 `return` early인 구조라면, 탭바를 각 분기 바깥(최외곽 View 자식)으로 끌어올려 항상 렌더되게 한다.
-
-### B.4 [수정] `granite.config.ts` (D62 — 회귀 동시 수정)
-
-```ts
-appName: 'airecipe-miniapp',   // 'airecipe'에서 원복 — 진입 deep link prefix와 1:1 동기
+import { View, StyleSheet } from 'react-native';
+import { BottomTabBar } from '../src/components/BottomTabBar';
+...
+return (
+  <View style={styles.root}>
+    <NotFoundScreen title="..." subtitle="..." onBack={handleBack} />
+    <BottomTabBar active="none" />
+  </View>
+);
+const styles = StyleSheet.create({ root: { flex: 1 } });
 ```
-다른 필드(scheme/brand/env/ads) 변경 없음.
-
-### B.5 변경 없음 (확인용)
-
-- `src/router.gen.ts` — **변경 0**. 새 라우트 없음(D55). 기존 5라우트 그대로.
-- `src/_app.tsx` — **변경 0**. 탭바는 화면별 마운트라 Provider 추가 불필요.
-- `pages/*.tsx` shim 5개 — **변경 0**.
-- `src/services`·`hooks`·zod·types — **변경 0**. api-client 팀 no-op.
-- 스택 화면(`recipe/generate`·`[id]`·`recommend`)·`pages/_404.tsx` — **변경 0**(탭바 미렌더 D56).
-
-### B.6 [선택] AGENTS.md
-
-`src/components/AGENTS.md`에 `BottomTabBar` 행 1줄 추가(단일 하단 탭바 SSOT, 화면별 `active` prop 명시 전달, 색은 TDS 토큰). frontend가 컴포넌트 추가 시 동기.
+`_404`는 `colors`/`StyleSheet` 미import 상태 → `StyleSheet`·`View` import 추가 필요. `backgroundColor`는 `ErrorPage`가 자체 처리하므로 root에 불필요(flex:1만).
 
 ---
 
-## C. QA 검증 항목 (miniapp-qa)
+## C. BottomTabBar.tsx 변경 스펙 (frontend, 컴포넌트 1곳)
 
-| # | 항목 | 기대 |
-|---|------|------|
-| Q1 | typecheck | `pnpm typecheck` PASS |
-| Q2 | lint | `pnpm lint` 0 errors (router.gen.ts 누적 warning 1건 허용) |
-| Q3 | BottomTabBar 단일 컴포넌트 | `src/components/BottomTabBar.tsx` 1개. 중복 정의 0 (D57) |
-| Q4 | 탭 전환 | 홈↔마이 `navigation.navigate('/'|'/my-recipes', {})`. push 아님(D55) |
-| Q5 | 탭바 노출 범위 | `/`·`/my-recipes`만 렌더. generate/[id]/recommend/_404 **미렌더** (D56) — grep으로 BottomTabBar import가 두 화면에만 |
-| Q6 | 홈 중복 진입점 제거 | `index.tsx`에 `AccessoryTextButton "마이 레시피"` 부재 (D58). "오늘의 추천" CTA 유지 |
-| Q7 | 색 토큰 | hex 직접 사용 0건 — `colors.*`만 (ADR-015 D39). 활성/비활성 토큰 구분 |
-| Q8 | 아이콘 | (추가 시) `Icon name` 실재 검증 근거 첨부. 미검증이면 라벨 only |
-| Q9 | SafeArea | 하단 패딩 존재 + ScrollView paddingBottom으로 탭바 가림 없음 (D61) |
-| Q10 | **appName 회귀** | `granite.config.ts` `appName: 'airecipe-miniapp'` (D62). dev 진입 시 홈 정상(=`/_404` 미표시). `navigation.getState` `routes[0].path` 정상 매칭 |
-| Q11 | router.gen.ts | 변경 0 — 5라우트 그대로 |
-| Q12 | 데이터 경로 | api-client/hooks/zod 변경 0 (계약 무영향) |
+1. `export type TabKey = 'home' | 'my';` — **유지**(탭 항목 키는 2개 그대로).
+2. `BottomTabBarProps.active` 타입: `TabKey` → **`TabKey | 'none'`**.
+3. JSDoc `active` 설명에 "비-탭 화면은 `'none'` 전달 — 어떤 탭도 활성 아님(D63)" 1줄 추가.
+4. `handlePress`·`TABS`·`map`·`styles` 등 **그 외 전부 무변경**(§A.1 점검 결과 로직 정합).
 
-**Q10은 디바이스/샌드박스 dev 진입 실증이 최종 — 코드 측은 appName 문자열 1:1 확인까지.**
+> 상단 파일 헤더 JSDoc의 "탭 노출 화면(`/`·`/my-recipes`)이 직접 렌더" 문구는 "모든 화면이 직접 렌더(D63 — 비-탭 화면은 `active='none'`)"로 갱신 권장(주석 일관성). 로직 영향 없음.
 
 ---
 
-## D. SSOT 인용
+## D. SSOT 문서 갱신 위치 (architect 직접 갱신함 — §E)
 
-- ADR-017 §1(실증)·§2(D53~D62)·§3(정합성) — 본 작업 결정 SSOT.
-- 07-ROUTING §7.8.1 — 라우팅 측 SSOT(갱신 완료).
-- 06-UI-MAPPING §6.1 — TDS colors 토큰 의무(hex 금지, ADR-015 D39).
-- hotfix: `_workspace_hotfix_entry_fallback/03_qa_report.md` — appName 회귀 root cause.
+| 문서 | 위치 | 갱신 내용 |
+|------|------|----------|
+| `docs/adr/ADR-017-...md` | §2 카탈로그 + 변경 이력 | **D63 신규**(D56 대체), D56 원문 보존 + 전방 주석, `active:'none'` 결정 기록 |
+| `docs/appsintoss-port/07-ROUTING.md` | §7.8.1 노출 범위 표 | "스택/추천/_404 미렌더" → "전 화면 렌더(`active='none'`)"로 표 갱신 + D63 참조 |
+| `docs/appsintoss-port/06-UI-MAPPING.md` | BottomTabBar 관련(§6.1 색 규약은 불변) | 변경 불요(색 규약 그대로). 별도 BottomTabBar 행 없음 → 갱신 불필요 |
+| `src/components/AGENTS.md` | `BottomTabBar.tsx` 행 | "`/`·`/my-recipes` 두 화면만 마운트" → "**전 화면 마운트**(비-탭은 `active='none'`)" + props `{ active: 'home'\|'my'\|'none' }` |
+| `airecipe-miniapp/CLAUDE.md` | 현재 단계 절 | 하단 탭바 노출 범위 D63 갱신(frontend 구현 완료 후 오케스트레이터/architect 갱신) |
 
-## E. 팀 통지
+---
 
-- **frontend**: B.1~B.6 구현. 블로커 게이트 통과(방식 C 확정). 활성 색 `colors.orange500`(확정, D59). SafeArea 훅/Icon name은 실재 확인 후 채택(추측 금지).
-- **api-client**: no-op (계약 무영향).
-- **qa**: C의 Q1~Q12. Q10(appName)·Q5(노출 범위)·Q6(중복 제거) 우선.
-- **백엔드 영향**: 없음.
+## E. 완료 기준 (QA 인계)
+
+- BottomTabBar `active` 타입 `'home'|'my'|'none'`. typecheck PASS.
+- 6개 화면(index·my-recipes·generate·recommend·[id]·_404) + [id]의 식별자 가드/404/정상 3분기 + recommend의 가드/정상 2분기 모두에서 탭바 렌더.
+- 비-탭 화면에서 두 탭 모두 비활성색(grey500)·`selected:false`. 탭 누름 시 navigate 정상(재포커스).
+- generate/recommend/[id] scrollContent `paddingBottom:24` — 콘텐츠 탭바 가림 없음.
+- lint 0 errors(router.gen.ts 누적 warning 1건 허용).
+- 백엔드/api-client/zod/types/router.gen.ts 변경 0.

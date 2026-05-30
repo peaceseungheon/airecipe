@@ -32,8 +32,11 @@ import { Txt, colors } from '@toss/tds-react-native';
 export type TabKey = 'home' | 'my';
 
 export interface BottomTabBarProps {
-  /** 현재 화면이 자신의 활성 탭을 명시 전달 (런타임 상태 의존 제거 — D57/§3.4) */
-  active: TabKey;
+  /**
+   * 현재 화면이 자신의 활성 탭을 명시 전달 (런타임 상태 의존 제거 — D57/§3.4).
+   * 비-탭 화면은 `'none'` 전달 — 어떤 탭도 활성 아님(D63).
+   */
+  active: TabKey | 'none';
 }
 
 const TABS: { key: TabKey; label: string; path: '/' | '/my-recipes' }[] = [

@@ -31,6 +31,7 @@ import {
 } from '@toss/tds-react-native';
 import { createRoute, useNavigation } from '@granite-js/react-native';
 
+import { BottomTabBar } from '../../src/components/BottomTabBar';
 import { NutritionPanel } from '../../src/components/NutritionPanel';
 import { RecipeDisplay } from '../../src/components/RecipeDisplay';
 import { SearchForm } from '../../src/components/SearchForm';
@@ -236,6 +237,8 @@ function GeneratePage() {
           </Txt>
         ) : null}
       </ScrollView>
+
+      <BottomTabBar active="none" />
     </View>
   );
 }
@@ -248,6 +251,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 20,
     gap: 24,
+    paddingBottom: 24,
   },
   indicator: {
     padding: 20,
