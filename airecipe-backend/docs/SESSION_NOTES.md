@@ -376,14 +376,7 @@ Supabase 대시보드에서 `supabase/schema.sql` 실행 (테이블 생성)
 AIReceipe/
 ├── src/
 │   ├── app/
-│   │   ├── api/recipes/          # 6개 엔드포인트
-│   │   ├── auth/                 # login, signup
-│   │   ├── my-recipes/           # 마이 레시피 목록
-│   │   ├── recipe/               # generate, [id]
-│   │   ├── layout.tsx
-│   │   └── page.tsx              # 홈
-│   ├── components/               # 14개 (RecipeCard, NutritionPanel 등)
-│   ├── hooks/                    # 5개 (useRecipeGenerate, useMyRecipes, useRecipe, useAuth, api-client)
+│   │   └── api/                  # API 라우트 전용 (recipes, recommendations) — 화면 없음
 │   ├── lib/
 │   │   ├── ai/                   # AI Providers (Gemini 기본 / Claude 보존, Factory) — ADR-008
 │   │   └── supabase/             # client, server, middleware
