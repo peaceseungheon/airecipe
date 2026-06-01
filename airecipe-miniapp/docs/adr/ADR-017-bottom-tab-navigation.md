@@ -73,7 +73,9 @@ Granite NativeStack 위에, **항상 화면 하단에 고정 렌더되는 커스
 | **D59** | 활성 탭 색은 TDS **`colors.orange500`(`#FF6B00`)**, 비활성은 `colors.grey500`. brand primaryColor `#FF6B35`의 최근접 실재 토큰. hex 직접 사용 금지(ADR-015 D39) — **TDS 토큰만**. ⚠️ `colors.primary`는 `@toss/tds-colors@0.1.0`에 **부재**(QA 실증 TS2339), `colors.blue500`은 실재하나 브랜드(주황)와 이질이라 기각. 근거·기각안 §3.3. | ADR-015 D39 hex 금지 + QA 실증 |
 | **D60** | 탭 항목 표현은 **라벨(Txt) 우선**. `Icon`은 `name`이 실재 검증된 경우에만 추가(§3.2). 실재 미확인 시 라벨 only로 출하 — 검수·런타임 안전. | §1.3 Icon.name 자유 문자열 리스크 |
 | **D61** | 하단 SafeArea 패딩 처리 필수(홈 인디케이터 영역). RN `useSafeAreaInsets` 또는 TDS 제공 인셋 훅 실재 확인 후 적용; 미확인 시 `paddingBottom` 상수 폴백. ScrollView 콘텐츠가 탭바에 가리지 않도록 `contentContainerStyle`에 `paddingBottom` 확보. | iOS 홈바 겹침 방지 |
-| **D62** | **[정합성 회귀 동시 수정]** `granite.config.ts` `appName`을 `'airecipe'` → **`'airecipe-miniapp'`로 원복**. 진입 deep link prefix(`intoss://airecipe-miniapp`)와 1:1 동기. 탭바 도입과 무관하게 현재 진입이 `_404`로 떨어지는 회귀 상태이므로 본 작업에 포함. | 아래 §3.1 |
+| **D62** | ~~**[정합성 회귀 동시 수정]** `granite.config.ts` `appName`을 `'airecipe'` → `'airecipe-miniapp'`로 원복.~~ **🚫 폐기(2026-06-01)** — 아래 정정 참조. | 아래 §3.1 |
+
+> **🚫 D62 폐기 정정 (2026-06-01)**: D62는 콘솔 등록 deep link prefix를 `'airecipe-miniapp'`으로 **오판**했다. 실제 콘솔 등록 앱이름은 **`airecipe`**이며, 커밋 `c491ac6`("앱인토스 콘솔에 저장되어 있는 앱이름으로 수정")가 `appName: 'airecipe'`로 의도적으로 재설정한 것이 정본이다(사용자 확정 2026-06-01). **`appName`은 `'airecipe'`이며, `'airecipe-miniapp'`으로 바꾸지 말 것.** D62 및 §3.1의 회귀 진단은 잘못된 전제(콘솔 prefix=`airecipe-miniapp`)에 기반했으므로 무효. hotfix root cause #1(CLAUDE.md)도 동일하게 무효.
 
 ---
 
@@ -120,13 +122,15 @@ D56은 "글로벌 탭바를 끼울 루트 슬롯이 없으니 탭이 보여야 �
 
 ## 3. 정합성·리스크
 
-### 3.1 ⚠️ appName 진입 폴백 회귀 (실재 확인 — 본 ADR로 동시 수정)
+### 3.1 ~~⚠️ appName 진입 폴백 회귀~~ 🚫 오진단 폐기 (2026-06-01)
 
-CLAUDE.md hotfix 기록과 `_workspace_hotfix_entry_fallback/01_architect_baseline.md`(line 6)는 `appName`을 `'airecipe-miniapp'`로 **원복했다고 명시**하나, 현재 `granite.config.ts:7`은 `appName: 'airecipe'`다(검증 확인). monorepo 병합(commit `05ef27c`)이 hotfix 이전 값을 재도입한 것으로 보인다.
+> **🚫 본 절은 잘못된 진단이었음 (2026-06-01 정정).** 아래 분석은 콘솔 등록 deep link prefix가 `'airecipe-miniapp'`이라고 **오판**한 데서 출발했다. 실제 콘솔 등록 앱이름은 **`airecipe`**이고, 커밋 `c491ac6`("콘솔에 저장된 앱이름으로 수정")가 `appName: 'airecipe'`로 맞춘 것이 정본이다(사용자 확정). 따라서 D62의 "`airecipe-miniapp` 원복"은 폐기됐고, `appName`은 `'airecipe'`가 맞다. 아래 원문은 이력 보존용.
 
-영향: 진입 deep link `intoss://airecipe-miniapp`에서 prefix를 strip한 결과가 `"-miniapp"` 잔여가 되어 어떤 라우트와도 매칭되지 않고 wildcard → `/_404`로 폴백한다(hotfix root cause #1과 동일). **탭바 도입 전에 이 회귀를 고치지 않으면 앱이 홈에 진입조차 못 한다.** → D62.
+~~CLAUDE.md hotfix 기록과 `_workspace_hotfix_entry_fallback/01_architect_baseline.md`(line 6)는 `appName`을 `'airecipe-miniapp'`로 원복했다고 명시하나, 현재 `granite.config.ts:7`은 `appName: 'airecipe'`다(검증 확인). monorepo 병합(commit `05ef27c`)이 hotfix 이전 값을 재도입한 것으로 보인다.~~
 
-검수 정책(출시 전 필수): 콘솔 등록 deep link prefix ↔ `granite.config.ts` `appName` 1:1 동기. 별 ADR 없이 본 ADR에 동결.
+~~영향: 진입 deep link `intoss://airecipe-miniapp`에서 prefix를 strip한 결과가 `"-miniapp"` 잔여가 되어 어떤 라우트와도 매칭되지 않고 wildcard → `/_404`로 폴백한다.~~ → **무효(위 정정 참조).**
+
+검수 정책(출시 전 필수): 콘솔 등록 deep link prefix ↔ `granite.config.ts` `appName`(=`airecipe`) 1:1 동기 확인.
 
 ### 3.2 Icon.name 자유 문자열 리스크 (D60)
 

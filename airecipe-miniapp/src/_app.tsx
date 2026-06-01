@@ -6,6 +6,8 @@ import { context } from '../require.context';
 import { RecipeCacheProvider } from './hooks/useRecipeCache';
 import { TossUserIdProvider } from './hooks/useTossUserId';
 
+import * as Sentry from '@sentry/react-native';
+
 /**
  * AppContainer — 전역 Provider 마운트 지점.
  *
@@ -21,4 +23,18 @@ function AppContainer({ children }: PropsWithChildren<InitialProps>) {
   );
 }
 
-export default AppsInToss.registerApp(AppContainer, { context });
+const SENTRY_DSN = import.meta.env.SENTRY_DSN;
+
+if (SENTRY_DSN && import.meta.env.APP_ENV !== 'local') {
+  Sentry.init({
+    dsn: SENTRY_DSN,
+    environment: import.meta.env.APP_ENV,
+    sendDefaultPii: false,
+    enableLogs: false,
+    enableNative: false,
+  });
+}
+
+const app = Sentry.wrap(AppContainer);
+
+export default AppsInToss.registerApp(app, { context });

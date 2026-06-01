@@ -28,8 +28,10 @@
 |------|---------|------|---------|
 | `API_BASE_URL` | `https://aireceipe.example.com` | 백엔드 베이스 URL (현재 Vercel 배포) | 공개 가능 (URL은 비밀이 아님) |
 | `APP_ENV` | `"production"` \| `"staging"` \| `"local"` | 환경 구분 | 공개 |
-| `SENTRY_DSN` (선택) | `https://...@sentry.io/...` | 에러 트래킹 | 공개 (DSN은 공개 키) |
+| `SENTRY_DSN` (선택) | `https://...@sentry.io/...` | 에러 트래킹 런타임 init (ADR-019). 미설정 또는 `APP_ENV=local`이면 init 스킵 | 공개 (DSN은 공개 키) |
 | `LOG_LEVEL` (선택) | `"info"` \| `"debug"` | 로깅 레벨 | 공개 |
+
+> **Sentry 소스맵 업로드(CI 전용, ADR-019)**: `SENTRY_AUTH_TOKEN`·`SENTRY_ORG`·`SENTRY_PROJECT`는 `@granite-js/plugin-sentry`가 **빌드 시점에만** 사용하며 **미니앱 번들에 인라인되지 않는다**. CI 시크릿으로만 주입하고, 토큰 부재 시 plugin은 no-op(로컬/기여자 빌드 안전). `SENTRY_AUTH_TOKEN`은 비공개 — 절대 `.env`·번들·콘솔 공개 값에 두지 않는다.
 
 > **금지 항목**: `GEMINI_API_KEY`, `ANTHROPIC_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY`(미니앱 경로 미사용), DB URL — 모두 미니앱에 두지 않는다. 미니앱이 알 필요가 없으며, 클라이언트 번들에 노출되면 즉시 키 침해다.
 
@@ -74,7 +76,8 @@ export default defineConfig({
 
   // 2. RFC-1123 호환 appName — 콘솔에 등록한 앱 ID와 동일해야 함
   //    소문자, 숫자, 하이픈만. 시작/끝은 영숫자. 1~63자.
-  appName: 'aireceipe',
+  //    ⚠️ 본 앱의 정본은 'airecipe'(콘솔 등록명). 'airecipe-miniapp'으로 바꾸지 말 것(ADR-017 D62 폐기).
+  appName: 'airecipe',
 
   plugins: [
     appsInToss({
@@ -219,7 +222,7 @@ if (appEnv === 'production') {
 - [ ] `API_BASE_URL`은 HTTPS만 (production/staging). HTTP는 local 한정.
 - [ ] CORS 화이트리스트가 와일드카드 아님.
 - [ ] `X-Toss-User-Id` 헤더 값은 `getAnonymousKey()` 반환 hash. UI 노출 금지.
-- [ ] Sentry/로깅에서 PII 마스킹 (요리명은 PII 아님, 다만 사용자가 입력한 자유 텍스트 로그 정책 검토).
+- [x] Sentry PII 차단 (ADR-019 D68) — `sendDefaultPii: false` + `enableLogs: false`로 IP/쿠키/유저·자유 텍스트 자동 수집 차단. `enableNative: false`(미니앱 네이티브 Sentry 미탑재). `SENTRY_AUTH_TOKEN`은 CI 시크릿(번들 미포함).
 - [ ] `permissions: []` — 본 Sprint는 추가 권한 불필요. 추가 시 검수 가이드 준수.
 
 ## 9.6 출시 정책 점검 (앱인토스 검수)

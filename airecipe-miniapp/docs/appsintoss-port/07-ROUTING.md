@@ -486,7 +486,7 @@ function GeneratePage() {
 
 **활성 색** = TDS `colors.orange500`(`#FF6B00`, brand `#FF6B35` 최근접 실재 토큰 — D59), 비활성 = `colors.grey500`. ⚠️ `colors.primary`는 `@toss/tds-colors@0.1.0`에 **부재**(TS2339)라 사용 불가(§3.3). hex 직접 사용 금지(ADR-015 D39). 아이콘은 `Icon.name`이 자유 문자열이라 실재 검증 시에만 추가, 미검증 시 라벨 only(D60). 하단 SafeArea 패딩 + ScrollView `paddingBottom` 확보(D61).
 
-> ⚠️ **appName 회귀 동시 수정(D62)**: 현재 `granite.config.ts:7` `appName: 'airecipe'`는 hotfix가 원복했어야 할 `'airecipe-miniapp'`이 monorepo 병합으로 되돌아간 회귀 상태다. 진입 deep link prefix와 미스매치 → `/_404` 폴백. 탭바 도입 전 `'airecipe-miniapp'`로 원복 필수. 콘솔 등록 deep link prefix ↔ `appName` 1:1 동기는 출시 전 검증 의무.
+> ✅ **appName 정정(2026-06-01, ADR-017 D62 폐기)**: `granite.config.ts` `appName`의 정본은 **`airecipe`**다 — 앱인토스 콘솔 등록명과 1:1(커밋 `c491ac6` "콘솔 앱이름으로 수정"). ADR-017 D62가 `'airecipe-miniapp'`로 원복하라고 한 것은 콘솔 deep link prefix를 오판한 잘못된 지시이며, `c491ac6` + 사용자 확정으로 **폐기**됐다. **appName을 `airecipe-miniapp`으로 바꾸지 말 것.** 콘솔 등록 deep link prefix ↔ `appName` 1:1 동기는 출시 전 검증 의무.
 
 ## 7.9 검증 절차 (QA가 확인할 항목)
 

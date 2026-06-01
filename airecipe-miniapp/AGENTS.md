@@ -24,7 +24,7 @@
 
 ### `pages/` — Granite 파일 기반 라우팅
 
-- **책임**: 각 화면의 라우트 구현 정본. `intoss://airecipe-miniapp/<path>` 자동 매핑. 라우트 구현은 이 디렉터리 단일 계층(ADR-018 — 이전 `src/pages/` shim 2계층 제거).
+- **책임**: 각 화면의 라우트 구현 정본. `intoss://airecipe/<path>` 자동 매핑(prefix = `scheme://appName`). 라우트 구현은 이 디렉터리 단일 계층(ADR-018 — 이전 `src/pages/` shim 2계층 제거).
 - **핵심 규약**: `createRoute('/...')` 패턴. 비즈니스 로직은 화면 결합만 — presentational은 `src/components/`로 위임(`../src/...`/`../../src/...` 참조). `src/pages/` 신규 생성 금지.
 - **주요 파일**: `index.tsx`(홈), `my-recipes.tsx`, `recipe/{generate,recommend,[id]}.tsx`, `_404.tsx`(404). 상세는 `pages/AGENTS.md`.
 - **SSOT**: `docs/appsintoss-port/07-ROUTING.md` + `pages/AGENTS.md`.

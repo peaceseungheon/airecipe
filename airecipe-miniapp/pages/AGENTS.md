@@ -60,7 +60,7 @@
 ## 라우트 등록 정책 (출시 점검 영향)
 
 - **등록 라우트** — `/`, `/recipe/generate`, `/my-recipes`, `/recipe/[id]`, `/recipe/recommend`. `src/router.gen.ts` 자동 갱신, 수동 수정 금지.
-- 새 화면 추가 시 출시 검수 도메인 화이트리스트·딥링크(`intoss://airecipe-miniapp/...`) 영향 점검 (07 §7.6, 09-ENV-CONFIG).
+- 새 화면 추가 시 출시 검수 도메인 화이트리스트·딥링크(`intoss://airecipe/...`, prefix = `scheme://appName`) 영향 점검 (07 §7.6, 09-ENV-CONFIG).
 - 비기능 화면(about 등) 추가 시 노출 영향 별 점검 (`appsintoss-publish-checklist` 스킬).
 
 ## 진입점

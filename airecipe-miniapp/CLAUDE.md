@@ -50,7 +50,7 @@ AI 레시피 안내 — 앱인토스 미니앱 (React Native + Granite + TDS).
 | React | `19.2.x` |
 | TDS | `@toss/tds-react-native` (비게임 필수) |
 | 환경변수 | `@granite-js/plugin-env` (빌드 시점 주입, `import.meta.env`) |
-| 라우팅 | 파일 기반 (`pages/` 디렉터리 = `intoss://airecipe-miniapp/<path>`) |
+| 라우팅 | 파일 기반 (`pages/` 디렉터리 = `intoss://airecipe/<path>`, prefix = `scheme://appName`) |
 | 패키지 매니저 | pnpm |
 | 린트/포맷 | eslint + prettier |
 | 테스트 | jest + `@testing-library/react-native` |
@@ -70,7 +70,29 @@ AI 레시피 안내 — 앱인토스 미니앱 (React Native + Granite + TDS).
 
 ## 현재 단계
 
-**라우트 구현을 라우팅 루트 `pages/`로 통합(ADR-018) + 하단 탭바(ADR-017) → 디바이스 진입 실증 + 백엔드/출시 외부 작업 PENDING** (2026-05-30).
+**Sentry 에러 트래킹 Granite 정식 경로 정렬(ADR-019) → 라우트 `pages/` 통합(ADR-018) + 하단 탭바(ADR-017) → 디바이스 진입 실증 + 백엔드/출시/Sentry 콘솔 외부 작업 PENDING** (2026-06-01).
+
+### Sentry 설정 검토·정렬 (ADR-019, 2026-06-01)
+
+사용자 요청("Sentry 설정 검토")으로 점검 → bare RN wizard 기본 설정이 Granite 미니앱 환경과 불일치(5문제) 확인 후 정렬. **미니앱 단독·백엔드 무변경.** typecheck PASS, lint 0 errors(router.gen.ts 누적 warning 1건).
+
+5문제 → 6결정(ADR-019 D64~D69):
+- **D64** 소스맵은 `@granite-js/plugin-sentry`로 일원화 — `granite.config.ts` plugins 말미에 `sentry()` 추가, `metro.config.cjs` `withSentryConfig` 제거(Granite 자체 번들러는 metro 경유 안 함).
+- **D65** 빌드 플러그인은 `SENTRY_AUTH_TOKEN` 존재 시에만 `enabled` — 토큰 부재 시 no-op(로컬/기여자 빌드 안전), 토큰/org/project는 CI 시크릿(번들 미포함).
+- **D66** 런타임 init 환경 게이팅 — `APP_ENV==='local'` OR DSN 미설정 시 `Sentry.init` 스킵(ADR-014 D27 ads noop과 동일 정책).
+- **D67** DSN·environment는 plugin-env 주입(`import.meta.env.SENTRY_DSN`/`APP_ENV`), 하드코딩 제거.
+- **D68** PII 차단 — `sendDefaultPii:false`+`enableLogs:false`(코드 규칙 6·09 §9.5).
+- **D69** 네이티브 의존 통합 미사용 — `enableNative:false` 유지, `mobileReplay`/`feedback`/replay 샘플레이트 제거(JS 에러 캡처만 유효).
+
+산출: `granite.config.ts`(sentry 플러그인 + SENTRY_DSN env. appName은 `airecipe` 불변)·`metro.config.cjs`·`src/_app.tsx`·`src/types/env.d.ts`·`src/env.d.ts`(수동 sync, D38 선례) + `docs/adr/ADR-019` 신규 + 09 §9.1.1/§9.5 갱신 + `.env.example`/`.env.production` 주석 갱신.
+
+> **appName 정정 (2026-06-01)**: `granite.config.ts` `appName`의 정본은 **`airecipe`**(콘솔 등록명, 커밋 `c491ac6`). ADR-017 D62의 "`airecipe-miniapp` 원복" 지시는 콘솔 deep link prefix를 오판한 것으로 **폐기**한다. 앞으로 appName을 `airecipe-miniapp`으로 바꾸지 말 것. (아래 hotfix root cause #1 표·D62 기록은 당시 판단의 이력으로 남기되, 결론은 본 정정이 우선.)
+
+**외부 작업 PENDING(ADR-019)**: Sentry 콘솔 org/project slug 확정 + CI `SENTRY_AUTH_TOKEN`/`SENTRY_ORG`/`SENTRY_PROJECT` 시크릿 등록 + staging/prod 빌드 `SENTRY_DSN` 주입 + 실 송출·소스맵 수신 검증.
+
+### 라우트 `pages/` 통합 — `src/pages/` shim 제거 (ADR-018, 2026-05-30)
+
+사용자 요청("`src/pages/` 파일들을 라우팅 루트 `pages/`에 통합")에 따라, `pages/`(shim 재export) + `src/pages/`(실구현) 2계층을 **루트 `pages/` 단일 계층**으로 통합. `require.context('./pages')`·자동 생성 `src/router.gen.ts`(`from '../pages/'`)가 본디 루트 `pages/`를 가리키므로 Granite 메커니즘상 안전. `_404.tsx`가 이미 쓰던 `../src/components/...` 패턴으로 5개 라우트 정렬. **미니앱 단독·백엔드 무변경.**
 
 ### 라우트 `pages/` 통합 — `src/pages/` shim 제거 (ADR-018, 2026-05-30)
 
@@ -88,7 +110,7 @@ AI 레시피 안내 — 앱인토스 미니앱 (React Native + Granite + TDS).
 - **단일 SSOT** `BottomTabBar` props `{ active: 'home'|'my' }` — 탭 노출 화면이 직접 마운트, 탭 누름 → `navigation.navigate(path, {})`. **새 라우트·router.gen.ts 변경 0**(D55).
 - 노출 범위: ~~`/`·`/my-recipes`만(D56)~~ **→ 전 화면(D63, 2026-05-30 — 아래 절 참조).** 홈 `AccessoryTextButton "마이 레시피"` 제거(D58, 중복). "오늘의 추천" CTA 유지.
 - 활성 탭 색 `colors.orange500`(`#FF6B00`) — brand `#FF6B35` 최근접 실재 토큰(D59). `colors.primary` 부재(TS2339)·`blue500` 브랜드 이질 기각. hex 금지(ADR-015 D39).
-- **appName 회귀 동시 수정(D62)** — `granite.config.ts` `appName: 'airecipe' → 'airecipe-miniapp'`. monorepo 병합(`05ef27c`)이 직전 hotfix 원복값을 되돌린 실재 회귀, 미수정 시 진입 `/_404` 폴백.
+- ~~**appName 회귀 동시 수정(D62)** — `granite.config.ts` `appName: 'airecipe' → 'airecipe-miniapp'`.~~ **🚫 폐기(2026-06-01)** — appName 정본은 `'airecipe'`(콘솔 등록명, 커밋 `c491ac6`). D62는 오진단이었음. 위 "appName 정정" 절 참조.
 
 코드 산출:
 - `src/components/BottomTabBar.tsx` (신규) — 단일 하단 탭바 SSOT.

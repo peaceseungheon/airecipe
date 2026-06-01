@@ -54,7 +54,7 @@ Granite 파일 기반 라우팅의 실제 라우팅 루트는 **미니앱 루트
 - **트레이드오프**: ADR-010/011/012/013/014/016/017 및 `06-UI-MAPPING`/`10-SPRINT-PLAN`의 본문이 `src/pages/...` 경로를 인용한다. 과거 결정 서술은 시점 기록으로 보존하되, 각 ADR 상단에 본 ADR로의 전방 참조 주석을 추가하고, **현재 상태를 서술하는 살아있는 문서**(루트/미니앱 `AGENTS.md`, `CLAUDE.md`, `06`/`10`/`11`)의 경로 표기를 `pages/`로 갱신한다.
 - **회귀 기준**: `pnpm typecheck` 0 errors(누적 `router.gen.ts` lint warning 1건은 ADR-010 §6.4의 알려진 자동 생성 한계로 무관). 라우트 4개(`/`, `/recipe/generate`, `/my-recipes`, `/recipe/[id]`) 등록 불변. `recipe/recommend`는 `_app.tsx` context로 자동 등록(스택 화면).
 - **영향 챕터**: 07-ROUTING(라우트=파일 경로 규약은 불변, 디렉터리만 `pages/`로 정합), 06-UI-MAPPING(코드 인용 경로), 10-SPRINT-PLAN(산출물 경로), 11-ADS(grep 가드 경로).
-- **검수 영향 없음**: 라우트 경로·딥링크(`intoss://airecipe-miniapp/<path>`)·도메인 화이트리스트 불변. 콘솔 등록에 영향 없음.
+- **검수 영향 없음**: 라우트 경로·딥링크(`intoss://airecipe/<path>`, prefix = `scheme://appName`)·도메인 화이트리스트 불변. 콘솔 등록에 영향 없음.
 
 ## 참조
 

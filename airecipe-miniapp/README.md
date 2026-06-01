@@ -20,13 +20,13 @@ cp .env.example .env.local
 pnpm dev:local
 ```
 
-토스 샌드박스 앱에서 `intoss://airecipe-miniapp`를 입력하여 진입. 자세한 절차는 `docs/appsintoss-port/09-ENV-CONFIG.md` 참조.
+토스 샌드박스 앱에서 `intoss://airecipe`를 입력하여 진입(딥링크 prefix = `scheme://appName` = `intoss://` + `airecipe`). 자세한 절차는 `docs/appsintoss-port/09-ENV-CONFIG.md` 참조.
 
 ## 디렉터리 구조
 
 ```
 airecipe-miniapp/
-├── pages/                    # 파일 기반 라우팅 (intoss://airecipe-miniapp/<path>)
+├── pages/                    # 파일 기반 라우팅 (intoss://airecipe/<path>)
 ├── src/
 │   ├── _app.tsx              # 앱 컨테이너
 │   ├── components/           # TDS 기반 재사용 컴포넌트
