@@ -190,17 +190,25 @@ export async function apiFetch(path: string, init?: RequestInit & { tossUserId?:
 
 ### 9.4.1 환경별 빌드
 
-```bash
-# package.json scripts (예시)
+> **중요 — plugin-env는 `.env` 파일을 읽지 않는다.** `@granite-js/plugin-env`는 `granite.config.ts`의 `env({...})`에 넘긴 객체 리터럴(각 값은 `process.env.X ?? 기본값`)을 빌드 시점에 인라인할 뿐이다. `ait`/granite CLI 역시 `.env`를 `process.env`로 자동 로드하지 않는다(Node도 `--env-file` 없이는 미로드). 따라서 **`.env.*` 파일을 빌드에 반영하려면 `dotenv-cli`로 `process.env`를 먼저 채워야 한다.**
+
+빌드 스크립트는 `dotenv-cli`로 환경별 `.env.*` 파일을 로드해 `ait build` 자식 프로세스의 `process.env`에 주입한다:
+
+```jsonc
+// package.json scripts (실제 동결값)
 "scripts": {
-  "dev:local":      "APP_ENV=local      API_BASE_URL=http://localhost:3000 granite dev",
-  "dev:staging":    "APP_ENV=staging    API_BASE_URL=https://aireceipe-staging.vercel.app granite dev",
-  "build:staging":  "APP_ENV=staging    API_BASE_URL=https://aireceipe-staging.vercel.app granite build",
-  "build:prod":     "APP_ENV=production API_BASE_URL=https://aireceipe.example.com granite build"
+  "dev:local":      "APP_ENV=local API_BASE_URL=http://localhost:3000 granite dev",
+  "dev:staging":    "APP_ENV=staging API_BASE_URL=https://aireceipe-staging.vercel.app granite dev",
+  "build:staging":  "dotenv -e .env.staging -- ait build",
+  "build:prod":     "dotenv -e .env.production -- ait build"
 }
 ```
 
-또는 `.env.local`, `.env.staging`, `.env.production`을 두고 CI에서 환경에 맞는 파일을 선택.
+- 주입 체인: `dotenv -e <파일>` → 자식 `process.env` 채움 → `ait build`가 `granite.config.ts` 평가 → `env({...})`가 `process.env`를 읽어 `import.meta.env`로 인라인.
+- `.env.local` / `.env.staging` / `.env.production`은 모두 `.gitignore` 대상(로컬·CI 주입). `.env.example`을 복사해 값 채움.
+- `dotenv-cli`는 대상 파일이 없으면 **에러 없이 통과**(vars 미설정 → `granite.config.ts` 기본값으로 폴백)하므로, staging/prod 빌드 전 해당 `.env.*` 파일 존재를 확인한다.
+- `SENTRY_AUTH_TOKEN`(소스맵 업로드, ADR-019)은 `.env.*`가 아니라 **CI 시크릿**으로만 주입한다(번들 미포함).
+- `dev:local`/`dev:staging`은 로컬 개발 편의를 위해 인라인 env 유지(파일 불필요).
 
 ### 9.4.2 import.meta.env 접근
 
