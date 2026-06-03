@@ -42,12 +42,14 @@ npx vercel --prod # 프로덕션 배포
 
 > 깔끔한 경로(`/terms`, `/privacy`)를 원하면 Vercel `vercel.json`의 `cleanUrls: true`를 추가하거나, 파일명을 `terms/index.html` 구조로 바꾼다(현재는 단순화를 위해 `.html` 그대로).
 
-## 출시 전 확정 필요 (placeholder)
+## 사업자 정보 확정 완료 (2026-06-03)
 
-본문에 `<span class="todo">[ ]</span>`로 강조된 항목을 실제 값으로 교체해야 한다 (콘솔 등록값과 동기):
+placeholder를 실제 값으로 교체 완료 (인앱 `pages/terms.tsx`·`privacy.tsx`와 동기):
 
-- `terms.html` 제10조 — `[관할 법원]` (사업자 소재지 기준)
-- `privacy.html` 제7절 — `[보호책임자 성명·직책]`, `[고객센터 채널]`
-- 사업자 법인명·대표자 등 식별 정보(필요 시 본문에 추가)
+- `terms.html` 제2조 4호 — 서비스 제공자 "디지털공방"
+- `terms.html` 제10조 — 별도 합의 관할 없이 「민사소송법」 기준 (placeholder 제거)
+- `privacy.html` 제7절 — 개인정보처리자 "디지털공방", 보호책임자 "이승헌", 문의 tmdgis19@gmail.com
+
+> ⚠️ 본문 이원화: 위 값은 인앱(`airecipe-miniapp/pages/*.tsx`)과 본 외부 HTML 두 곳에 존재한다. 수정 시 양쪽 동기 필수. (`.todo` 강조 CSS는 향후 placeholder용으로 보존)
 
 생성된 본문은 표준 보일러플레이트이므로 **실제 운영 형태에 맞춘 법무 검토 후 확정**을 권장한다. (근거: `airecipe-miniapp/docs/adr/ADR-020-legal-static-pages.md`)

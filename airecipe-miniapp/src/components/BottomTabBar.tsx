@@ -8,10 +8,13 @@
  * - Granite Router는 NativeStack을 고정 마운트하고 1급 탭 네비게이터 export가 없으며
  *   TDS에 하단 탭바 전용 컴포넌트도 없다(ADR-017 §1). → 유일하게 계약-정합한 방식은
  *   TDS 프리미티브(Txt/colors) + RN Pressable/View로 합성한 고정 하단 바를
- *   탭 노출 화면(`/`·`/my-recipes`)이 직접 렌더하는 것(D53).
+ *   탭 노출 화면(`/`·`/recipe`·`/my-recipes`)이 직접 렌더하는 것(D53).
+ *
+ * ADR-021(요리 기록 피드): 2탭(홈/마이) → 3탭(피드 `/`·레시피 `/recipe`·마이 `/my-recipes`)
+ *   재편. `TabKey`를 `'feed'|'recipe'|'my'`로 확장. `'none'` 센티넬·로직 불변.
  *
  * 정책:
- * - 단일 SSOT 컴포넌트(D57). 홈/마이가 각각 `<BottomTabBar active="home"|"my" />` 1줄로 마운트.
+ * - 단일 SSOT 컴포넌트(D57). 피드/레시피/마이가 각각 `<BottomTabBar active="feed"|"recipe"|"my" />` 1줄로 마운트.
  * - 탭 전환은 `navigation.navigate(path, {})` (push 아님 — 재포커스, D55). 새 라우트 0개.
  * - 활성 판정은 화면이 명시 전달한 `active` prop(런타임 라우트 상태 의존 제거, §3.4).
  * - 색은 TDS `colors` 토큰만 — 활성 `colors.orange500` / 비활성 `colors.grey500`.
@@ -29,7 +32,10 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { useNavigation } from '@granite-js/react-native';
 import { Txt, colors } from '@toss/tds-react-native';
 
-export type TabKey = 'home' | 'my';
+export type TabKey = 'feed' | 'recipe' | 'my';
+
+/** 탭 루트 경로 (ADR-021 — 3탭 재편: 피드/레시피/마이). */
+type TabPath = '/' | '/recipe' | '/my-recipes';
 
 export interface BottomTabBarProps {
   /**
@@ -39,8 +45,9 @@ export interface BottomTabBarProps {
   active: TabKey | 'none';
 }
 
-const TABS: { key: TabKey; label: string; path: '/' | '/my-recipes' }[] = [
-  { key: 'home', label: '홈', path: '/' },
+const TABS: { key: TabKey; label: string; path: TabPath }[] = [
+  { key: 'feed', label: '피드', path: '/' },
+  { key: 'recipe', label: '레시피', path: '/recipe' },
   { key: 'my', label: '마이 레시피', path: '/my-recipes' },
 ];
 
@@ -48,7 +55,7 @@ export function BottomTabBar({ active }: BottomTabBarProps) {
   const navigation = useNavigation();
 
   const handlePress = useCallback(
-    (key: TabKey, path: '/' | '/my-recipes') => {
+    (key: TabKey, path: TabPath) => {
       if (key === active) return; // 동일 탭 재탭 no-op
       navigation.navigate(path, {}); // D55 — navigate(재포커스)
     },

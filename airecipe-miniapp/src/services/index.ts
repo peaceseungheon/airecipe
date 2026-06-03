@@ -17,3 +17,9 @@ export type {
 } from './recipes';
 export { streamRecipe } from './sse-client';
 export type { StreamRecipeOptions } from './sse-client';
+export {
+  createCookingLog,
+  listCookingLogs,
+  getCookingLog,
+  deleteCookingLog,
+} from './cooking-logs';

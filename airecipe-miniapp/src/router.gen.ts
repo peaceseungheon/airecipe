@@ -3,29 +3,38 @@
 import { Route as _IndexRoute } from '../pages/';
 import { Route as _MyRecipesRoute } from '../pages/my-recipes';
 import { Route as _PrivacyRoute } from '../pages/privacy';
+import { Route as _TermsRoute } from '../pages/terms';
+import { Route as _CookingLogIdRoute } from '../pages/cooking-log/[id]';
+import { Route as _CookingLogNewRoute } from '../pages/cooking-log/new';
 import { Route as _RecipeIdRoute } from '../pages/recipe/[id]';
+import { Route as _RecipeIndexRoute } from '../pages/recipe/';
 import { Route as _RecipeGenerateRoute } from '../pages/recipe/generate';
 import { Route as _RecipeRecommendRoute } from '../pages/recipe/recommend';
-import { Route as _TermsRoute } from '../pages/terms';
 
 declare module '@granite-js/react-native' {
   interface RegisterScreenInput {
     '/': (typeof _IndexRoute)['_inputType'];
     '/my-recipes': (typeof _MyRecipesRoute)['_inputType'];
     '/privacy': (typeof _PrivacyRoute)['_inputType'];
+    '/terms': (typeof _TermsRoute)['_inputType'];
+    '/cooking-log/:id': (typeof _CookingLogIdRoute)['_inputType'];
+    '/cooking-log/new': (typeof _CookingLogNewRoute)['_inputType'];
     '/recipe/:id': (typeof _RecipeIdRoute)['_inputType'];
+    '/recipe': (typeof _RecipeIndexRoute)['_inputType'];
     '/recipe/generate': (typeof _RecipeGenerateRoute)['_inputType'];
     '/recipe/recommend': (typeof _RecipeRecommendRoute)['_inputType'];
-    '/terms': (typeof _TermsRoute)['_inputType'];
   }
 
   interface RegisterScreen {
     '/': (typeof _IndexRoute)['_outputType'];
     '/my-recipes': (typeof _MyRecipesRoute)['_outputType'];
     '/privacy': (typeof _PrivacyRoute)['_outputType'];
+    '/terms': (typeof _TermsRoute)['_outputType'];
+    '/cooking-log/:id': (typeof _CookingLogIdRoute)['_outputType'];
+    '/cooking-log/new': (typeof _CookingLogNewRoute)['_outputType'];
     '/recipe/:id': (typeof _RecipeIdRoute)['_outputType'];
+    '/recipe': (typeof _RecipeIndexRoute)['_outputType'];
     '/recipe/generate': (typeof _RecipeGenerateRoute)['_outputType'];
     '/recipe/recommend': (typeof _RecipeRecommendRoute)['_outputType'];
-    '/terms': (typeof _TermsRoute)['_outputType'];
   }
 }

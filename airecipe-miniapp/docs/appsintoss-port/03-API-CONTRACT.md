@@ -601,6 +601,99 @@ X-Toss-User-Id: <getAnonymousKey() hash>
 
 ---
 
+## 3.8b 엔드포인트 8~11 — 요리 기록 피드 `cooking-logs` (인증, ADR-013)
+
+요리 기록(사진 1장 + 레시피 스냅샷 + 별점 + 소감) 4 엔드포인트(생성/목록/상세/삭제). **모두 보호** — `X-Toss-User-Id` 필수, 401 자동 재시도 1회(05 §5.4 패턴 재사용). owner-scoped(본인 기록만). 백엔드 SSOT: `AIReceipe` `docs/api/cooking-logs.md` + `docs/adr/ADR-013-cooking-logs.md` + 설계 스펙 `docs/superpowers/specs/2026-06-03-cooking-log-feed-design.md` §6.
+
+> **사진 저장**: 비공개 Cloudflare R2 버킷. 업로드는 base64-in-JSON 단일 POST(백엔드 경유, 미니앱은 R2 직접 접근 안 함). 조회 시 `photoUrl`은 presigned GET URL(TTL 1h, 만료 있음) — 목록 응답마다 신선한 URL 발급. 캐싱 시 만료 고려.
+
+### 3.8b.1 응답 shape `CookingLog`
+
+```ts
+// src/types/api.ts (미니앱) — CookingLog
+{
+  "id": string,                               // uuid
+  "photoUrl": string,                         // R2 presigned GET URL(만료 있음)
+  "recipe": GeneratedRecipe,                  // 스냅샷(camelCase)
+  "rating": number,                           // 1..5
+  "review": string,
+  "createdAt": string                         // ISO 8601
+}
+```
+- `user_id`/`photo_path`/`source_recipe_id` 등 내부 식별자 **비노출**(경계 camelCase, snake 누출 시 매퍼 버그).
+
+### 3.8b.2 엔드포인트 8 — `POST /api/cooking-logs` (생성)
+
+```http
+POST /api/cooking-logs HTTP/1.1
+Content-Type: application/json
+X-Toss-User-Id: <getAnonymousKey() hash>
+
+{
+  "image": "data:image/jpeg;base64,...",   // 필수, base64 data URI
+  "mimeType": "image/jpeg",                  // 필수, ^image/
+  "recipe": { /* GeneratedRecipe 스냅샷 */ }, // 필수
+  "sourceRecipeId": "uuid | null",           // 선택(저장본 출처면 채움, 미저장이면 생략/null)
+  "rating": 5,                                // 필수, 정수 1..5
+  "review": "국물이 끝내줘요"                 // 필수, trim 후 1..1000자
+}
+```
+
+- **불변식**: `image`는 base64 data URI(정규식), `rating`은 1..5(0/6 거부), `review`는 trim 후 비어있지 않음(빈 문자열 거부).
+- 동작: 검증 → base64 디코드 → R2 업로드 → `cooking_logs` insert → presigned `photoUrl` 발급.
+- **응답 201**: `{ data: CookingLog }`.
+- 이미지 base64는 ~2–3MB. 미니앱은 `maxWidth 1024` 다운스케일로 플랫폼 body 한도(Vercel 4.5MB) 회피.
+
+### 3.8b.3 엔드포인트 9 — `GET /api/cooking-logs?page&pageSize` (목록)
+
+- owner-scoped, `created_at` 역순(피드 정렬).
+- query: `?page`(기본 1, 0/음수/비숫자 400) · `?pageSize`(기본 20, **상한 50 clamp** — ADR-006, `meta.pageSize` 신뢰).
+- **응답 200**: `{ data: CookingLog[], meta: { total, page, pageSize } }`.
+- 빈 목록도 200: `{ data: [], meta: { total: 0, page: 1, pageSize: 20 } }`.
+- 각 항목 `photoUrl`은 신선한 presigned URL.
+
+### 3.8b.4 엔드포인트 10 — `GET /api/cooking-logs/[id]` (상세)
+
+- owner-scoped. 본문 없음.
+- **응답 200**: `{ data: CookingLog }`.
+- 미존재/타인 소유 → **404 NOT_FOUND**(구분 안 함, ADR-005 통일). 미니앱 UI 단일 경로.
+
+### 3.8b.5 엔드포인트 11 — `DELETE /api/cooking-logs/[id]` (삭제)
+
+- owner-scoped. 행 삭제 + R2 객체 삭제(멱등). 본문 없음.
+- **응답 200**: `{ data: { id } }`(204 아님 — 캐시 무효화용 id 반환).
+- 404 멱등 정규화(미존재/타인 소유).
+
+### 3.8b.6 에러 (4종 공통)
+
+`ApiErrorCode` 카탈로그 재사용(신규 코드 없음).
+
+| HTTP | code | 조건 |
+|------|------|------|
+| 400 | `VALIDATION_ERROR` | image/mime/rating(1..5)/review(비어있음)/페이지네이션 쿼리/JSON 파싱 실패 |
+| 401 | `UNAUTHORIZED` | 헤더 없음 → 미니앱 1회 자동 재시도 |
+| 404 | `NOT_FOUND` | 상세/삭제 미존재·타인 소유(ADR-005 통일·멱등) |
+| 500 | `INTERNAL_ERROR` | R2 업로드/presign 실패·DB 실패(StorageError/RepositoryError 수렴) |
+
+> 스펙 §6.1의 `PAYLOAD_TOO_LARGE`는 플랫폼/게이트웨이 레벨이며 백엔드 `ApiErrorCode`에는 없다(미니앱 다운스케일로 회피, ADR-013 D6). AI 무관 엔드포인트(429/502 미발생).
+
+### 3.8b.7 CORS
+
+3.1.4 정책. 백엔드 cors.ts는 origin 기반(path 무관)이라 신규 4 라우트가 자동으로 동일 정책 적용. preflight OPTIONS 204. `Access-Control-Allow-Methods`에 GET/POST/DELETE/OPTIONS 포함.
+
+### 3.8b.8 외부 작업 PENDING (백엔드, ADR-013)
+
+| 항목 | 비고 |
+|------|------|
+| Cloudflare R2 버킷 `cooking-photos` 생성(비공개) | 공개 도메인/접근 비활성 |
+| R2 API 토큰 발급 + env 4키 주입 | `R2_ACCOUNT_ID`/`R2_ACCESS_KEY_ID`/`R2_SECRET_ACCESS_KEY`/`R2_BUCKET`. 백엔드 전용(미니앱 미포함) |
+| Supabase `0003_create_cooking_logs.sql` 적용 | 테이블 + 인덱스 + RLS 3종 |
+| CORS 화이트리스트에 미니앱 origin 포함 확인 | origin 기반 — 이미 있으면 무변경 |
+| staging·prod 배포 + 라이브 스모크 | 4 엔드포인트 + presigned URL 이미지 표시 검증 |
+| 개인정보처리방침(ADR-020) 사진 저장·보관 1줄 추가 | 미니앱 검수 항목 |
+
+---
+
 ## 3.9 HTTP 상태 매트릭스 (한눈)
 
 | 엔드포인트 | 200 | 201 | 400 | 401 | 404 | 429 | 500 | 502 | 503 |
@@ -613,6 +706,10 @@ X-Toss-User-Id: <getAnonymousKey() hash>
 | PATCH /recipes/[id]/favorite | O | - | O | O | O | - | - | - | O |
 | DELETE /recipes/[id] | O | - | - | O | O | - | - | - | O |
 | POST /recommendations | O | - | O | O | - | O | O | O | O |
+| POST /cooking-logs | - | O | O | O | - | - | O | - | - |
+| GET /cooking-logs | O | - | O | O | - | - | O | - | - |
+| GET /cooking-logs/[id] | O | - | - | O | O | - | O | - | - |
+| DELETE /cooking-logs/[id] | O | - | - | O | O | - | O | - | - |
 
 > `*` 스트리밍은 HTTP 200 + `error` 청크로 에러 전달.  
 > `**` 스트리밍 모드에서는 AI 레이트리밋/Provider 에러도 200 + `error` 청크로 변환된다 (`src/app/api/recipes/generate/route.ts` 70~75행 `toChunkError`).  
@@ -700,3 +797,4 @@ QA가 03 챕터를 검증할 때 적용할 단언 (계약 6절 + 미니앱 컨�
 | 2026-05-22 | §3.4.2 잘못된 uuid 22P02 처리 노트 추가 | qa sweep 보완 2 — 404 수렴 사양과 실제 코드 경로(503) 갭 명시 |
 | 2026-05-22 | §3.5.5 Allow-Headers 표기에 `Accept` 추가, §3.10 의사 코드의 baseURL을 `import.meta.env.API_BASE_URL`로 교체 | qa Task #5 종합 sweep FAIL #6-A·#6-D — 09 SSOT(`API_BASE_URL`)·§3.1.4 표(3개 헤더)와의 정합 복원 |
 | 2026-05-29 | §3.8 `POST /api/recommendations` 신설 + §3.9~§3.12 renumber + §3.11.6 "5→6" 갱신 | Phase 6 — ADR-016 D44~D52 동기 + 외부 작업 PENDING 명시 |
+| 2026-06-03 | §3.8b 요리 기록 피드 `cooking-logs` 4 엔드포인트(8~11: POST/GET 목록/GET 상세/DELETE) 신설 + §3.9 매트릭스 4행 추가 | 요리 기록 피드 — 백엔드 ADR-013 / 설계 스펙 §6과 1:1 동기. R2 presigned `photoUrl`·owner-scoped·404 통일·base64-in-JSON 업로드. 백엔드 외부 작업 PENDING(R2 버킷·토큰·마이그레이션·배포) 명시 |

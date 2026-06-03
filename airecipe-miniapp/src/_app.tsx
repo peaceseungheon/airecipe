@@ -3,10 +3,12 @@ import { AppsInToss } from '@apps-in-toss/framework';
 import { InitialProps } from '@granite-js/react-native';
 
 import { context } from '../require.context';
+import { CookingLogCacheProvider } from './hooks/useCookingLogCache';
 import { RecipeCacheProvider } from './hooks/useRecipeCache';
 import { TossUserIdProvider } from './hooks/useTossUserId';
 
 import * as Sentry from '@sentry/react-native';
+import { Analytics } from '@vercel/analytics/next';
 
 /**
  * AppContainer — 전역 Provider 마운트 지점.
@@ -14,11 +16,16 @@ import * as Sentry from '@sentry/react-native';
  * Phase 1 §A.8: TossUserIdProvider가 자식 화면 전체에 식별자(`getAnonymousKey()` hash)를 노출.
  * Phase 3 §D.4: RecipeCacheProvider가 마이 레시피 목록 캐시 무효화 트리거를 노출.
  *   TossUserIdProvider 안쪽에 마운트 — 식별자가 있어야 캐시도 의미. 외부 의존 0.
+ * 요리 피드: CookingLogCacheProvider가 피드 목록 캐시 무효화 트리거를 노출.
+ *   RecipeCacheProvider 안쪽에 형제로 마운트 — 피드/레시피 목록은 독립 무효화.
  */
 function AppContainer({ children }: PropsWithChildren<InitialProps>) {
   return (
     <TossUserIdProvider>
-      <RecipeCacheProvider>{children}</RecipeCacheProvider>
+      <RecipeCacheProvider>
+        <CookingLogCacheProvider>{children}</CookingLogCacheProvider>
+      </RecipeCacheProvider>
+      <Analytics />
     </TossUserIdProvider>
   );
 }

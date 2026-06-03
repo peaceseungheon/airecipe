@@ -10,8 +10,11 @@
 
 | 파일 | 라우트 | 책임 | SSOT |
 |------|--------|------|------|
-| `index.tsx` | `/` (홈) | PageNavbar + SearchForm + `<BottomTabBar active="home" />`(ADR-017). 제출 → `/recipe/generate` 진입 (params). "오늘의 추천" CTA → `/recipe/recommend`. 공개 endpoint — useTossUserId 미사용 | 07 §7.3.1, ADR-016 D50, ADR-017 D56·D58 |
-| `recipe/generate.tsx` | `/recipe/generate` | PageNavbar + SearchForm + 진행 인디케이터 + 에러 박스 + RecipeDisplay/NutritionPanel + **저장 버튼**(`useSaveRecipe` 결합 → `/recipe/[id]` 직진). 공개 endpoint — useTossUserId 미사용 (useSaveRecipe는 훅 내부에서 사용) | 07 §7.3.2, 08 §8.3~8.5 |
+| `index.tsx` | `/` (피드) | **보호 화면(ADR-021)** — 요리 기록 피드. PageNavbar + `useCookingFeed` 결합 + FlatList(CookingLogCard) / FeedEmptyState 분기 + 우하단 FAB "올리기"(colors.orange500) + `<BottomTabBar active="feed" />`. 식별자/로딩/에러/빈/목록 분기. FAB·카드 탭 → `/cooking-log/new`·`/cooking-log/:id` | 07 §7.3.1, ADR-021 D75·D83 |
+| `recipe/index.tsx` | `/recipe` (레시피 탭) | **공개 화면(ADR-021)** — 기존 홈 콘텐츠 이전. PageNavbar + SearchForm + "오늘의 추천" CTA(`/recipe/recommend`) + 약관/개인정보 푸터 + `<BottomTabBar active="recipe" />`. 제출 → `/recipe/generate`. useTossUserId 미사용 | 07 §7.3.9, ADR-021 D75, ADR-016 D50 |
+| `recipe/generate.tsx` | `/recipe/generate` | PageNavbar + SearchForm + 진행 인디케이터 + 에러 박스 + RecipeDisplay/NutritionPanel + **저장 버튼**(`useSaveRecipe` 결합 → `/recipe/[id]` 직진) + **"이 레시피로 기록 남기기"**(미저장 recipe 전달 → `/cooking-log/new`, ADR-021 D78). 공개 endpoint — useTossUserId 미사용 (useSaveRecipe는 훅 내부에서 사용) | 07 §7.3.2, 08 §8.3~8.5, ADR-021 D78 |
+| `cooking-log/new.tsx` | `/cooking-log/new` | **보호 화면(ADR-021)** — PageNavbar + CookingLogForm(사진·레시피·별점·소감) + `<BottomTabBar active="none" />`. `useCreateCookingLog` 결합 → 성공 시 피드(`/`) 복귀. 진입 2종: 피드 FAB / 생성 결과(initialRecipe params) | 07 §7.3.10, ADR-021 D77·D78 |
+| `cooking-log/[id].tsx` | `/cooking-log/[id]` | **보호 화면(ADR-021)** — `useCookingLogDetail(id)` + `useDeleteCookingLog(id)`. 로딩/404(단일 NotFoundScreen)/에러/정상 분기. 사진 + Rating(readonly) + 소감 + RecipeDisplay(스냅샷) + 삭제 Button(remove() 무인자). 성공·404 정규화 후 `/` 복귀 | 07 §7.3.11, ADR-005, ADR-021 D79·D82 |
 | `recipe/recommend.tsx` | `/recipe/recommend` | 보호 화면 — useTossUserId 가드 + useRecommendations 결합. 미선택/로딩/에러/정상 분기 + ThemePicker + RecommendationCard. 카드 탭 → `/recipe/generate` 재사용. AI 면책 1줄 | ADR-016 D44~D52 |
 | `my-recipes.tsx` | `/my-recipes` | 보호 화면 — useTossUserId 가드 + useMyRecipes 결합 + `<BottomTabBar active="my" />`(ADR-017). 상단 FilterTabs(전체/즐겨찾기) + RecipeCard.onToggleFavorite(낙관적 mutate). 빈+정상 양쪽 하단 `<AppInlineAd slot="my-recipes-bottom" />`(로딩/에러 미렌더). 단순 페이지네이션(이전/다음 + `meta.pageSize` 신뢰) | 07 §7.3.3, ADR-012 D14·D15·D18, ADR-013 D4·D9·D11, ADR-014 D30, ADR-017 D56 |
 | `recipe/[id].tsx` | `/recipe/[id]` | 보호 화면 — useTossUserId 가드 + useRecipeDetail 결합. 로딩/404/에러/정상 4-way 분기. 404 → `<NotFoundScreen onBack={...} />` 단일 컴포넌트. PageNavbar.AccessoryButtons에 FavoriteButton + 본문 하단 삭제 Button + DeleteConfirmDialog. 낙관적 mutate(D4) + 삭제 성공·404 정규화 후 handleBack(D8). handleBack은 `canGoBack?.()` + fallback `/my-recipes` | 07 §7.3.4, ADR-005, ADR-012 D14·D16, ADR-013 D5·D6·D7·D8·D9 |
@@ -27,15 +30,15 @@
 - **`createRoute` export 패턴** — 각 화면은 `export const Route = createRoute('/path', { component, validateParams? })`. component는 화면 함수 컴포넌트.
 - **`href`/`useRouter`/`<Link>` 사용 금지** — Granite는 `useNavigation().navigate(path, params)` + `Route.useParams()` 사용 (07 §7.2 #3·#4).
 - **`useAuth` 사용 금지** — Toss 식별이 자동 (ADR-009 D2). 로그인/로그아웃 분기 없음.
-- **공개 endpoint 화면(`/`, `/recipe/generate`)에서 `useTossUserId` 미사용** — 헤더 미부착(05 §5.3, 03 §3.2.1, AC2.6). 보호 화면(`/my-recipes`, `/recipe/[id]`, `/recipe/recommend`)은 `useTossUserId` 필수.
+- **공개 endpoint 화면(`/recipe`, `/recipe/generate`, `/terms`, `/privacy`)에서 `useTossUserId` 미사용** — 헤더 미부착(05 §5.3, 03 §3.2.1, AC2.6). 보호 화면(`/`(피드), `/my-recipes`, `/recipe/[id]`, `/recipe/recommend`, `/cooking-log/new`, `/cooking-log/[id]`)은 `useTossUserId` 필수(피드/생성/상세/삭제는 훅 내부 식별자 가드).
 - **보호 화면 식별자 가드 패턴** — `useTossUserId().tossUserId === undefined` → Loading/Spinner 렌더 + 데이터 훅 호출 차단. 발급 완료 시 데이터 훅 호출.
 - **`PageNavbar`는 화면 본문에서 직접 렌더** — 글로벌 layout 없음 (07 §7.8). compound API(`PageNavbar.Title` 등)만 사용. 공통 래퍼 `AppNavbar.tsx` 만들지 않음 (ADR-011 D12).
-- **fetch 직접 호출 0건** — 모든 데이터 호출은 hooks/(useRecipeGenerate/useMyRecipes/useRecipeDetail/useSaveRecipe/useRecommendations) 통한다. recipes.ts/api-client 직접 호출도 금지.
+- **fetch 직접 호출 0건** — 모든 데이터 호출은 hooks(useRecipeGenerate/useMyRecipes/useRecipeDetail/useSaveRecipe/useRecommendations/useCookingFeed/useCreateCookingLog/useCookingLogDetail/useDeleteCookingLog) 통한다. recipes.ts/cooking-logs.ts/api-client 직접 호출도 금지.
 - **404 UI는 `<NotFoundScreen onBack={...} />` 단일 컴포넌트만** — `<ErrorPage statusCode={404}>` 직접 렌더 + 인라인 "찾을 수 없어요" 텍스트 0건 (ADR-012 D16).
 - **`useMyRecipes`의 `meta.pageSize` 신뢰** — lastPage 계산은 `Math.ceil(meta.total / meta.pageSize)`. `query.pageSize`로 계산 금지 (ADR-006 clamp 적용값과 일관).
 - **낙관적 UI는 호출 측 책임** — ADR-013 D19. 페이지가 (a) `mutate(next)` 즉시 적용 → (b) `await toggle(id, target)` → (c) `null` 시 `mutate(prev)` 롤백.
 - **`useToggleFavorite`는 단일 hook 인스턴스로 카드 목록 공유** — ADR-013 D24. 카드 map 안에서 hook 호출 금지(rules of hooks). 페이지 상단 1회 호출 후 `toggle(id, target)` + `pendingId === card.id` 패턴.
-- **`BottomTabBar`는 노출 화면이 직접 마운트** — ADR-017 D55. `/`·`/my-recipes`만 노출, props `{ active: 'home'|'my' }`. 새 라우트·router.gen.ts 변경 0. `scrollContent`에 `paddingBottom` 확보.
+- **`BottomTabBar`는 노출 화면이 직접 마운트** — ADR-017 D55·D63, ADR-021 D75. **3탭** `/`(피드)·`/recipe`·`/my-recipes`, props `{ active: 'feed'|'recipe'|'my'|'none' }`. 비-탭 화면은 `'none'`. 새 탭 라우트는 router.gen.ts 수동 등록 필요(`/recipe`·`/cooking-log/*`). `scrollContent`/listContent에 `paddingBottom` 확보.
 
 ## SSE 상태 결합 패턴 (`recipe/generate.tsx` 인용)
 
@@ -61,7 +64,7 @@
 
 ## 라우트 등록 정책 (출시 점검 영향)
 
-- **등록 라우트** — `/`, `/recipe/generate`, `/my-recipes`, `/recipe/[id]`, `/recipe/recommend`, `/terms`, `/privacy`. `src/router.gen.ts` 자동 갱신, 수동 수정 금지(단 typecheck를 위해 신규 라우트는 빌드 전 수동 등록 — Phase 6·ADR-020 선례).
+- **등록 라우트** — `/`, `/recipe`, `/recipe/generate`, `/my-recipes`, `/recipe/[id]`, `/recipe/recommend`, `/terms`, `/privacy`, `/cooking-log/new`, `/cooking-log/[id]`. `src/router.gen.ts` 자동 갱신, 수동 수정 금지(단 typecheck를 위해 신규 라우트는 빌드 전 수동 등록 — Phase 6·ADR-020·ADR-021 선례).
 - 새 화면 추가 시 출시 검수 도메인 화이트리스트·딥링크(`intoss://airecipe/...`, prefix = `scheme://appName`) 영향 점검 (07 §7.6, 09-ENV-CONFIG).
 - 비기능 화면(about 등) 추가 시 노출 영향 별 점검 (`appsintoss-publish-checklist` 스킬).
 - **정적 콘텐츠 화면(`/terms`·`/privacy`, ADR-020)** — 외부 호출 0건·본문은 모듈 상수. 공개 화면이라 useTossUserId 미사용. 신규 외부 도메인 0건이라 화이트리스트 영향 없음. 본문 사업자 정보 placeholder는 출시 전 실제 값 확정 의무.

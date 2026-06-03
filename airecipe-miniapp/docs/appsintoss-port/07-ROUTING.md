@@ -46,6 +46,8 @@ Granite >= 1.0 라우팅의 핵심(공식 문서 인용):
 
 ### 7.3.1 홈 — `/` → `pages/index.tsx`
 
+> **⚠ ADR-021 갱신 (2026-06-03):** 홈(`/`)은 더 이상 SearchForm 화면이 아니다 — **내 요리 기록 피드**(역순 `FlatList` + 우하단 FAB "올리기")로 전환됐다. 보호 화면(`useCookingFeed` → `useTossUserId` 헤더). 기존 홈의 SearchForm + 추천 CTA + 약관 푸터는 **레시피 탭(`/recipe`, §7.3.9)** 으로 이전됐다. 아래 표·스케치는 ADR-021 이전(레거시)이며 레시피 탭(§7.3.9)에 해당한다.
+
 | 항목 | 현재 웹 | 미니앱 |
 |------|---------|--------|
 | 경로 | `/` | `/` (`pages/index.tsx`) |
@@ -225,6 +227,41 @@ function RecommendPage() {
 
 > **검수 메모 (ADR-020)**: 약관·개인정보처리방침의 인앱 제공은 검수에 유리. 본문 내 사업자 정보 placeholder(`[관할 법원]`·`[보호책임자]`·`[고객센터]`·법인명)는 **출시 전 실제 값 확정 의무**(콘솔 등록값과 동기). 두 화면 모두 신규 외부 도메인 호출 0건 → 도메인 화이트리스트 영향 없음. 딥링크 prefix(`intoss://airecipe/terms`·`/privacy`)는 기존과 동일 메커니즘이라 콘솔 변경 불필요.
 
+### 7.3.9 레시피 탭 랜딩 — `/recipe` → `pages/recipe/index.tsx` (ADR-021)
+
+| 항목 | 미니앱 |
+|------|--------|
+| 경로 | `/recipe` (`pages/recipe/index.tsx`) |
+| 진입 보호 | **공개 화면** — 공개 generate endpoint라 `useTossUserId` 미사용 |
+| 핵심 UI | `PageNavbar.Title("레시피")` + `SearchForm` + "오늘의 추천 받기" CTA + 약관/개인정보 푸터 + `<BottomTabBar active="recipe" />` |
+| 데이터 호출 | **0건**(본 화면) — SearchForm 제출 시 `/recipe/generate`로 위임 |
+| 진입점 | 하단 탭바 "레시피" 탭 |
+| 비고 | ADR-021 3탭 재편 — 기존 홈(`/`) 콘텐츠를 본 화면으로 이전. 홈은 피드로 전환(§7.3.1) |
+
+### 7.3.10 요리 기록 올리기 — `/cooking-log/new` → `pages/cooking-log/new.tsx` (ADR-021)
+
+| 항목 | 미니앱 |
+|------|--------|
+| 경로 | `/cooking-log/new` (`pages/cooking-log/new.tsx`) |
+| 진입 보호 | **보호** — `useCreateCookingLog` 내부 식별자 가드(미발급 시 한국어 에러 + null) |
+| 핵심 UI | `PageNavbar.Title("요리 기록 올리기")` + `CookingLogForm`(사진·레시피 스냅샷·별점·소감) + `<BottomTabBar active="none" />` |
+| 데이터 호출 | `useCreateCookingLog().create` → `createCookingLog`(POST `/api/cooking-logs`, base64 data URI) |
+| 진입점 | (a) 피드 FAB "올리기"(저장본 선택), (b) `/recipe/generate` 완료 "이 레시피로 기록 남기기"(미저장 recipe 전달, sourceRecipeId 없음) |
+| Params 읽기 | `{ recipe?: GeneratedRecipe, sourceRecipeId?: string }` |
+| 성공 후 | 피드(`/`)로 복귀 + 캐시 invalidate(상단 노출, AC4) |
+
+### 7.3.11 요리 기록 상세 — `/cooking-log/[id]` → `pages/cooking-log/[id].tsx` (ADR-021)
+
+| 항목 | 미니앱 |
+|------|--------|
+| 경로 | `/cooking-log/:id` (`pages/cooking-log/[id].tsx`) |
+| 진입 보호 | **보호** — `useCookingLogDetail`/`useDeleteCookingLog` 내부 식별자 가드 |
+| 핵심 UI | `PageNavbar.Title(dishName)` + 사진 + `Rating(readonly)` + 소감 + `RecipeDisplay`(레시피 스냅샷 전체) + "기록 삭제" Button + `<BottomTabBar active="none" />` |
+| 데이터 호출 | `useCookingLogDetail(id)`(GET `/api/cooking-logs/[id]`) + `useDeleteCookingLog(id).remove()`(DELETE) |
+| 분기 | 로딩 / 404(단일 `NotFoundScreen`, ADR-005 통일) / 에러 / 정상 |
+| 삭제 후 | 성공·404 정규화 모두 피드(`/`)로 복귀 + invalidate(AC6) |
+| 비고 | `useDeleteCookingLog`는 id를 **훅 인자**로, `remove()`는 무인자(실 시그니처) |
+
 ### 7.3.5 layout (현재 `src/app/layout.tsx`) — **Granite 메커니즘으로 흡수**
 
 | 현재 layout 요소 | 미니앱 처리 |
@@ -250,13 +287,16 @@ function RecommendPage() {
 
 | # | 현재 경로 | 현재 파일 | 미니앱 경로 | 미니앱 파일 | 보호 |
 |---|----------|----------|------------|-------------|------|
-| 1 | `/` | `src/app/page.tsx` | `/` | `pages/index.tsx` | 공개 |
+| 1 | `/` | `src/app/page.tsx` | `/` | `pages/index.tsx` | **보호** (요리 기록 피드 — ADR-021로 피드 전환) |
 | 2 | `/recipe/generate` | `src/app/recipe/generate/page.tsx` | `/recipe/generate` | `pages/recipe/generate.tsx` | 공개 |
 | 3 | `/my-recipes` | `src/app/my-recipes/page.tsx` | `/my-recipes` | `pages/my-recipes.tsx` | 식별자 보장 |
 | 4 | `/recipe/[id]` | `src/app/recipe/[id]/page.tsx` | `/recipe/[id]` | `pages/recipe/[id].tsx` | 식별자 보장 |
 | 5 | — (신규, Phase 6) | — | `/recipe/recommend` | `pages/recipe/recommend.tsx` | 식별자 보장 |
 | 6 | — (신규, ADR-020) | — | `/terms` | `pages/terms.tsx` | 공개 (정적) |
 | 7 | — (신규, ADR-020) | — | `/privacy` | `pages/privacy.tsx` | 공개 (정적) |
+| 8 | — (신규, ADR-021) | — | `/recipe` | `pages/recipe/index.tsx` | 공개 (레시피 탭 랜딩 — 기존 홈 콘텐츠 이전) |
+| 9 | — (신규, ADR-021) | — | `/cooking-log/new` | `pages/cooking-log/new.tsx` | 보호 (업로드 폼) |
+| 10 | — (신규, ADR-021) | — | `/cooking-log/:id` | `pages/cooking-log/[id].tsx` | 보호 (기록 상세·삭제) |
 | - | `/auth/login` | `src/app/auth/login/page.tsx` | — | **제외** | — |
 | - | `/auth/signup` | `src/app/auth/signup/page.tsx` | — | **제외** | — |
 | - | (layout) | `src/app/layout.tsx` | — | Granite ThemeProvider + 화면별 Navbar | — |
@@ -497,15 +537,20 @@ function GeneratePage() {
 
 **채택(C — 커스텀 고정 하단 탭바):** NativeStack 위에 `BottomTabBar` 단일 컴포넌트를 두고, **각 화면이 직접 마운트**한다. 탭 누름 → `navigation.navigate(path, {})`. **새 라우트·router.gen.ts 변경 0개.**
 
-> ⚠️ **노출 범위 전 화면 확대 (ADR-017 D63, 2026-05-30 — D56 대체):** 사용자 요청("모든 화면 노출")으로 비-탭 화면(생성/추천/상세/_404)에도 탭바를 마운트한다. 비-탭 화면은 `active="none"`(활성 탭 없음 센티넬 — 두 탭 모두 비활성색 `grey500`·`selected:false`). early-return 분기(식별자 가드·404)에도 마운트. `BottomTabBarProps.active`는 `'home'|'my'|'none'`. 아래 표는 D63 반영본이다.
+> ⚠️ **노출 범위 전 화면 확대 (ADR-017 D63, 2026-05-30 — D56 대체):** 사용자 요청("모든 화면 노출")으로 비-탭 화면(생성/추천/상세/_404)에도 탭바를 마운트한다. 비-탭 화면은 `active="none"`(활성 탭 없음 센티넬 — 모든 탭 비활성색 `grey500`·`selected:false`). early-return 분기(식별자 가드·404)에도 마운트.
 
-| 화면 | 하단 탭바 (D63) | 상단 Navbar |
-|------|----------------|-------------|
-| `/` (홈) | `<BottomTabBar active="home" />` | `PageNavbar` Title만 (AccessoryTextButton "마이 레시피" **제거** — D58) |
+> ⚠️ **3탭 재편 (ADR-021, 2026-06-03):** 2탭(홈/마이) → **3탭 [피드 `/` · 레시피 `/recipe` · 마이 `/my-recipes`]**. `BottomTabBarProps.active`는 `'feed'|'recipe'|'my'|'none'`(기존 `'home'`→`'feed'`, `'recipe'` 추가). `'none'` 센티넬·`navigate(재포커스)`·로직 불변. 아래 표는 ADR-021 반영본이다.
+
+| 화면 | 하단 탭바 | 상단 Navbar |
+|------|----------|-------------|
+| `/` (피드, ADR-021) | `<BottomTabBar active="feed" />` | `PageNavbar` Title "요리 피드" |
+| `/recipe` (레시피 탭, ADR-021) | `<BottomTabBar active="recipe" />` | `PageNavbar` Title "레시피" |
 | `/my-recipes` (마이) | `<BottomTabBar active="my" />` (식별자 가드 분기 + 정상 분기) | `PageNavbar` BackButton + "마이 레시피" |
 | `/recipe/generate` | `<BottomTabBar active="none" />` (정상 분기 — ScrollView 형제) | 기존 유지 |
 | `/recipe/recommend` | `<BottomTabBar active="none" />` (식별자 가드 + 정상 분기) | 기존 유지 |
 | `/recipe/[id]` | `<BottomTabBar active="none" />` (식별자 가드 + 404 분기 + 정상 분기) | 기존 유지 |
+| `/cooking-log/new` (ADR-021) | `<BottomTabBar active="none" />` | `PageNavbar` Title "요리 기록 올리기" |
+| `/cooking-log/[id]` (ADR-021) | `<BottomTabBar active="none" />` (로딩/404/에러/정상 분기) | `PageNavbar` Title(dishName) / `NotFoundScreen` |
 | `/terms` (ADR-020) | `<BottomTabBar active="none" />` (정적 — ScrollView 형제) | `PageNavbar` Title "서비스 이용약관" |
 | `/privacy` (ADR-020) | `<BottomTabBar active="none" />` (정적 — ScrollView 형제) | `PageNavbar` Title "개인정보처리방침" |
 | `/_404` | `<BottomTabBar active="none" />` (`View` 래퍼로 `NotFoundScreen`과 형제) | `NotFoundScreen`(ErrorPage) |
@@ -549,3 +594,4 @@ function GeneratePage() {
 | 2026-05-22 | 초기 작성 (세션 #4) | App Router 7화면 → Granite 5화면 매핑 + proxy 가드 식별자 단일 조건으로 단순화 + 딥링크/백버튼 |
 | 2026-05-29 | §7.8.1 신설 — 하단 탭바([홈/마이 레시피]) 도입. Granite/TDS 실증 검증(탭 네비게이터 1급 부재 → 커스텀 고정 하단 바 채택) + 홈 AccessoryTextButton 제거 + appName 회귀 동시 수정 명시. ADR-017 D53~D62. | 사용자 요청(마이 레시피 탭) — §7.8 "향후 검토"의 실행 |
 | 2026-05-30 | §7.8.1 노출 범위 표 갱신 — **전 화면 확대(ADR-017 D63, D56 대체).** 비-탭 화면(생성/추천/상세/_404)에도 `<BottomTabBar active="none" />` 마운트, early-return 분기 포함, `active:'home'\|'my'\|'none'`. D55 재포커스 불변 명시. | 사용자 요청("모든 화면 노출") |
+| 2026-06-03 | **3탭 재편 + 요리 기록 피드 (ADR-021).** §7.3.1 홈→피드 전환 주석, §7.3.9~§7.3.11 신설(`/recipe` 레시피 탭·`/cooking-log/new`·`/cooking-log/:id`), §7.4 매핑표 행 8·9·10, §7.8.1 3탭 표(`active:'feed'\|'recipe'\|'my'\|'none'`) + cooking-log 2행. 홈(`/`)은 보호 피드로 전환(`useCookingFeed`), 기존 홈 콘텐츠는 `/recipe`로 이전. | 요리 기록 피드 단계(설계 스펙 2026-06-03) |

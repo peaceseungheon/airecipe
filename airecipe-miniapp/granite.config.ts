@@ -14,9 +14,14 @@ export default defineConfig({
       brand: {
         displayName: 'AI 레시피',
         primaryColor: '#FF6B35',
-        icon: '',
+        icon: 'https://pub-af1aa7fb010c4b21b82d84a9e7a97ab8.r2.dev/images/airecipe%E1%84%85%E1%85%A9%E1%84%80%E1%85%A9.png',
       },
-      permissions: [],
+      permissions: [
+        // 요리 기록 사진 업로드(ADR-021) — 앨범 읽기 + 카메라 촬영.
+        // 타입: @apps-in-toss/plugins Permission — photos.access ∈ 'read'|'write', camera.access = 'access'.
+        { name: 'photos', access: 'read' },
+        { name: 'camera', access: 'access' },
+      ],
     }),
 
     env({

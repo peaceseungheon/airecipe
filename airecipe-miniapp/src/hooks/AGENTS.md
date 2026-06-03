@@ -60,6 +60,11 @@ export function formatTossUserIdMask(hash: TossUserId | undefined): string;  // 
 | `useMyRecipes.ts` 확장 (Phase 4) | Phase 3 위에 `mutate: (next: Recipe) => void` 추가 — data 안 id 매칭 항목 교체. 낙관적 UI · 호출 측 prev 보관 패턴(D19) | ADR-013 D19, baseline §B D4 |
 | `useRecipeDetail.ts` 확장 (Phase 4) | Phase 3 위에 `mutate: (next: Recipe) => void` 추가 — PATCH 응답 Recipe로 직접 갱신(refetch GET 회피 — D20) | ADR-013 D20, baseline §B D5 |
 | `useRecommendations.ts` (Phase 6) | 테마 기반 추천 — `{ items, isLoading, error, refresh }`. theme deps + AbortController(이전 in-flight abort) + 401 자동 재시도(refresh 주입) + 메모리 hash key 캐시. 테마 미선택 시 호출 보류 | 03 §3.8, ADR-016 D47·D51, baseline §useRecommendations |
+| `useCookingLogCache.tsx` (ADR-021) | 피드 캐시 무효화 — `CookingLogCacheProvider` + `useCookingLogCacheTrigger()`(`{ trigger, invalidate }`). `useRecipeCache` 미러. `_app.tsx`에서 `RecipeCacheProvider` 안쪽 형제 마운트 | 03 §3.8b, ADR-021 D81 |
+| `useCookingFeed.ts` (ADR-021) | 피드 목록 조회 — `{ data, meta, isLoading, error, refetch }`. `listCookingLogs` raw `{data,meta}` 보존. `trigger` dep + 401 재시도 + AbortController | 03 §3.8b.3, ADR-021 D81 |
+| `useCreateCookingLog.ts` (ADR-021) | 생성 mutation — `{ create: (req) => Promise<CookingLog\|null>, isSaving, error, reset }`. 성공 시 `invalidate()` 1회. 식별자 미발급 시 한국어 에러 + null | 03 §3.8b.2, ADR-021 D77·D81 |
+| `useDeleteCookingLog.ts` (ADR-021) | DELETE 삭제 — **`useDeleteCookingLog(id)`** 훅 인자 + `{ remove: () => Promise<boolean>, isPending, error, reset }`(remove **무인자**). **404 성공 정규화** → invalidate + true | 03 §3.8b.5, ADR-021 D82 |
+| `useCookingLogDetail.ts` (ADR-021) | 단건 조회 — `{ data, isLoading, notFound, error, refetch }`. `getCookingLog` + 404 정규화(`notFound:true`). id 변경 시 재조회 | 03 §3.8b.4, ADR-005, ADR-021 |
 
 ## Phase 2·3 추가 규약 (Phase 1 규약 위에 누적)
 

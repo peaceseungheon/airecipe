@@ -1,85 +1,113 @@
-# 03 — QA Report: BottomTabBar 전 화면 노출 (ADR-017 D63)
+# 03 — QA 통합 정합성 리포트: 요리 기록 피드 (ADR-021, cooking-log-feed)
 
-검증자: miniapp-qa. 기준 디렉토리 `airecipe-miniapp/`.
-SSOT: `docs/adr/ADR-017-bottom-tab-navigation.md` §2.1 D63, `_workspace/01_architect_baseline.md`(§B 표·§B.4·§B.5), `_workspace/02_frontend_summary.md`.
-방법: 양쪽 동시 읽기(스펙 ↔ 구현) + git diff 교차 + 빌드 게이트 직접 실행.
+검증자: miniapp-qa. 기준 디렉토리 `airecipe-miniapp/`. 브랜치 `feat/cooking-log-feed`.
+SSOT: `docs/appsintoss-port/03-API-CONTRACT.md` §3.8b(백엔드 QA 확정 shape), 설계 스펙·계획(2026-06-03), ADR-021 D75~D83.
+방법: 양쪽 동시 읽기(SSOT ↔ 구현) — zod ↔ 03 ↔ services ↔ hooks ↔ pages/components 5단 교차 + TDS 실재성(설치 패키지 `.d.ts` 직접 검증) + 게이트 실측.
 
-## 최종 verdict: **GO** — 7/7 PASS, FAIL 0건
+## 최종 verdict: **GO** — 8/8 영역 PASS, 치명 FAIL 0건. 비차단 관찰 2건(기존 누적·외부 의존).
+
+게이트 실측: `pnpm test` 7 PASS · `pnpm typecheck` exit 0 · `pnpm lint` 0 errors (router.gen.ts 누적 무해 warning 1건, 사전 존재).
+
+---
+
+## 검증 매트릭스 요약
+
+| # | 영역 | 결과 |
+|---|------|------|
+| 1 | 백엔드 응답 shape ↔ zod ↔ 소비 (목록 {data,meta}·단건 .data·삭제 {id}) | **PASS** |
+| 2 | api-client 메서드 ↔ 훅 시그니처 ↔ 페이지 호출 (특히 useDeleteCookingLog(id)/remove()) | **PASS** |
+| 3 | 라우팅 정합 (createRoute ↔ router.gen ↔ navigate / BottomTabBar 3탭) | **PASS** |
+| 4 | TDS 매핑 실재성 (Rating 판별 유니온 D79 + 6종) | **PASS** |
+| 5 | 인증 헤더 (보호 4종 tossUserId+refresh / 평문 노출 0) | **PASS** |
+| 6 | 미디어 어댑터 (SDK 격리 1곳 + base64 정규화 → request) | **PASS** |
+| 7 | 검수 정책 (권한 선언↔사용 / hex 0 / privacy 고지 / AI 면책) | **PASS** |
+| 8 | 스냅샷 무결성 (GeneratedRecipe 필드만 전송 / id·isFavorite·createdAt 제외) | **PASS** |
 
 ---
 
-## 항목별 결과
+## 영역별 결과 (증거: 파일:라인)
 
-### 1. 전 화면 노출 실재성 — **PASS**
+### 1. 응답 shape ↔ zod ↔ 소비 — PASS
 
-6개 페이지 전 렌더 분기에서 `<BottomTabBar ...>` 마운트 확인(파일:라인). 분기 트리별 교차 확인:
+- 03 §3.8b.1 `CookingLog={id,photoUrl,recipe:GeneratedRecipe,rating(1..5),review,createdAt}`(내부 식별자 비노출) ↔ `src/lib/zod/cooking-log.ts:14-21` `cookingLogSchema`(필드·타입·`rating.int().min(1).max(5)` 일치, `user_id/photo_path/source_recipe_id` 부재 = 비노출 정합) ↔ `src/types/cooking-log.ts:13-20` `CookingLog` interface 1:1.
+- **래핑 unwrap 위치 일관(03 §3.10 #1)**:
+  - 생성 `createCookingLog`(`cooking-logs.ts:37-48`) → `apiResponseSchema(cookingLogSchema)` 검증 후 `wrapped.data` unwrap → `CookingLog`. 03 §3.8b.2 `201 {data:CookingLog}` 정합.
+  - 목록 `listCookingLogs`(`:54-67`) → `apiListResponseSchema(cookingLogSchema)` → **raw `{data,meta}` 보존**(unwrap 안 함). 03 §3.8b.3 `{data:[],meta}` + ADR-006 `meta.pageSize` 신뢰 정합. `useCookingFeed.ts:92-96`이 `res.data`/`res.meta` 분리 소비.
+  - 상세 `getCookingLog`(`:72-86`) → `.data` unwrap → `CookingLog`. 03 §3.8b.4 정합.
+  - 삭제 `deleteCookingLog`(`:91-105`) → `deleteResponseSchema=apiResponseSchema(z.object({id:z.string()}))`(`:27`) → `wrapped.data` = `{id}`. 03 §3.8b.5 `200 {data:{id}}`(204 아님) 정합.
+- zod 검증은 raw 응답에 적용(`api-client.ts:124-132`) — 래핑 위반·snake 누출 모두 차단. `as`/`any` 우회 없음(api-client는 zod `safeParse` 결과만 반환).
 
-| 페이지 | 분기 | 마운트 라인 | active |
-|--------|------|------------|--------|
-| `pages/index.tsx` | 정상(단일) | :76 | `"home"` |
-| `pages/my-recipes.tsx` | 식별자 가드 | :122 | `"my"` |
-| `pages/my-recipes.tsx` | 정상(로딩/에러/빈/목록 4-way 공통 부모 root) | :251 | `"my"` |
-| `pages/recipe/generate.tsx` | 정상(단일 ScrollView, early-return 없음) | :241 | `"none"` |
-| `pages/recipe/recommend.tsx` | 식별자 가드 | :61 | `"none"` |
-| `pages/recipe/recommend.tsx` | 정상(미선택/로딩/에러/정상 분기 공통 부모 root) | :152 | `"none"` |
-| `pages/recipe/[id].tsx` | 식별자 가드 | :125 | `"none"` |
-| `pages/recipe/[id].tsx` | 404 분기(View 래퍼로 NotFoundScreen과 형제, §B.4) | :135 | `"none"` |
-| `pages/recipe/[id].tsx` | 정상(로딩/에러/정상 분기 공통 부모 root, ScrollView 직후·Dialog 형제) | :222 | `"none"` |
-| `pages/_404.tsx` | 폴백(View 래퍼로 NotFoundScreen과 형제, §B.5) | :57 | `"none"` |
+### 2. api-client 메서드 ↔ 훅 ↔ 페이지 호출 — PASS
 
-- 핵심 검증: generate/recommend/[id]/my-recipes 정상 분기는 `isLoading/error/data` 등을 ScrollView **내부**에서 분기하고 ScrollView·탭바는 `root` View의 공통 형제다. 따라서 내부 상태 분기와 무관하게 탭바가 항상 렌더 — 분기별 별도 마운트 불요(스펙 정합). early-return(별도 JSX 트리 반환)하는 분기(가드·404·_404)에는 각각 직접 마운트 확인. **누락 0건.**
-- git diff 교차: 신규 마운트 7개(generate 1 + recommend 2 + [id] 3 + _404 1) — frontend summary와 일치. index/my-recipes는 prior cycle에서 이미 마운트(working tree == HEAD, 변경 0).
+- 4 메서드 모두 `services/index.ts`에서 named export. 소비 훅 시그니처 교차:
+  - `useCookingFeed(query)` → `listCookingLogs(query, {tossUserId,refreshTossUserId})` (`useCookingFeed.ts:87-90`). `pages/index.tsx:37` `useCookingFeed({page,pageSize:10})`.
+  - `useCreateCookingLog().create(req)` → `createCookingLog(req, auth)` (`useCreateCookingLog.ts:82-85`). `pages/cooking-log/new.tsx:57` `create(req)`.
+  - `useCookingLogDetail(id)` → `getCookingLog(id, auth)` (`useCookingLogDetail.ts:85`). `pages/cooking-log/[id].tsx:49` `useCookingLogDetail(params.id)`.
+  - **`useDeleteCookingLog(id).remove()` — 핵심 검증 PASS**: 훅이 `id`를 **인자**로 받음(`useDeleteCookingLog.ts:34`), `remove`는 **무인자** `():Promise<boolean>`(`:52`). 페이지 `[id].tsx:50-51` `useDeleteCookingLog(params.id ?? '')` + `:58` `await remove()`. D82 시그니처 정확.
+  - 404 멱등 정규화: `remove()`가 `NOT_FOUND` → `invalidate()` + `return true`(`:73-76`). 03 §3.8b.5 멱등 정합. 상세 404는 `notFound:true`(`useCookingLogDetail.ts:98-104`, ADR-005 통일).
+- 직접 `fetch(`/`XMLHttpRequest` — pages/components/hooks 0건(grep). 모든 보호 호출은 api-client 단일 경로.
 
-### 2. active prop 정합 — **PASS**
+### 3. 라우팅 정합 — PASS
 
-- 타입: `BottomTabBar.tsx:39` `active: TabKey | 'none'`(`TabKey = 'home' | 'my'`, :32). 탭 화면 `"home"`/`"my"`, 비-탭 4종 `"none"` 전달 — 전수 일치(항목 1 표).
-- `'none'` 로직 정합(코드 성립 확인):
-  - no-op 가드 `:52` `if (key === active) return` → `'home'!=='none'` ∧ `'my'!=='none'` → 미발동, 두 탭 navigate 정상.
-  - `isActive = tab.key === active`(:61) → `'none'`에서 두 탭 모두 `false`.
-  - 색(:73) `isActive ? colors.orange500 : colors.grey500` → 두 탭 `grey500`(비활성색).
-  - 접근성(:68) `accessibilityState={{ selected: isActive }}` → 두 탭 `selected:false`.
-- `TABS`/`map`/`handlePress`/`styles` 무변경 — git diff상 `BottomTabBar.tsx` 변경은 JSDoc 3줄 + 타입 `TabKey` → `TabKey | 'none'` **단 한 곳**(로직 0줄). 스펙 §C 정합.
+- `createRoute` ↔ `router.gen.ts` ↔ navigate 3자 일치:
+  - `/cooking-log/:id`(`[id].tsx:38` `createRoute('/cooking-log/:id')`) ↔ `router.gen.ts:20,33` ↔ `index.tsx:45` `navigate('/cooking-log/:id',{id})`.
+  - `/cooking-log/new`(`new.tsx:34`) ↔ `router.gen.ts:21,34` ↔ `index.tsx:40`·`new.tsx:59`·`generate.tsx:227` navigate.
+  - `/recipe`(`recipe/index.tsx:22`) ↔ `router.gen.ts:23,37`.
+- 동적 `:id`: `[id].tsx:39-43` `validateParams`가 `{id: string|undefined}` 정규화 → `Route.useParams()`(`:47`). 전달측 `navigate('/cooking-log/:id',{id})` 객체 일치.
+- **BottomTabBar 3탭(D75)**: `TabKey='feed'|'recipe'|'my'`(`BottomTabBar.tsx:35`), path `'/'|'/recipe'|'/my-recipes'`(`:48-52`). active prop 전수: feed(index)·recipe(recipe/index)·my(my-recipes ×2)·none(generate/recommend×2/[id]×3/cooking-log new/[id]×4/terms/privacy/_404). **잔여 `'home'` 참조 0건**(grep 전역). 모든 active 값이 유효 유니온(`TabKey|'none'`) — typecheck가 보증.
 
-### 3. import 경로 정합 — **PASS**
+### 4. TDS 매핑 실재성 — PASS (설치 패키지 `.d.ts` 직접 검증)
 
-- depth1(`pages/*.tsx`): index/my-recipes/_404 모두 `'../src/components/BottomTabBar'` ✓
-- depth2(`pages/recipe/*.tsx`): generate/recommend/[id] 모두 `'../../src/components/BottomTabBar'` ✓
-- typecheck PASS(아래 항목 7)가 모든 경로 해석 성립을 보증. 깨진 경로 0건.
+> AppsInToss MCP는 본 환경 미제공 → 스킬 폴백: 설치된 `@toss/tds-react-native` `.d.ts` + `pnpm typecheck` 실측으로 검증(설치본=실 빌드 대상이므로 MCP 문서보다 강한 실재 증거).
 
-### 4. paddingBottom 정합 — **PASS**
+- **`Rating` 판별 유니온 (D79 — 정정의 정정 검증) PASS**: `dist/cjs/components/rating/index.d.ts`는 `export { Rating }` + `export type { RatingProps }`만 — **`EditableRating`/`ReadOnlyRating` named *값* export 부재**(타입만 내부 존재). D79 채택이 실 export와 정확히 일치. `Rating.d.ts`: `RatingProps = ({readonly:false}&EditableRatingProps) | ({readonly:true}&ReadOnlyRatingProps)`.
+  - `StarRatingInput.tsx:33-41`: `readonly={false}`+`value`+`onValueChange`+`size="large"`+`max=5` → EditableRating 분기(`EditableRatingProps`: `value/onValueChange?/size:'medium'|'large'|'big'/max?`). `size` 필수·"large" 유효.
+  - `CookingLogCard.tsx:41`: `readonly`+`value`+`variant="compact"`+`size="small"` → ReadOnlyRating 분기(`variant:'full'|'compact'|'iconOnly'`, `size:'tiny'|'small'|'medium'|'large'|'big'`). 유효.
+  - `[id].tsx:119`: `readonly`+`variant="full"`+`size="medium"` → ReadOnlyRating 유효.
+- `Button`(type/style/display/size/loading/disabled)·`TextField`(variant/value/onChangeText/placeholder/hasError; maxLength=RN TextInput passthrough)·`ErrorPage`(statusCode/title/subtitle/onPressLeftButton/onPressRightButton — `NotFoundScreen.tsx` 정확 일치)·`PageNavbar.Title`(`extensions/page-navbar`)·`Badge`/`List`/`ListRow`(`RecipeDisplay`) 전부 barrel 재export 실재.
+- `colors.*` 토큰 — 본 차 사용분(`red700`/`orange500`/`white`/`grey100`/`grey200`/`grey500`/`grey600`/`grey700`/`grey800`/`grey900`/`blue500`/`red50`) 전수: `pnpm typecheck` exit 0이 멤버 접근 실재를 보증(부재 시 TS2339 — BottomTabBar JSDoc이 `colors.primary` 부재를 TS2339로 기록한 선례와 동일 메커니즘). 별도 TS 프로브에서도 토큰 접근 무에러 확인.
+- **`RecipeDisplay`가 GeneratedRecipe 수용 PASS**: props `recipe: GeneratedRecipe`(`RecipeDisplay.tsx:30`), 읽는 필드(`dishName/description/difficulty/servings/cookTimeMinutes/ingredients/steps/tips`)가 `generatedRecipeSchema`(`recipe.ts:32-42`) 전 필드 포함. 상세 화면 `data.recipe`(= `cookingLogSchema.recipe = generatedRecipeSchema`) 그대로 전달(`[id].tsx:124`) — id/createdAt/isFavorite 미참조(불변식 06 §6.7 준수).
+- `EmptyState`(FeedEmptyState가 위임)는 **로컬** `src/components/EmptyState.tsx` — TDS 아님(혼동 주의). 정상.
 
-- generate/recommend/[id] 정상 분기 `scrollContent`에 `paddingBottom: 24` **신규 추가** 확인(git diff: 각 파일 `+    paddingBottom: 24,` 1건). 추가 전 미적용 → 추가 후 1회 — 콘텐츠 탭바 가림 방지.
-- index/my-recipes는 기존 24 유지(변경 0).
-- 가드 분기·404 분기(ScrollView 없음)는 paddingBottom 불요 — 스펙 §B 정합.
+### 5. 인증 헤더 — PASS
 
-### 5. 회귀 없음 — **PASS**
+- 보호 4종 모두 `{tossUserId, refreshTossUserId}` 전달: create/list/get/delete(`cooking-logs.ts:43-44,64-65,81-82,100-101`). api-client가 `X-Toss-User-Id` 자동 주입(`api-client.ts:82-83`) + 401 시 `refreshTossUserId()` 재발급 1회 재시도(`:110-118`).
+- 훅 4종 모두 `useTossUserId()`로 `{tossUserId, refresh}` 취득 → auth 주입. `tossUserId===undefined` 시 보호 호출 보류(feed: 로딩 표시 `index.tsx:56`; create: 즉시 한국어 에러 `useCreateCookingLog.ts:69-72`; detail/delete 동일).
+- `useTossUserId`가 `getAnonymousKey()` SDK 1회 + 메모리 캐시(`useTossUserId.tsx:42,96,106`) + hash zod 검증(`:38,61`). **평문 노출 0**: pages/components에서 `tossUserId`는 `=== undefined` 가드에만 사용, 렌더·로그 평문 0건(grep). 마스킹 헬퍼 `formatTossUserIdMask` 별도 제공.
+- 404/네트워크 에러 UI 한국어 통일: 4 훅 모두 동일 `ERROR_CODE_MESSAGES` 한국어 매핑(예 NOT_FOUND "기록을 찾을 수 없어요"), 네트워크 실패는 api-client에서 `INTERNAL_ERROR` "네트워크에 연결할 수 없어요"로 정규화(`api-client.ts:107`).
 
-- git diff HEAD 전체 변경 파일: `BottomTabBar.tsx`·`pages/_404.tsx`·`pages/recipe/[id].tsx`·`generate.tsx`·`recommend.tsx`(코드 5) + `ADR-017`·`07-ROUTING.md`·`src/components/AGENTS.md`(문서 3) + `_workspace/*`(산출물). **그 외 0.**
-- 금지 변경 대상 전수 확인(diff 부재 = 변경 0): `src/router.gen.ts` ✓, `src/services/api-client.ts`/`recipes.ts` ✓, `src/lib/zod/**` ✓, `src/types/api.ts` ✓, `src/_app.tsx` ✓, `granite.config.ts` ✓.
-- 기존 로직(목록/필터/페이지네이션/즐겨찾기/광고/SSE/저장/404 폴백) 코드 무변경 — 본 차 변경은 각 페이지에 탭바 마운트 1줄(+import) + scrollContent paddingBottom 1줄에 국한.
-- 참고(비-FAIL): `granite.config.ts:7` `appName: 'airecipe'`. ADR-017 D62는 `'airecipe-miniapp'` 원복을 동결했으나, 이후 커밋 `c491ac6`("앱인토스 콘솔에 저장되어 있는 앱이름으로 수정")가 콘솔 등록명 `'airecipe'`로 의도적으로 재설정. **D63 작업 범위 밖(granite.config.ts 변경 0이 본 작업 요구이며 충족)** — 본 검증의 FAIL 아님. 단, 콘솔 deep link prefix ↔ appName 1:1 동기는 출시 전 외부 작업으로 architect 재확인 권고(정보성).
+### 6. 미디어 어댑터 — PASS
 
-### 6. 문서↔구현 정합 — **PASS**
+- SDK 직접 접근 격리: `AppsInToss.fetchAlbumPhotos/openCamera`는 `adapter.appsintoss.ts:11,33`(`AppsInToss as unknown as MediaBridges` 로컬 타입) **단일 위치**. `PhotoPickerButton.tsx:18,27`은 `../lib/media`의 `media` 객체만 사용(SDK import 0).
+- base64 정규화: `normalizePicked`(`normalize.ts:11-20`)가 data URI/raw base64 모두 흡수 → `{dataUri, mimeType}`. `PhotoPickerButton` `onPick` → `CookingLogForm.tsx:93-94` `image: photo.dataUri`, `mimeType: photo.mimeType` → `CreateCookingLogRequest`. 03 §3.8b.2 `image:data:image/...`+`mimeType:^image/` 정합(zod `createCookingLogRequestSchema:24-25` 정규식 일치).
+- 환경 분기: `index.ts:15-17` `APP_ENV==='local'` → noop, 미지원 → noop 폴백.
 
-- `ADR-017` §2.1 D63/D63a~e: `active: TabKey|'none'`, 전 화면 마운트, early-return 분기 마운트, 404/폴백 View 래퍼, paddingBottom 24 — 구현과 일치.
-- `07-ROUTING.md` §7.8.1: 노출 범위 표가 6화면 전체 + `active="none"`(비-탭) + early-return 분기 명시로 갱신됨. D55 재포커스 불변 명시. 구현 일치.
-- `src/components/AGENTS.md` BottomTabBar 행: props `{ active: 'home'|'my'|'none' }` + "전 화면 마운트" + 비-탭 `'none'` 비활성색/`selected:false`로 갱신. 구현 일치.
-- 미세 잔존(비-FAIL, 프리-D63·D63 범위 밖): 07 §7.8.1 본문 "활성 색 = TDS `colors.primary` 계열 토큰" 1줄은 D53~D62 시점 텍스트로, 실제 채택색은 ADR-017 §3.3·D59가 `colors.orange500`으로 확정(`colors.primary`는 `@toss/tds-colors@0.1.0` 부재). 구현(`BottomTabBar.tsx:73`)은 `orange500` 정상. 문서 표현 정합화는 architect 후속 권고(정보성).
+### 7. 검수 정책 — PASS
 
-### 7. 빌드 게이트 — **PASS**
+- 권한 선언 ↔ 사용: `granite.config.ts:19-24` `{name:'photos',access:'read'}`+`{name:'camera',access:'access'}`(D80) ↔ 어댑터 `fetchAlbumPhotos`(앨범=photos)+`openCamera`(카메라). 최소권한 정합.
+- hex 0건: 본 차 신규/수정 9파일 전수 grep 0(색은 `colors` 토큰만, D83/ADR-015 D39).
+- 사진=개인정보 고지: `pages/privacy.tsx:39,56` — 첨부 사진 수집 + "비공개 클라우드 스토리지·만료 서명 URL·기록 삭제 시 사진 동반 삭제" 명시. 03 §3.8b.8 PENDING(개인정보처리방침 사진 1줄) 충족.
+- AI 면책: 기록 자체엔 불필요(요리명/사진/소감 사용자 입력). 레시피 생성·추천 화면 기존 면책 유지(범위 외, 무변경).
+- SDK 직접 import는 `_app.tsx`(Granite 컨테이너, 기존)·`useTossUserId`·`adapter.toss`·`adapter.appsintoss` 4곳만 — 신규 격리 정책 준수.
 
-- `pnpm typecheck`(tsc --noEmit): exit 0, 에러 0. (`as`/`any` 우회 없음 — BottomTabBar 변경은 union 타입 확장뿐.)
-- `pnpm lint`(eslint .): exit 0, **0 errors, 1 warning** — `src/router.gen.ts:1` "Unused eslint-disable directive"(누적 허용분 정확히 1건). 신규 코드발 warning 0.
+### 8. 스냅샷 무결성 — PASS
+
+- `toGeneratedRecipe`(`CookingLogForm.tsx:41-53`)가 `dishName/description/servings/cookTimeMinutes/difficulty/ingredients/steps/tips/nutrition` 9필드만 추출 → **id/isFavorite/createdAt 비전송**(GeneratedRecipe 필드만). 제출 `recipe: toGeneratedRecipe(recipeSel.recipe)`(`:95`).
+- `RecipeSnapshotPicker`: 저장본 선택 시 `onSelect(r, r.id)`(`:67`) — `Recipe`(extends GeneratedRecipe)를 상위호환 전달 + `sourceRecipeId=r.id`. 미저장(생성 결과)은 `new.tsx:52` `sourceRecipeId: null`. D78 정합(저장본=r.id / 미저장=null). 런타임 잔여 extra 필드는 제출 직전 `toGeneratedRecipe`가 제거 → 백엔드로 GeneratedRecipe 순수 shape 전송.
+- 생성→기록 진입: `generate.tsx:227` `navigate('/cooking-log/new', { recipe })`(미저장 GeneratedRecipe, id 없음) → `new.tsx:51-53` `initialRecipe={recipe, sourceRecipeId: null}`. id 누출 0.
 
 ---
+
+## 비차단 관찰 (정보성 — 수정 불요)
+
+1. **router.gen.ts lint warning 1건** (`1:1 Unused eslint-disable directive`) — Granite 자동 생성 파일, `granite build` 시 재생성. 사전 누적·무해(0 errors). 차단 아님.
+2. **디바이스 사진 선택 반환형 실증 PENDING** (ADR-021 외부 작업) — `adapter.appsintoss.ts`의 브리지 반환 `{id?,dataUri?}`은 가정. `normalizePicked`가 dataUri/raw 모두 흡수해 방어적이나, 실 디바이스 반환 형태(`base64:false`일 때 dataUri 제공 여부)는 미검증. 백엔드 cooking-logs·R2 미배포와 함께 출시 전 e2e 실증 필요. **코드 경계면 정합과 무관** — 외부 의존, architect 인계.
+
+## 미검증 (환경 제약)
+
+- **AppsInToss MCP**(`search_tds_rn_docs`/`get_tds_rn_doc`) 본 세션 미제공 → 설치 패키지 `.d.ts` + `pnpm typecheck` 실측으로 폴백(영역 4). 설치본은 실 빌드 대상이므로 MCP 문서보다 강한 실재 증거 — TDS 매핑 PASS 확정.
 
 ## 통지
 
-- **수정 요청 없음** — frontend 산출물 결함 0. architect 계약/정책 결함 0.
-- **정보성(architect 후속 권고, 비차단):**
-  1. 07-ROUTING §7.8.1 "활성 색 = `colors.primary` 계열" 문구를 `colors.orange500`로 정합화(D59 반영) — 구현은 이미 정상.
-  2. `granite.config.ts` `appName='airecipe'`(D62 원복이 `c491ac6`로 재설정됨) ↔ 콘솔 등록 deep link prefix 1:1 동기 출시 전 디바이스 실증 — 본 D63 범위 밖, 진입 폴백 회귀 방지 차원.
-
-## 외부 작업 PENDING (코드 측 검증 범위 밖)
-
-- 디바이스/샌드박스 dev 진입 실증: 전 화면에서 하단 탭 노출·탭 누름 재포커스·iOS SafeArea 하단 겹침(현재 `paddingBottom: 12` 상수 폴백, D61).
+- 치명 FAIL 0 → frontend/api-client 수정 요청 없음.
+- 외부 작업 PENDING(디바이스 사진 실증·백엔드 R2 배포·권한 콘솔 등록)은 architect 인계(코드 경계면 외부).

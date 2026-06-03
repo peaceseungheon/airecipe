@@ -22,6 +22,9 @@ import { RecipeGenerationService } from "@/services/recipe-generation.service";
 import { RecipeService } from "@/services/recipe.service";
 import { createAIRecommendationProvider } from "@/lib/ai/ai-recommendation-provider.factory";
 import { RecommendationService } from "@/services/recommendation.service";
+import { CookingLogService } from "@/services/cooking-log.service";
+import { SupabaseCookingLogRepository } from "@/repositories/supabase-cooking-log.repository";
+import { r2Storage } from "@/lib/storage/r2-storage";
 import type { AuthSource } from "@/types/user";
 
 /**
@@ -55,6 +58,27 @@ export async function getRecipeService(
       ? createSupabaseServiceRoleClient()
       : await createSupabaseServerClient();
   return new RecipeService(new SupabaseRecipeRepository(supabase));
+}
+
+/**
+ * 요리 기록 Service 를 조립한다(getRecipeService 와 동일한 client 선택 패턴).
+ *
+ * - `source = 'cookie'` (웹앱, 기본): 요청별 쿠키 클라이언트 → RLS 적용.
+ * - `source = 'header'` (미니앱): service-role 싱글턴 → RLS 우회 + 앱 레이어 격리.
+ *
+ * R2 스토리지(`r2Storage`)는 무상태 모듈 싱글턴이므로 재사용한다.
+ */
+export async function getCookingLogService(
+  source: AuthSource = "cookie",
+): Promise<CookingLogService> {
+  const supabase =
+    source === "header"
+      ? createSupabaseServiceRoleClient()
+      : await createSupabaseServerClient();
+  return new CookingLogService(
+    new SupabaseCookingLogRepository(supabase),
+    r2Storage,
+  );
 }
 
 /** 추천 — 테마 기반 요리 추천 서비스 (AI Provider 주입, ADR-011). 무상태 → 싱글턴. */
