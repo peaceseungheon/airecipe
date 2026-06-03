@@ -21,7 +21,7 @@
 - 메인(홈) = 내 기록 피드(역순), 우하단 FAB "올리기".
 - 3탭 재편: 피드(`/`) · 레시피(`/recipe`) · 마이(`/my-recipes`).
 - 기록 상세 화면(사진 + 레시피 스냅샷 + 별점 + 소감), 기록 삭제.
-- 백엔드: `cooking_logs` 테이블 + 비공개 Storage 버킷 + 4 엔드포인트.
+- 백엔드: `cooking_logs` 테이블 + 비공개 **Cloudflare R2** 버킷 + 4 엔드포인트.
 
 ### 비범위 (다음 단계 — 명시적 제외)
 - **공개 피드 / 타 사용자 콘텐츠 노출**(이번엔 owner-scoped, 본인 기록만).
@@ -45,9 +45,10 @@
 | D3 | 앱 구조 | **3탭: 피드(홈)/레시피/마이** | 생성·추천은 '레시피' 탭으로 이동 |
 | D4 | 필수 입력 | 사진(1장)·레시피·별점·소감 **모두 필수** | |
 | D5 | 평점 방식 | **별 5점(★1~5)** | TDS 별 컴포넌트 실재성 검증 필요 |
-| D6 | 업로드 아키텍처 | **A. 백엔드 경유** | base64 JSON 단일 요청 → Supabase Storage |
-| D7 | 버킷 공개 범위 | **비공개 버킷 + 서명 조회 URL** | 프라이버시·다음 단계 정합 |
+| D6 | 업로드 아키텍처 | **A. 백엔드 경유** | base64 JSON 단일 요청 → 백엔드가 R2에 저장 |
+| D7 | 버킷 공개 범위 | **비공개 버킷 + 서명(presigned) 조회 URL** | 프라이버시·다음 단계 정합 |
 | D8 | 레시피 스냅샷 출처 | **저장본 선택 + 방금 생성한 미저장 레시피 첨부 둘 다** | `sourceRecipeId` 미저장 시 null |
+| D9 | 스토리지 공급자 | **Cloudflare R2** (S3 호환) | Supabase Storage 아님. 백엔드가 S3 API로 업로드/presign/삭제 |
 
 ---
 
@@ -79,11 +80,26 @@
 - **RLS**: `user_id = 현재 사용자`(웹 Supabase Auth 쿠키 OR 미니앱 `X-Toss-User-Id` → internal uuid 매핑, 기존 dual-auth 재사용).
 - 인덱스: `(user_id, created_at desc)`.
 
-### 5.2 Storage 버킷 `cooking-photos`
-- **비공개(private) 버킷**.
-- 객체 경로: `{internal_user_id}/{log_id}.{ext}`.
-- 조회 시 서버가 **서명 URL**(예: TTL 1h) 발급 → 응답 `photoUrl`.
-- 업로드/삭제는 서버(서비스 롤)만 수행. 미니앱은 Storage 직접 접근 안 함.
+### 5.2 객체 스토리지 — Cloudflare R2 버킷 `cooking-photos`
+- **공급자: Cloudflare R2**(S3 호환 API). Supabase Storage **아님**.
+- **비공개(private) 버킷** — 공개 도메인/공개 접근 비활성.
+- 객체 키: `{internal_user_id}/{log_id}.{ext}`.
+- 조회 시 서버가 **S3 presigned GET URL**(예: TTL 1h) 발급 → 응답 `photoUrl`.
+- 업로드(`PutObject`)/조회 presign/삭제(`DeleteObject`)는 **백엔드만** 수행(R2 자격증명 서버 전용). 미니앱은 R2를 직접 접근하지 않음.
+
+### 5.3 R2 연동 (백엔드)
+- **런타임:** 기존 API Route 관례대로 `export const runtime = "nodejs"`(AWS SDK 동작 — edge 불가).
+- **클라이언트(권장):** `@aws-sdk/client-s3` + `@aws-sdk/s3-request-presigner`(presign 1급 지원). 경량 대안 `aws4fetch` 가능하나 표준성·presign 편의로 AWS SDK v3 권장.
+  - `S3Client({ region: "auto", endpoint: "https://<R2_ACCOUNT_ID>.r2.cloudflarestorage.com", credentials: { accessKeyId, secretAccessKey } })`.
+- **신규 환경변수(백엔드 전용, 미니앱에 절대 미포함):**
+  | 키 | 용도 |
+  |---|---|
+  | `R2_ACCOUNT_ID` | R2 엔드포인트 구성 |
+  | `R2_ACCESS_KEY_ID` | R2 API 토큰 access key |
+  | `R2_SECRET_ACCESS_KEY` | R2 API 토큰 secret |
+  | `R2_BUCKET` | 버킷명(`cooking-photos`) |
+- **격리:** R2 접근을 단일 모듈(예: `src/lib/storage/r2.ts` 또는 `StorageService`)로 캡슐화 — 업로드/presign/삭제만 노출. 어댑터 격리로 향후 공급자 교체·테스트 용이(레포지토리/어댑터 패턴).
+- `.env.example` 갱신 + 배포 환경(Vercel staging/prod)에 R2 시크릿 주입(외부 작업 PENDING).
 
 ---
 
@@ -103,7 +119,7 @@
     "review": "국물이 끝내줘요"                 // 필수, 비어있지 않음
   }
   ```
-- 동작: 입력 검증 → Storage 업로드 → `cooking_logs` 행 insert → 생성 결과 반환.
+- 동작: 입력 검증 → base64 디코드 → **R2 업로드(`PutObject`)** → `cooking_logs` 행 insert(`photo_path`=R2 키) → 생성 결과 반환.
 - **Next.js 라우트 body 크기 한도 상향**(이미지 base64 ~2–3MB 고려).
 - Response 201: `CookingLog`(아래 6.5).
 - 에러: `VALIDATION_ERROR`(필드/크기/mime), `UNAUTHORIZED`, `PAYLOAD_TOO_LARGE`, AI 무관.
@@ -117,13 +133,13 @@
 - owner-scoped. Response 200: `CookingLog`. 미존재/비소유 → 404(구분 안 함, 기존 관례).
 
 ### 6.4 `DELETE /api/cooking-logs/[id]` — 기록 삭제
-- owner-scoped. 행 삭제 + Storage 객체 삭제. Response 200: `{ data: { id } }`. 404 멱등 정규화(기존 관례).
+- owner-scoped. 행 삭제 + **R2 객체 삭제(`DeleteObject`)**. Response 200: `{ data: { id } }`. 404 멱등 정규화(기존 관례).
 
 ### 6.5 응답 shape `CookingLog`
 ```jsonc
 {
   "id": "uuid",
-  "photoUrl": "https://...signed...",  // 서명 조회 URL(만료 있음)
+  "photoUrl": "https://...r2-presigned...",  // R2 presigned GET URL(만료 있음)
   "recipe": { /* GeneratedRecipe 스냅샷 */ },
   "rating": 5,
   "review": "...",
@@ -175,7 +191,8 @@
 ### 7.6 검증 필요 항목 (architect/QA 단계, 출시 전 실증)
 - ⚠ **TDS 별점 컴포넌트 실재성** — 실재 시 사용, 없으면 검증된 프리미티브로 합성(★/☆ 글리프 + `colors` 토큰; ADR-017의 `Icon name` free-string 렌더 리스크 회피).
 - ⚠ **이미지 브리지 untyped → 타입 어댑터** + 디바이스 실증(외부 작업 PENDING 관례, 광고 SDK 선례).
-- Next.js body 크기 한도 / 서명 URL TTL ↔ 피드 캐싱 상호작용.
+- Next.js body 크기 한도 / **R2 presigned URL TTL ↔ 피드 캐싱** 상호작용(만료 후 재조회 시 URL 갱신 필요 — 목록 응답마다 신선한 presign 발급).
+- **R2 자격증명·SDK**: `runtime="nodejs"` 필수(edge 불가), 자격증명 백엔드 전용(미니앱 미포함), R2 엔드포인트/버킷 설정 검증.
 - **검수/개인정보:** 신규 권한(photos/camera) 콘솔+config 선언 + 최소권한 정당화. **사진은 개인정보** → 개인정보처리방침(ADR-020)에 사진 저장·보관 1줄 추가. AI 콘텐츠 면책은 기존 패턴 유지(기록 자체는 AI 산출 아님).
 
 ---
@@ -192,7 +209,7 @@
         |
    useCreateCookingLog -> api-client.createCookingLog(base64+recipe+rating+review)
         |  (단일 POST)
-   backend: 검증 -> Storage 업로드 -> cooking_logs insert -> CookingLog 반환
+   backend: 검증 -> R2 업로드(PutObject) -> cooking_logs insert -> CookingLog(presigned photoUrl) 반환
         |
    성공 -> 피드(/)로 이동 + 캐시 무효화(새 기록 상단 노출)
 ```
