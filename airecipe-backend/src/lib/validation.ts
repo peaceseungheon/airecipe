@@ -47,6 +47,29 @@ export const listQuerySchema = z.object({
     .transform((n) => Math.min(n, 50)),
 });
 
+// POST /api/cooking-logs — 요리 기록 생성 (스펙 §6.1)
+export const createCookingLogRequestSchema = z.object({
+  image: z
+    .string()
+    .regex(/^data:image\/[a-zA-Z0-9.+-]+;base64,/, "이미지 형식이 올바르지 않습니다."),
+  mimeType: z.string().regex(/^image\//, "이미지 형식이 올바르지 않습니다."),
+  recipe: generatedRecipeSchema,
+  sourceRecipeId: z.string().uuid().nullable().optional(),
+  rating: z.coerce.number().int().min(1).max(5),
+  review: z.string().trim().min(1, "소감을 입력해 주세요.").max(1000),
+});
+
+// GET /api/cooking-logs 쿼리 — page/pageSize (recipes listQuery 와 동일 관례, ADR-006).
+export const cookingLogListQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .default(20)
+    .transform((n) => Math.min(n, 50)),
+});
+
 /**
  * zod 파싱을 수행하고 실패 시 ServiceError(VALIDATION_ERROR)로 변환한다.
  * Route는 try/catch로 받아 failFromError로 응답한다.
