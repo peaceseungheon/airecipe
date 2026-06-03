@@ -1,60 +1,46 @@
 /**
  * 앱인토스 이미지 피커 어댑터 — SDK 직접 import 단일 위치(ADR-014 광고 어댑터 규약 동일).
  *
- * 브리지(`AppsInToss.fetchAlbumPhotos`/`openCamera`)는 `.d.ts`에 타입 선언이 없어
- * 로컬 타입으로 선언한다(런타임 실재 — dist/index.js 2700·2703행 확인).
- * 디바이스 반환형(`{ id, dataUri }` 가정)은 실증 PENDING — normalizePicked가 dataUri/raw 모두 흡수.
+ * `fetchAlbumPhotos`/`openCamera`는 `@apps-in-toss/framework`의 **최상위 named export**다
+ * (framework가 `@apps-in-toss/native-modules`를 `export *` 재노출 — index.d.ts:14, 런타임 실재).
+ * ⚠ `AppsInToss` 객체에는 없다(`{ registerApp }`만) — 객체 경유 접근은 항상 undefined라
+ *    isSupported가 false로 떨어져 noop 폴백 → "클릭해도 무반응" 버그가 됐었다.
+ *
+ * 반환형(실증): `ImageResponse = { id: string; dataUri: string }`.
+ * `base64: true`로 호출 → `dataUri`는 prefix 없는 raw base64. normalizePicked가 data URI로 래핑한다.
+ *   (base64:false면 file URI라 미리보기·백엔드 base64-in-JSON 업로드(ADR-021 D77) 모두 불가.)
+ * 권한 거부 시 `*PermissionError` throw → null로 정규화(호출 측은 미선택과 동일 처리).
  *
  * 환경 분기는 index.ts에서 — 본 파일은 어댑터 구현만.
  */
 
-import { AppsInToss } from '@apps-in-toss/framework';
+import { fetchAlbumPhotos, openCamera } from '@apps-in-toss/framework';
 
 import { normalizePicked } from './normalize';
 import type { MediaAdapter, PickedImage } from './types';
 
-interface ImageBridgeResult {
-  id?: string;
-  dataUri?: string;
-}
-
-interface MediaBridges {
-  fetchAlbumPhotos?: (opts: {
-    maxCount?: number;
-    maxWidth?: number;
-    base64?: boolean;
-  }) => Promise<ImageBridgeResult[] | ImageBridgeResult>;
-  openCamera?: (opts: {
-    maxWidth?: number;
-    base64?: boolean;
-  }) => Promise<ImageBridgeResult>;
-}
-
-const bridges = AppsInToss as unknown as MediaBridges;
-
-function firstResult(
-  r: ImageBridgeResult[] | ImageBridgeResult,
-): ImageBridgeResult | null {
-  if (Array.isArray(r)) return r[0] ?? null;
-  return r ?? null;
-}
-
 export function createAppsInTossMediaAdapter(): MediaAdapter {
   return {
-    isSupported: () => typeof bridges.fetchAlbumPhotos === 'function',
+    isSupported: () => typeof fetchAlbumPhotos === 'function',
     pickFromAlbum: async (): Promise<PickedImage | null> => {
-      if (typeof bridges.fetchAlbumPhotos !== 'function') return null;
-      const res = await bridges.fetchAlbumPhotos({
-        maxCount: 1,
-        maxWidth: 1024,
-        base64: false,
-      });
-      return normalizePicked(firstResult(res)?.dataUri);
+      try {
+        const res = await fetchAlbumPhotos({
+          maxCount: 1,
+          maxWidth: 1024,
+          base64: true,
+        });
+        return normalizePicked(res[0]?.dataUri);
+      } catch {
+        return null;
+      }
     },
     pickFromCamera: async (): Promise<PickedImage | null> => {
-      if (typeof bridges.openCamera !== 'function') return null;
-      const res = await bridges.openCamera({ maxWidth: 1024, base64: false });
-      return normalizePicked(res?.dataUri);
+      try {
+        const res = await openCamera({ maxWidth: 1024, base64: true });
+        return normalizePicked(res?.dataUri);
+      } catch {
+        return null;
+      }
     },
   };
 }
