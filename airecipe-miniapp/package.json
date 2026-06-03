@@ -21,7 +21,6 @@
     "@granite-js/react-native": "1.0.28",
     "@sentry/react-native": "^8.13.0",
     "@toss/tds-react-native": "^2.0.3",
-    "@vercel/analytics": "^2.0.1",
     "brick-module": "0.5.1",
     "react": "19.2.3",
     "react-native": "0.84.0",

@@ -8,7 +8,6 @@ import { RecipeCacheProvider } from './hooks/useRecipeCache';
 import { TossUserIdProvider } from './hooks/useTossUserId';
 
 import * as Sentry from '@sentry/react-native';
-import { Analytics } from '@vercel/analytics/next';
 
 /**
  * AppContainer — 전역 Provider 마운트 지점.
@@ -25,7 +24,6 @@ function AppContainer({ children }: PropsWithChildren<InitialProps>) {
       <RecipeCacheProvider>
         <CookingLogCacheProvider>{children}</CookingLogCacheProvider>
       </RecipeCacheProvider>
-      <Analytics />
     </TossUserIdProvider>
   );
 }
