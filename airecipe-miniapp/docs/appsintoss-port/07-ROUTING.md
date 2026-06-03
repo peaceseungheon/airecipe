@@ -201,6 +201,30 @@ function RecommendPage() {
 
 > **이름 선택 사유 (D49)**: `/recipe/recommend`는 기존 `/recipe/*` 그룹과 일관성 유지. `/recommendations`(최상위 그룹 부담)·`/recipe/recommendations`(URL 길이) 기각.
 
+### 7.3.7 서비스 이용약관 — `/terms` → `pages/terms.tsx` (ADR-020)
+
+| 항목 | 미니앱 |
+|------|--------|
+| 경로 | `/terms` (`pages/terms.tsx`) |
+| 진입 보호 | **공개 화면** — `useTossUserId` 미사용. 정적 콘텐츠라 식별자 불필요(홈·generate와 동일 정책) |
+| 핵심 UI | `PageNavbar.Title("서비스 이용약관")` + `ScrollView`(제1조~제10조 섹션 반복) + 시행일 + `<BottomTabBar active="none" />` |
+| 데이터 호출 | **0건** — api-client/fetch/hooks 미사용. 본문은 모듈 상수(`ARTICLES`)로 정적 렌더 |
+| 진입점 | 홈 `pages/index.tsx` 하단 푸터 링크 → `navigation.navigate('/terms', {})` |
+| Params 읽기 | 없음 (`{}`) |
+
+### 7.3.8 개인정보처리방침 — `/privacy` → `pages/privacy.tsx` (ADR-020)
+
+| 항목 | 미니앱 |
+|------|--------|
+| 경로 | `/privacy` (`pages/privacy.tsx`) |
+| 진입 보호 | **공개 화면** — `useTossUserId` 미사용 |
+| 핵심 UI | `PageNavbar.Title("개인정보처리방침")` + `ScrollView`(8절 섹션 반복: 수집 항목·이용 목적·보유 기간·제3자 제공·위탁·이용자 권리·보호책임자·변경) + 시행일 + `<BottomTabBar active="none" />` |
+| 데이터 호출 | **0건** — 본문은 모듈 상수(`SECTIONS`)로 정적 렌더 |
+| 진입점 | 홈 푸터 링크 → `navigation.navigate('/privacy', {})` |
+| Params 읽기 | 없음 (`{}`) |
+
+> **검수 메모 (ADR-020)**: 약관·개인정보처리방침의 인앱 제공은 검수에 유리. 본문 내 사업자 정보 placeholder(`[관할 법원]`·`[보호책임자]`·`[고객센터]`·법인명)는 **출시 전 실제 값 확정 의무**(콘솔 등록값과 동기). 두 화면 모두 신규 외부 도메인 호출 0건 → 도메인 화이트리스트 영향 없음. 딥링크 prefix(`intoss://airecipe/terms`·`/privacy`)는 기존과 동일 메커니즘이라 콘솔 변경 불필요.
+
 ### 7.3.5 layout (현재 `src/app/layout.tsx`) — **Granite 메커니즘으로 흡수**
 
 | 현재 layout 요소 | 미니앱 처리 |
@@ -231,6 +255,8 @@ function RecommendPage() {
 | 3 | `/my-recipes` | `src/app/my-recipes/page.tsx` | `/my-recipes` | `pages/my-recipes.tsx` | 식별자 보장 |
 | 4 | `/recipe/[id]` | `src/app/recipe/[id]/page.tsx` | `/recipe/[id]` | `pages/recipe/[id].tsx` | 식별자 보장 |
 | 5 | — (신규, Phase 6) | — | `/recipe/recommend` | `pages/recipe/recommend.tsx` | 식별자 보장 |
+| 6 | — (신규, ADR-020) | — | `/terms` | `pages/terms.tsx` | 공개 (정적) |
+| 7 | — (신규, ADR-020) | — | `/privacy` | `pages/privacy.tsx` | 공개 (정적) |
 | - | `/auth/login` | `src/app/auth/login/page.tsx` | — | **제외** | — |
 | - | `/auth/signup` | `src/app/auth/signup/page.tsx` | — | **제외** | — |
 | - | (layout) | `src/app/layout.tsx` | — | Granite ThemeProvider + 화면별 Navbar | — |
@@ -480,6 +506,8 @@ function GeneratePage() {
 | `/recipe/generate` | `<BottomTabBar active="none" />` (정상 분기 — ScrollView 형제) | 기존 유지 |
 | `/recipe/recommend` | `<BottomTabBar active="none" />` (식별자 가드 + 정상 분기) | 기존 유지 |
 | `/recipe/[id]` | `<BottomTabBar active="none" />` (식별자 가드 + 404 분기 + 정상 분기) | 기존 유지 |
+| `/terms` (ADR-020) | `<BottomTabBar active="none" />` (정적 — ScrollView 형제) | `PageNavbar` Title "서비스 이용약관" |
+| `/privacy` (ADR-020) | `<BottomTabBar active="none" />` (정적 — ScrollView 형제) | `PageNavbar` Title "개인정보처리방침" |
 | `/_404` | `<BottomTabBar active="none" />` (`View` 래퍼로 `NotFoundScreen`과 형제) | `NotFoundScreen`(ErrorPage) |
 
 > 비-탭 화면은 push로 진입했으므로 탭 누름 시 `navigate`는 탭 루트로 **재포커스(pop-to)**한다 — 스택을 깊게 만들지 않음(D63d, D55 불변).

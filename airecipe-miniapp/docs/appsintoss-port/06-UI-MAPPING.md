@@ -353,6 +353,23 @@ Phase 6에서 추가되는 컴포넌트 2종. SegmentedControl·Pressable·Badge
 
 > `useRecommendations` 훅과 `pages/recipe/recommend.tsx` 라우트는 §6.10 외 — 훅은 `src/hooks/AGENTS.md`, 라우트는 07-ROUTING §7.3.6에서 동결.
 
+## 6.11 정적 법적 페이지 패턴 (이용약관·개인정보처리방침 — ADR-020)
+
+`pages/terms.tsx`·`pages/privacy.tsx`는 별도 도메인 컴포넌트 없이 **TDS 프리미티브만으로 본문을 반복 렌더**하는 정적 패턴이다. 신규 컴포넌트 0개 — `src/components/`에 추가하지 않는다(단일 화면 전용·재사용 없음, ADR-009 단순성 원칙).
+
+| 요소 | TDS 매핑 | 비고 |
+|------|---------|------|
+| 화면 제목 | `PageNavbar.Title` | "서비스 이용약관" / "개인정보처리방침" |
+| 본문 컨테이너 | RN `ScrollView` + `contentContainerStyle`(padding 20·gap 20·paddingBottom 24) | 긴 본문 스크롤. paddingBottom은 하단 탭바 가림 방지(ADR-017 D61) |
+| 조항/절 제목 | `Txt typography="t5" color={colors.grey900}` | 모듈 상수 배열을 `.map`으로 반복 |
+| 본문 단락 | `Txt typography="st9" color={colors.grey700}` + `style={{ lineHeight: 22 }}` | 단락 배열 `.map` |
+| 시행일 | `Txt typography="st11" color={colors.grey500}` | 본문 말미 1줄 |
+| 하단 탭바 | `<BottomTabBar active="none" />` | 비-탭 화면(ADR-017 D63) |
+
+> **본문 데이터**: 약관/처리방침 본문은 페이지 파일 내 모듈 상수(`ARTICLES`/`SECTIONS`: `{ title, body: string[] }[]`)로 둔다. 외부 호출 0건. hex 직접 사용 0건(`colors.*` 토큰만, ADR-015 D39). 사업자 정보 placeholder는 출시 전 확정(ADR-020 D74).
+>
+> **홈 푸터 진입(ADR-020 D72)**: `pages/index.tsx` `ScrollView` 하단에 `Pressable` + `Txt typography="st11" color={colors.grey500}` 텍스트 링크 2개를 가로 배치(가운데 `·` 구분, `colors.grey300`). 누름 → `navigation.navigate('/terms'|'/privacy', {})`.
+
 **AI 면책 문구 (ADR-016 D52 — Phase 5 D40 패턴 재사용):**
 - 위치: `pages/recipe/recommend.tsx` 추천 결과 리스트 하단 1줄.
 - 카피: "AI가 생성한 참고용 추천이에요. 식당·식자재 등 실제 상황을 고려해 선택해주세요."

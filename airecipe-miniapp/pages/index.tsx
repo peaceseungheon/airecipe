@@ -14,7 +14,7 @@
  */
 
 import React, { useCallback } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { createRoute, useNavigation } from '@granite-js/react-native';
 import { Button, PageNavbar, Txt, colors } from '@toss/tds-react-native';
 
@@ -37,6 +37,14 @@ function HomePage() {
 
   const handleOpenRecommend = useCallback(() => {
     navigation.navigate('/recipe/recommend', {});
+  }, [navigation]);
+
+  const handleOpenTerms = useCallback(() => {
+    navigation.navigate('/terms', {});
+  }, [navigation]);
+
+  const handleOpenPrivacy = useCallback(() => {
+    navigation.navigate('/privacy', {});
   }, [navigation]);
 
   return (
@@ -71,6 +79,30 @@ function HomePage() {
             오늘의 추천 받기
           </Button>
         </View>
+
+        <View style={styles.footer}>
+          <Pressable
+            onPress={handleOpenTerms}
+            accessibilityRole="link"
+            accessibilityLabel="서비스 이용약관"
+          >
+            <Txt typography="st11" color={colors.grey500}>
+              서비스 이용약관
+            </Txt>
+          </Pressable>
+          <Txt typography="st11" color={colors.grey300}>
+            ·
+          </Txt>
+          <Pressable
+            onPress={handleOpenPrivacy}
+            accessibilityRole="link"
+            accessibilityLabel="개인정보처리방침"
+          >
+            <Txt typography="st11" color={colors.grey500}>
+              개인정보처리방침
+            </Txt>
+          </Pressable>
+        </View>
       </ScrollView>
 
       <BottomTabBar active="home" />
@@ -93,5 +125,12 @@ const styles = StyleSheet.create({
   },
   recommendCta: {
     marginTop: 8,
+  },
+  footer: {
+    marginTop: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
   },
 });

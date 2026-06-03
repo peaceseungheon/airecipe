@@ -15,6 +15,8 @@
 | `recipe/recommend.tsx` | `/recipe/recommend` | 보호 화면 — useTossUserId 가드 + useRecommendations 결합. 미선택/로딩/에러/정상 분기 + ThemePicker + RecommendationCard. 카드 탭 → `/recipe/generate` 재사용. AI 면책 1줄 | ADR-016 D44~D52 |
 | `my-recipes.tsx` | `/my-recipes` | 보호 화면 — useTossUserId 가드 + useMyRecipes 결합 + `<BottomTabBar active="my" />`(ADR-017). 상단 FilterTabs(전체/즐겨찾기) + RecipeCard.onToggleFavorite(낙관적 mutate). 빈+정상 양쪽 하단 `<AppInlineAd slot="my-recipes-bottom" />`(로딩/에러 미렌더). 단순 페이지네이션(이전/다음 + `meta.pageSize` 신뢰) | 07 §7.3.3, ADR-012 D14·D15·D18, ADR-013 D4·D9·D11, ADR-014 D30, ADR-017 D56 |
 | `recipe/[id].tsx` | `/recipe/[id]` | 보호 화면 — useTossUserId 가드 + useRecipeDetail 결합. 로딩/404/에러/정상 4-way 분기. 404 → `<NotFoundScreen onBack={...} />` 단일 컴포넌트. PageNavbar.AccessoryButtons에 FavoriteButton + 본문 하단 삭제 Button + DeleteConfirmDialog. 낙관적 mutate(D4) + 삭제 성공·404 정규화 후 handleBack(D8). handleBack은 `canGoBack?.()` + fallback `/my-recipes` | 07 §7.3.4, ADR-005, ADR-012 D14·D16, ADR-013 D5·D6·D7·D8·D9 |
+| `terms.tsx` | `/terms` | **공개 정적 화면** — 서비스 이용약관 본문(제1조~제10조 + 시행일)을 모듈 상수(`ARTICLES`)로 `ScrollView` 렌더. `PageNavbar.Title` + `<BottomTabBar active="none" />`. useTossUserId/fetch/hooks 0건. 진입은 홈 푸터 링크. 사업자 정보 placeholder는 출시 전 확정 | 07 §7.3.7, ADR-020, ADR-017 D63 |
+| `privacy.tsx` | `/privacy` | **공개 정적 화면** — 개인정보처리방침 본문(8절 + 시행일)을 모듈 상수(`SECTIONS`)로 `ScrollView` 렌더. 제4절에 AI Provider 제3자 전송 고지. 동일 컨벤션·진입점 | 07 §7.3.8, ADR-020, ADR-017 D63 |
 | `_404.tsx` | (Granite 폴백) | 라우트 미매칭 진입 시 표시. `<NotFoundScreen />` 재사용(카피는 진입 폴백용 분기). 우측 "닫기" → `/` 이동 + canGoBack 폴백 | 10 §10.6, ADR-005, ADR-012 D16, ADR-015 D40 |
 
 ## 규약 (강제)
@@ -59,9 +61,10 @@
 
 ## 라우트 등록 정책 (출시 점검 영향)
 
-- **등록 라우트** — `/`, `/recipe/generate`, `/my-recipes`, `/recipe/[id]`, `/recipe/recommend`. `src/router.gen.ts` 자동 갱신, 수동 수정 금지.
+- **등록 라우트** — `/`, `/recipe/generate`, `/my-recipes`, `/recipe/[id]`, `/recipe/recommend`, `/terms`, `/privacy`. `src/router.gen.ts` 자동 갱신, 수동 수정 금지(단 typecheck를 위해 신규 라우트는 빌드 전 수동 등록 — Phase 6·ADR-020 선례).
 - 새 화면 추가 시 출시 검수 도메인 화이트리스트·딥링크(`intoss://airecipe/...`, prefix = `scheme://appName`) 영향 점검 (07 §7.6, 09-ENV-CONFIG).
 - 비기능 화면(about 등) 추가 시 노출 영향 별 점검 (`appsintoss-publish-checklist` 스킬).
+- **정적 콘텐츠 화면(`/terms`·`/privacy`, ADR-020)** — 외부 호출 0건·본문은 모듈 상수. 공개 화면이라 useTossUserId 미사용. 신규 외부 도메인 0건이라 화이트리스트 영향 없음. 본문 사업자 정보 placeholder는 출시 전 실제 값 확정 의무.
 
 ## 진입점
 

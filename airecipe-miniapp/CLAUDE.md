@@ -70,7 +70,22 @@ AI 레시피 안내 — 앱인토스 미니앱 (React Native + Granite + TDS).
 
 ## 현재 단계
 
-**Sentry 에러 트래킹 Granite 정식 경로 정렬(ADR-019) → 라우트 `pages/` 통합(ADR-018) + 하단 탭바(ADR-017) → 디바이스 진입 실증 + 백엔드/출시/Sentry 콘솔 외부 작업 PENDING** (2026-06-01).
+**이용약관·개인정보처리방침 인앱 정적 페이지 추가(ADR-020) → Sentry 정식 경로 정렬(ADR-019) → 라우트 `pages/` 통합(ADR-018) + 하단 탭바(ADR-017) → 디바이스 진입 실증 + 사업자 정보 확정 + 백엔드/출시/Sentry 콘솔 외부 작업 PENDING** (2026-06-01).
+
+### 이용약관·개인정보처리방침 인앱 정적 페이지 (ADR-020, 2026-06-01)
+
+사용자 요청("서비스 이용약관 페이지")으로 확정 3결정(표준 보일러플레이트 생성 / 이용약관+개인정보처리방침 둘 다 / 홈 푸터 진입) 후 구현. **미니앱 단독·백엔드 무변경.** typecheck PASS, lint 0 errors(router.gen.ts 누적 warning 1건). hex 0건·금지 호출 0건 grep 확인.
+
+5결정(ADR-020 D70~D74):
+- **D70** 외부 URL이 아닌 **인앱 정적 라우트**로 제공 — 검수 접근성·오프라인 가용·외부 도메인 0건·관리 비용 제거. 본문은 모듈 상수.
+- **D71** **별 라우트 2개 분리**(`/terms`·`/privacy`) — 단일 페이지+탭 기각(파일 라우팅 단순·독립 딥링크).
+- **D72** 진입점 **홈 푸터 링크** — 설정 화면 신설 회피(범위 최소화). `Pressable`+`Txt`(grey500) 2개.
+- **D73** **공개 정적 화면** — useTossUserId/api-client/fetch/hooks 0건. TDS만·hex 0건(ADR-015 D39). `<BottomTabBar active="none" />`(ADR-017 D63).
+- **D74** 사업자 정보 **placeholder + 출시 전 확정 의무** — 법인명·관할법원·보호책임자·고객센터.
+
+산출: `pages/terms.tsx`·`pages/privacy.tsx`(신규)·`pages/index.tsx`(푸터)·`src/router.gen.ts`(수동 등록 2) + `docs/adr/ADR-020`(신규) + 07 §7.3.7/§7.3.8·§7.4·§7.8.1 + 06 §6.11 + pages/AGENTS.md 갱신.
+
+**외부 작업 PENDING(ADR-020 D74)**: 약관/처리방침 본문 사업자 정보 placeholder(`[관할 법원]`·`[보호책임자]`·`[고객센터]`·법인명) 출시 전 실제 값 확정(콘솔 등록값 동기) + 표준 보일러플레이트 법무 검토.
 
 ### Sentry 설정 검토·정렬 (ADR-019, 2026-06-01)
 
@@ -405,6 +420,7 @@ Phase별 수용 기준은 `docs/appsintoss-port/10-SPRINT-PLAN.md`. 결정 트�
 | 2026-05-29 | 진입 폴백 hotfix — "현재 단계" 절 hotfix 절 신설 + 4 root cause 표. 사용자 보고("앱 진입 시 NotFoundScreen + 닫기 무동작") → `navigation.getState` 진단 로그로 root cause 확정 → 4 fix 적용 후 정상 동작 검증. (1) `granite.config.ts` appName `airecipe-miniapp` 원복(commit 87625a4 역행 — 콘솔 등록 deep link prefix와 동기) (2) `NotFoundScreen.tsx` 우측 닫기에 onBack 정확 바인딩 + props 확장(`onContactSupport?`/`title?`/`subtitle?`) (3) `pages/*.tsx` shim 5종 상대 경로 정정 (4) `_404.tsx` 진입 폴백 카피 분리 + try-catch + `__DEV__` `navigation.getState` JSON 진단 로그. 06 §6.5 NotFoundScreen 행 TDS 카피 매핑 정정. `_workspace_phase6` 보존 + 새 `_workspace` hotfix 사이클 | CLAUDE.md | hotfix 마무리 — typecheck PASS, lint 0 errors. 검수 정책 인계: 콘솔 등록 deep link prefix ↔ `appName` 1:1 동기화 출시 전 검증 필수. |
 | 2026-06-01 | `.env.*` 빌드 주입 수정 — 사용자 검토 요청("production 빌드 시 `.env.production` 적용 여부")으로 점검 → plugin-env·ait CLI 모두 `.env` 미로드(빌드가 `.env.production`을 무시·`build:prod`는 example placeholder URL 인라인)임을 코드/패키지 확인. `dotenv-cli` devDependency 추가 + `build:staging`/`build:prod`를 `dotenv -e .env.<env> -- ait build`로 전환(파일이 SSOT). `.env.staging` 템플릿 신규 + `.env.production`/`.env.example` 헤더 주석 정정 + 09 §9.4.1 갱신(plugin-env 미로드·dotenv-cli 체인 명시). **미니앱 단독·백엔드 무변경.** 주입 최종값 검증 PASS(prod: 실 URL·production·warn·SENTRY_DSN set / plain build는 local 폴백 회귀 없음). | package.json·.env.staging(신규)·.env.production·.env.example·09-ENV-CONFIG·CLAUDE.md | `.env.production`이 빌드에 미적용이던 문제 해소 — 파일을 빌드 SSOT로 승격(A안: dotenv-cli). |
 | 2026-05-30 | BottomTabBar 전 화면 노출 (ADR-017 D63 — D56 대체) — "현재 단계" 하단 탭바 절에 D63 서브절 추가 + D56 노출 범위 정정(취소선). `active` 센티넬 `'none'` 도입(D63a, 로직 무변경·타입만 확장), early-return 분기 마운트(D63b), 404/_404 View 래퍼 패턴(D63c), D55 재포커스 불변(D63d), generate/recommend/[id] paddingBottom 24(D63e). 6개 페이지 전 분기 마운트. 산출: `BottomTabBar.tsx`·`pages/recipe/{generate,recommend,[id]}.tsx`·`pages/_404.tsx` + ADR-017 §2.1 D63 + `_workspace/01_architect_baseline.md` + 07 §7.8.1 + `src/components/AGENTS.md`. **백엔드 무변경.** 07 §7.8.1 본문 활성색 문구를 `colors.orange500`로 정합(QA 비차단 지적 반영). | 사용자 요청("모든 화면 노출"). QA 7/7 GO(FAIL 0), typecheck/lint PASS. |
+| 2026-06-01 | 이용약관·개인정보처리방침 인앱 정적 페이지 추가 (ADR-020) — "현재 단계" 절에 ADR-020 서브절 추가 + 변경 이력 1행. 신규 라우트 2개(`/terms`·`/privacy`, 공개 정적 화면) + 홈 푸터 진입 링크. 산출: `pages/terms.tsx`·`pages/privacy.tsx`(신규)·`pages/index.tsx`(푸터 surgical)·`src/router.gen.ts`(수동 등록 2) + `docs/adr/ADR-020`(신규 D70~D74) + 07 §7.3.7/§7.3.8·§7.4 행6·7·§7.8.1 2행 + 06 §6.11(정적 페이지 패턴) + pages/AGENTS.md 파일 표 2행·등록 라우트·정적 화면 규약. 본문 표준 한국어 보일러플레이트 생성(이용약관 제6조 AI 면책·개인정보 제4절 AI Provider 제3자 전송 고지). **미니앱 단독·백엔드 무변경.** 검수 영향: 외부 도메인 0건(화이트리스트 무변경)·딥링크 기존 메커니즘. 메인 세션이 frontend 위임 + architect/qa 역할 통합 수행(사용자가 추가 에이전트 스폰 거부, 직접 마무리). | 사용자 요청("서비스 이용약관 페이지"). typecheck PASS·lint 0 errors. 사업자 정보 placeholder 출시 전 확정 PENDING(D74). |
 
 ---
 
