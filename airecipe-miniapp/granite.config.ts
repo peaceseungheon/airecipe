@@ -14,7 +14,7 @@ export default defineConfig({
       brand: {
         displayName: 'AI 레시피',
         primaryColor: '#FF6B35',
-        icon: '',
+        icon: 'https://pub-af1aa7fb010c4b21b82d84a9e7a97ab8.r2.dev/images/airecipe%E1%84%85%E1%85%A9%E1%84%80%E1%85%A9.png',
       },
       permissions: [],
     }),
