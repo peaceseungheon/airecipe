@@ -218,6 +218,17 @@ function GeneratePage() {
               }
             />
             <NutritionPanel nutrition={recipe.nutrition} />
+            <Button
+              type="light"
+              style="weak"
+              display="block"
+              size="medium"
+              onPress={() =>
+                navigation.navigate('/cooking-log/new', { recipe })
+              }
+            >
+              이 레시피로 기록 남기기
+            </Button>
             {saveError ? (
               <View style={styles.errorBox} accessibilityLabel="레시피 저장 실패">
                 <Txt typography="t5" color={colors.red700}>
