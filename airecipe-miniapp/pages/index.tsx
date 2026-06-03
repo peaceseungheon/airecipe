@@ -66,9 +66,12 @@ function FeedPage() {
           </Txt>
         </View>
       ) : data.length === 0 ? (
-        <FeedEmptyState onAction={goNew} />
+        <View style={styles.center}>
+          <FeedEmptyState onAction={goNew} />
+        </View>
       ) : (
         <FlatList
+          style={styles.list}
           data={data}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
@@ -103,6 +106,9 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  list: {
+    flex: 1,
   },
   listContent: {
     padding: 16,

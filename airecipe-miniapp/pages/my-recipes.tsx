@@ -141,6 +141,7 @@ function MyRecipesPage() {
       </PageNavbar>
 
       <ScrollView
+        style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
@@ -258,12 +259,16 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.white,
   },
+  scroll: {
+    flex: 1,
+  },
   scrollContent: {
     padding: 20,
     gap: 16,
     paddingBottom: 24, // 하단 탭바 가림 방지 (ADR-017 D61)
   },
   center: {
+    flex: 1,
     paddingVertical: 60,
     alignItems: 'center',
   },

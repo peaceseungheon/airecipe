@@ -52,6 +52,7 @@ function RecipeHomePage() {
       </PageNavbar>
 
       <ScrollView
+        style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
@@ -112,6 +113,9 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: colors.white,
+  },
+  scroll: {
+    flex: 1,
   },
   scrollContent: {
     padding: 20,
