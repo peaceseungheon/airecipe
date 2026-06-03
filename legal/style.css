@@ -1,0 +1,107 @@
+/* AI 레시피 — 법적 고지 정적 페이지 공용 스타일 (의존성 0, 빌드 0) */
+:root {
+  --fg: #1a1a1a;
+  --muted: #6b7280;
+  --faint: #9ca3af;
+  --line: #e5e7eb;
+  --bg: #ffffff;
+  --accent: #ff6b00;
+}
+
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
+    "Pretendard", "Malgun Gothic", "Noto Sans KR", system-ui, sans-serif;
+  line-height: 1.7;
+  word-break: keep-all;
+}
+
+.wrap {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 32px 20px 80px;
+}
+
+header.doc {
+  padding-bottom: 16px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--line);
+}
+
+header.doc .brand {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  letter-spacing: 0.02em;
+  margin: 0 0 6px;
+}
+
+header.doc h1 {
+  font-size: 24px;
+  font-weight: 700;
+  margin: 0;
+}
+
+section.article {
+  margin: 0 0 28px;
+}
+
+section.article h2 {
+  font-size: 17px;
+  font-weight: 700;
+  margin: 0 0 10px;
+}
+
+section.article p {
+  margin: 0 0 8px;
+  font-size: 15px;
+  color: #333;
+}
+
+.effective {
+  margin-top: 40px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--faint);
+}
+
+footer.doc {
+  margin-top: 32px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+footer.doc a {
+  color: var(--muted);
+}
+
+a { color: var(--accent); }
+
+/* 출시 전 채워야 하는 placeholder 강조 (편집 시 눈에 띄게) */
+.todo {
+  background: #fff4e5;
+  border-radius: 4px;
+  padding: 0 4px;
+  color: #b45309;
+}
+
+/* index 목록 */
+ul.toc { list-style: none; padding: 0; margin: 24px 0 0; }
+ul.toc li { margin: 0 0 12px; }
+ul.toc a {
+  display: block;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  text-decoration: none;
+  color: var(--fg);
+  font-weight: 600;
+}
+ul.toc a:hover { border-color: var(--accent); }

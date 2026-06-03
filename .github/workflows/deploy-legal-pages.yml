@@ -1,0 +1,44 @@
+name: Deploy legal pages to GitHub Pages
+
+# repo 루트 `legal/` 폴더(이용약관·개인정보처리방침 정적 HTML)만 GitHub Pages로 배포한다.
+# monorepo의 backend/miniapp 코드는 배포 대상이 아니다 — `legal/`만 아티팩트로 올림.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'legal/**'
+      - '.github/workflows/deploy-legal-pages.yml'
+  workflow_dispatch: # 수동 실행 버튼 (Actions 탭)
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 동시 배포 1개로 제한 (진행 중 배포는 취소하지 않음 — Pages 권장)
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload legal/ as Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./legal
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
