@@ -88,9 +88,12 @@ export default defineConfig({
         icon: 'https://static.toss.im/icons/...', // 콘솔에서 업로드 후 URL 복사
       },
 
-      // 4. 런타임 권한 — 레시피 앱은 최소 권한
-      //    Sprint 1에서는 카메라/사진 불필요. 향후 사진 첨부 도입 시 추가.
-      permissions: [],
+      // 4. 런타임 권한 — 최소 권한(§9.2.5)
+      //    ADR-021(요리 기록 피드): 사진 첨부 도입으로 photos(read)·camera(access) 추가.
+      permissions: [
+        { name: 'photos', access: 'read' },
+        { name: 'camera', access: 'access' },
+      ],
     }),
 
     // 5. 빌드 시점 환경변수 주입 — import.meta.env로 접근
@@ -129,6 +132,28 @@ export default defineConfig({
 ### 9.2.4 webViewProps / 카테고리 — 비게임
 
 본 미니앱은 비게임 카테고리다. RN(Granite)은 `appsInToss` 플러그인이 비게임 기본을 제공한다. 만약 WebView 모드로 운영한다면 `webViewProps.type = 'partner'`로 설정해야 한다(본 포팅은 RN 모드).
+
+### 9.2.5 권한 선언 — photos / camera (ADR-021)
+
+요리 기록 피드(ADR-021)의 사진 첨부 도입으로 `permissions`에 **사진(앨범 읽기)·카메라(촬영)** 를 선언한다. 그 외 권한은 선언하지 않는다(최소권한).
+
+```ts
+permissions: [
+  { name: 'photos', access: 'read' },   // 앨범에서 요리 사진 1장 선택
+  { name: 'camera', access: 'access' }, // 카메라로 직접 촬영
+],
+```
+
+**타입 실재(`@apps-in-toss/plugins`의 `Permission` 유니온):**
+
+| name | access 허용값 | 본 미니앱 |
+|------|--------------|----------|
+| `photos` | `'read'` \| `'write'` | `'read'`(읽기만 — 저장 안 함) |
+| `camera` | `'access'` | `'access'` |
+
+> 권한 형태는 **객체 `{ name, access }` 배열**(문자열 배열 아님 — typecheck 검증). `granite.config.ts`의 `permissions`는 그대로 앱 매니페스트로 전달되며, **앱인토스 콘솔의 권한 등록**과 1:1 동기 + 최소권한 정당화(요리 사진 첨부가 기록의 필수 입력)가 출시 전 의무다.
+>
+> **미니앱 신규 환경변수는 없다** — 사진은 백엔드 경유(base64-in-JSON) 업로드라 R2 자격증명 등은 전부 백엔드 전용(설계 §5.3, §9.1.1 금지 항목). 미니앱은 photos/camera 권한 + 기존 `API_BASE_URL`만으로 충분하다.
 
 ## 9.3 도메인 화이트리스트 (미니앱 → 백엔드 호출)
 
@@ -231,7 +256,7 @@ if (appEnv === 'production') {
 - [ ] CORS 화이트리스트가 와일드카드 아님.
 - [ ] `X-Toss-User-Id` 헤더 값은 `getAnonymousKey()` 반환 hash. UI 노출 금지.
 - [x] Sentry PII 차단 (ADR-019 D68) — `sendDefaultPii: false` + `enableLogs: false`로 IP/쿠키/유저·자유 텍스트 자동 수집 차단. `enableNative: false`(미니앱 네이티브 Sentry 미탑재). `SENTRY_AUTH_TOKEN`은 CI 시크릿(번들 미포함).
-- [ ] `permissions: []` — 본 Sprint는 추가 권한 불필요. 추가 시 검수 가이드 준수.
+- [ ] **권한 최소화** — `permissions`는 photos(read)·camera(access) **2종만**(ADR-021 §9.2.5). 그 외 권한 미선언. 콘솔 권한 등록 ↔ config 동기 + 최소권한 정당화.
 
 ## 9.6 출시 정책 점검 (앱인토스 검수)
 
@@ -240,7 +265,7 @@ if (appEnv === 'production') {
 - [x] **비게임 출시 가이드** 준수 (`checklist/app-nongame.md`) — 디지털 자산/도박/자금세탁 미해당 (레시피 콘텐츠).
 - [x] **TDS 의무** — `@toss/tds-react-native` 사용 (raw `<Text/>` 0건, hex 직접 사용 0건 — ADR-015 D39 토큰화 완료).
 - [x] **AI 면책 문구** — `src/components/NutritionPanel.tsx` 하단 fixed 1줄 ("AI가 생성한 참고용 정보예요. 의료·영양 자문이 아닙니다.") — ADR-015 D40.
-- [x] **권한 최소화** — `granite.config.ts`의 `permissions: []`.
+- [x] **권한 최소화** — `granite.config.ts`의 `permissions`는 photos(read)·camera(access) 2종만(ADR-021 §9.2.5 — 요리 사진 첨부 필수 입력). 그 외 권한 0건.
 - [x] **에러 처리 한국어 UI** — 5개 훅 매핑 일관 (ADR-015 D41).
 - [x] **금지 환경변수 부재** — API 키·DB URL grep 0건 (§9.1.1).
 

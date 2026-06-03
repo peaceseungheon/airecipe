@@ -18,15 +18,27 @@
   - `index.ts` — 환경 분기(D27): `APP_ENV === 'local'` 또는 `ADS_ENABLED !== 'true'` → noop, 그 외 toss.
 - 호출 위치: `src/components/AppInlineAd.tsx`, `src/hooks/useFullScreenAd.ts`.
 
+### `media/` (ADR-021 신규 — 이미지 피커 어댑터)
+- 앱인토스 이미지 브리지(`AppsInToss.fetchAlbumPhotos`/`openCamera`)를 어댑터로 격리(광고 어댑터 규약 동일). **브리지가 `.d.ts`에 미선언(untyped)이라 로컬 타입 선언**.
+- 외부 노출은 `index.ts`의 `media` 객체 1개. 다른 파일은 어댑터 구현(appsintoss/noop)을 직접 import 금지.
+- 파일별 책임:
+  - `types.ts` — `MediaAdapter` 인터페이스 + `PickedImage`(dataUri/mimeType). SDK 직접 import 0건.
+  - `normalize.ts` — 순수 함수 `normalizePicked(raw)` — data URI/raw base64 → 표준 `PickedImage`. 단위 테스트(`normalize.test.ts`).
+  - `adapter.appsintoss.ts` — 앱인토스 브리지 실 구현. **SDK 직접 import는 본 파일만 허용**(ADR-021 D76, 광고 어댑터 규약). 로컬 브리지 타입 선언.
+  - `adapter.noop.ts` — local/미지원 placeholder. 항상 null 반환.
+  - `index.ts` — 환경 분기: `APP_ENV === 'local'` → noop, 미지원이면 noop 폴백, 그 외 appsintoss.
+- 노출: `media.pickFromAlbum()/pickFromCamera() → Promise<PickedImage|null>`.
+- 호출 위치: `src/components/PhotoPickerButton.tsx`.
+
 ## 책임 규약
 
-- **SDK 의존성 1곳 격리** — 광고 SDK는 `ads/adapter.toss.tsx`, Toss 인증 SDK는 `src/hooks/useTossUserId.tsx`(getAnonymousKey), 미니앱 컨테이너는 `src/_app.tsx`(AppsInToss). 다른 위치에서 `@apps-in-toss/framework` 광고 API import 0건.
+- **SDK 의존성 1곳 격리** — 광고 SDK는 `ads/adapter.toss.tsx`, **이미지 브리지는 `media/adapter.appsintoss.ts`**, Toss 인증 SDK는 `src/hooks/useTossUserId.tsx`(getAnonymousKey), 미니앱 컨테이너는 `src/_app.tsx`(AppsInToss). 다른 위치에서 `@apps-in-toss/framework` 광고/이미지 API import 0건(grep: `adapter.toss|adapter.appsintoss|useTossUserId`만 허용).
 - **순수 유틸** — `zod/` 스키마는 사이드 이펙트 0건. 변환·검증만.
 - **환경 의존성은 어댑터에서만** — `import.meta.env.X` 접근은 가능한 한 단일 위치(예: `ads/index.ts`)에 모은다.
 - **테스트 가능성** — 어댑터 인터페이스를 통해 mock 주입 가능. 직접 SDK call site 0건.
 
 ## SSOT 참조
 
-- ADR-009(아키텍처), ADR-010 D3(단일 호출 경로 원칙), ADR-014(광고 도입 결정).
+- ADR-009(아키텍처), ADR-010 D3(단일 호출 경로 원칙), ADR-014(광고 도입 결정), ADR-021(요리 기록 피드 — `media/` 어댑터).
 - `docs/appsintoss-port/11-ADS.md` (광고 SDK 사용 가이드).
 - `docs/appsintoss-port/09-ENV-CONFIG.md` §9.4 (plugin-env), §9.6 (검수 정책).

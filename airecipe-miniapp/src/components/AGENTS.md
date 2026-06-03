@@ -22,7 +22,13 @@ Phase 2의 레시피 생성 화면(`/recipe/generate`)과 홈(`/`)이 사용하�
 | `RecipeCard.tsx` 확장 (Phase 4) | Phase 3 위에 `onToggleFavorite?`/`favoritePending?` 활성화 — header에 `<FavoriteButton>` 합성. `onDelete?`는 자리표시 유지(카드 측 삭제 미활성 — D22) | 06 §6.4.4, ADR-013 D7·D22 |
 | `ThemePicker.tsx` (Phase 6) | 추천용 테마(상황 6 + 날씨 5) 선택 — TDS `SegmentedControl.Root` + `.Item` 2축 합성. props `{ value: RecommendationTheme, onChange }`. 한 번 더 같은 값 탭 시 해제(null). 한국어 라벨은 03 §3.8.2 SSOT | 06 §6.10, ADR-016 D44 |
 | `RecommendationCard.tsx` (Phase 6) | 추천 카드 1장 — Pressable + Txt(dishName t5 / description st9) + Badge tags. props `{ item: RecommendationItem, onPress }`. 추천은 ephemeral(id 없음) — `item.dishName`만 부모로 전달 | 06 §6.10, ADR-016 D45 |
-| `BottomTabBar.tsx` (탭바) | 하단 탭바([홈/마이 레시피]) **단일 SSOT**. RN `Pressable`/`View` + TDS `Txt`+`colors`(+선택 `Icon`). props `{ active: 'home'\|'my'\|'none' }` — 화면이 자신의 활성 탭 명시 전달, 비-탭 화면은 `'none'`(활성 탭 없음 — 두 탭 비활성색·`selected:false`). 탭 전환 `navigation.navigate('/'\|'/my-recipes', {})`. **전 화면 마운트**(홈/마이 + 생성/추천/상세/_404, early-return 분기 포함 — D63b). 색은 TDS 토큰만(hex 금지). | 07 §7.8.1, ADR-017 D53~D63 |
+| `BottomTabBar.tsx` (탭바, ADR-021 3탭) | 하단 탭바 **단일 SSOT**. RN `Pressable`/`View` + TDS `Txt`+`colors`. props `{ active: 'feed'\|'recipe'\|'my'\|'none' }` — **3탭**([피드 `/` · 레시피 `/recipe` · 마이 `/my-recipes`], ADR-021 D75. 기존 `'home'`→`'feed'`). 비-탭 화면은 `'none'`(모든 탭 비활성색·`selected:false`). 탭 전환 `navigation.navigate(path, {})`. **전 화면 마운트**(early-return 분기 포함). 색은 TDS 토큰만(hex 금지). | 07 §7.8.1, ADR-017 D53~D63, ADR-021 D75 |
+| `PhotoPickerButton.tsx` (ADR-021) | 요리 사진 선택 + 미리보기 — `media.pickFromAlbum()`(이미지 어댑터, SDK 직접 import 0건) + `Button`(light/weak) + RN `Image`. props `{ value: PickedImage\|null, onPick }` | 06 §6.12, ADR-021 D76 |
+| `StarRatingInput.tsx` (ADR-021) | 별점 입력(1..5) — TDS `Rating readonly={false}`(= EditableRatingProps, size="large"). `onValueChange` 결과 round. props `{ value, onChange }`. ⚠ `EditableRating` named export 부재 → `Rating` 판별 유니온(D79) | 06 §6.12, ADR-021 D79 |
+| `RecipeSnapshotPicker.tsx` (ADR-021) | 기록 첨부 레시피 스냅샷 선택 — `useMyRecipes` 재사용(저장본) + 생성 결과 전달(미저장). `Pressable`+`Txt` 목록. `onSelect(recipe, sourceRecipeId)`. props `{ selected, onSelect }` | 06 §6.12, ADR-021 D78 |
+| `CookingLogForm.tsx` (ADR-021) | 업로드 폼 조립 — PhotoPickerButton + RecipeSnapshotPicker + StarRatingInput + `TextField`(line) + `Button`. 4입력 필수 검증(한국어, AC2). Recipe→GeneratedRecipe 추출(`toGeneratedRecipe`). 에러 텍스트 `colors.red700`. props `{ initialRecipe?, pending?, error?, onSubmit }` | 06 §6.12, ADR-021 D78·D79 |
+| `CookingLogCard.tsx` (ADR-021) | 피드 카드 — RN `Image` + TDS `Rating readonly`(variant="compact" size="small") + `Txt`. `Pressable` 탭 → 상세. props `{ log: CookingLog, onPress }`. ⚠ `ReadOnlyRating` named export 부재 → `Rating readonly`(D79) | 06 §6.12, ADR-021 D79 |
+| `FeedEmptyState.tsx` (ADR-021) | 피드 0건 빈 상태 — `EmptyState` 재사용. props `{ onAction }` | 06 §6.12, ADR-021 |
 
 ## 규약 (강제)
 

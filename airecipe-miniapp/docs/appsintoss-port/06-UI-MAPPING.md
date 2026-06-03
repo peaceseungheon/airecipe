@@ -375,6 +375,30 @@ Phase 6에서 추가되는 컴포넌트 2종. SegmentedControl·Pressable·Badge
 - 카피: "AI가 생성한 참고용 추천이에요. 식당·식자재 등 실제 상황을 고려해 선택해주세요."
 - 스타일: `<Txt typography="st11" color={colors.grey600}>` fixed 1줄.
 
+## 6.12 요리 기록 피드 신규 컴포넌트 (ADR-021)
+
+요리 기록 피드 단계에서 추가되는 컴포넌트 6종 + FAB. **별점은 TDS `Rating` 채택**(아래 ⚠ 정정).
+
+> ⚠️ **TDS Rating 실재성 정정 (ADR-021 D79):** 계획 초안이 가정한 `EditableRating`/`ReadOnlyRating` **named export는 `@toss/tds-react-native` 최상위에 없다** — `rating/index.d.ts` barrel은 **`Rating`만** public export하고 두 컴포넌트는 내부 타입(`.d.ts` 미노출). 따라서 별점은 단일 `Rating`의 판별 유니온(`readonly` 분기)으로 사용한다:
+> - 입력(폼): `<Rating readonly={false} value onValueChange size="large" max={5} />` (EditableRatingProps — `size:'medium'|'large'|'big'`).
+> - 표시(카드/상세): `<Rating readonly value variant size max={5} />` (ReadOnlyRatingProps — `variant:'full'|'compact'|'iconOnly'`, `size:'tiny'..'big'`).
+> 합성 글리프(★/☆) 불필요 — 검증된 TDS 컴포넌트로 충족(설계 §7.6).
+
+| 새 컴포넌트 | 책임 | TDS 매핑 | 실 구현 |
+|-------------|------|---------|---------|
+| `PhotoPickerButton` | 요리 사진 선택 + 미리보기 | `Button`(type="light" style="weak") + RN `Image` + `Txt` | `src/components/PhotoPickerButton.tsx`. `media.pickFromAlbum()`(이미지 어댑터, SDK 직접 import 0건) → `PickedImage` 미리보기. props `{ value: PickedImage\|null, onPick }` |
+| `StarRatingInput` | 별점 입력(1..5) | `Rating readonly={false}` (size="large") | `src/components/StarRatingInput.tsx`. `onValueChange` 결과 `Math.round`. props `{ value, onChange }` |
+| `RecipeSnapshotPicker` | 기록에 첨부할 레시피 스냅샷 선택 | `Pressable` + `Txt` (목록) | `src/components/RecipeSnapshotPicker.tsx`. `useMyRecipes` 재사용(저장본) + 생성 결과 전달(미저장). `onSelect(recipe, sourceRecipeId)`. Recipe→GeneratedRecipe 추출은 폼이 수행 |
+| `CookingLogForm` | 업로드 폼 조립 + 검증 | `TextField`(variant="line") + 위 3종 + `Button`(primary/fill) | `src/components/CookingLogForm.tsx`. 사진·레시피·별점·소감 필수 검증(한국어 안내, AC2). 에러 텍스트 `colors.red700`(기존 화면 관례). `onSubmit(CreateCookingLogRequest)` |
+| `CookingLogCard` | 피드 카드(사진·요리명·별점·소감) | RN `Image` + `Rating readonly` (variant="compact" size="small") + `Txt` | `src/components/CookingLogCard.tsx`. `Pressable` 외곽 → 탭 시 상세. props `{ log: CookingLog, onPress }` |
+| `FeedEmptyState` | 기록 0건 빈 상태 | `EmptyState` 재사용 | `src/components/FeedEmptyState.tsx`. title/description/actionLabel/onAction 위임 |
+
+**FAB(피드 화면 — ADR-021 D83):** 우하단 "올리기" 버튼은 TDS 전용 컴포넌트 없이 RN `Pressable` + `Txt`(`colors.white`) 합성, 배경 `colors.orange500`. **hex 직접 사용 금지**(ADR-015 D39) — `colors` 토큰만(`orange500`/`white`). `position:'absolute' right:16 bottom:72 borderRadius:24`.
+
+**기록 상세(`/cooking-log/[id]`):** 레시피 스냅샷 전체는 기존 `RecipeDisplay`(GeneratedRecipe 수용 — §6.4.2) 재사용. 404는 단일 `NotFoundScreen`(ADR-005). 삭제는 `Button`(type="danger" style="fill").
+
+> `media` 이미지 어댑터·`useCooking*` 훅·`cooking-logs` 서비스는 §6.12 외 — 어댑터는 `src/lib/AGENTS.md`, 훅은 `src/hooks/AGENTS.md`, 라우트는 07-ROUTING §7.3.9~§7.3.11에서 동결.
+
 ## 6.6 접근성·국제화 체크리스트
 
 | 항목 | 적용 방식 |
@@ -424,3 +448,4 @@ QA(`integration-coherence-qa` 스킬)가 본 챕터 검증 시 확인:
 | 2026-05-29 | §6.1 색 규약 정합화 — 브랜드 강조색은 **`colors.orange500`(`#FF6B00`)** 사용 명시(brand `#FF6B35` 최근접 실재 토큰). `colors.primary`는 `@toss/tds-colors@0.1.0` **부재**(QA 실증 TS2339) → 사용 금지 명기. 신규 강조색은 hex 대신 brand 최근접 토큰 채택이 ADR-015 D39 hex-금지 정신에 부합 | 하단 탭바(ADR-017 D59) 활성 탭 색 확정에 수반. QA 실증: primary 토큰 비실재, orange500=`#FF6B00` 실재 |
 | 2026-05-29 | §6.5 NotFoundScreen 행 정정 — TDS ErrorPage 좌·우 버튼 카피 하드코딩 명시("고객센터 문의" / "닫기"). `onBack`을 `onPressRightButton`("닫기")에 바인딩, `onContactSupport?` prop 추가. title/subtitle prop화로 진입 폴백 _404 카피 분리 | 사용자 보고 "닫기 버튼 무동작" root cause — Phase 3 이래 onBack을 좌측 "고객센터 문의" 버튼에 잘못 바인딩 + 우측 "닫기"는 핸들러 미설정. TDS 실 구현(`node_modules/.../ErrorPage.js`) 검증으로 정정 |
 | 2026-05-25 | §6.1 매핑 원칙 — **색상은 TDS `colors` 토큰 사용** 규약 추가 (hex 직접 사용 금지). NutritionPanel에 AI 면책 문구 추가 (`Txt typography="st11" color={colors.grey600}`) | Phase 5 완료(ADR-015 D39·D40) — hex 60+곳을 light 모드 정확 동등치(`colors.white`/`grey100`/`grey700`/`grey900`/`blue500`/`red50`/`red700`/`green50`/`green700`/`grey50`/`grey200`/`grey500`)로 일괄 교체. typecheck/lint PASS. 다크 모드 adaptive 대응(`colorsByPreference`)은 별 ADR로 분리(Phase 6 진화) |
+| 2026-06-03 | §6.12 요리 기록 피드 신규 컴포넌트 절 추가 — PhotoPickerButton/StarRatingInput/RecipeSnapshotPicker/CookingLogForm/CookingLogCard/FeedEmptyState + FAB 토큰 규약. **TDS Rating 실재성 정정**(ADR-021 D79): `EditableRating`/`ReadOnlyRating` named export 부재 → 단일 `Rating` 판별 유니온(`readonly` 분기)으로 입력/표시. | 요리 기록 피드 단계(ADR-021). TDS 실재성 검증: `rating/index.d.ts` barrel은 `Rating`만 export(QA 실증 TS2305). FAB은 `colors.orange500`/`white` 토큰(hex 0건) |
