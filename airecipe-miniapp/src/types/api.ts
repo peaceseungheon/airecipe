@@ -112,6 +112,21 @@ export interface RecommendationsRequest {
 
 export type RecommendationsResponse = ApiResponse<RecommendationsResponseInner>;
 
+// ─── cooking-logs (03 §3.8b) — 생성/목록/상세/삭제 ─────────────────────────
+
+import type { CookingLog } from './cooking-log';
+
+export type {
+  CookingLog,
+  CookingLogListQuery,
+  CreateCookingLogRequest,
+} from './cooking-log';
+
+export type CreateCookingLogResponse = ApiResponse<CookingLog>;
+export type CookingLogListResponse = ApiListResponse<CookingLog>;
+export type GetCookingLogResponse = ApiResponse<CookingLog>;
+export type DeleteCookingLogResponse = ApiResponse<{ id: string }>;
+
 // ─── 스트리밍 청크 (03 §3.2.4) — Phase 1은 타입만 ──────────────────────────
 
 export type StreamChunk =
