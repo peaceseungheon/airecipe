@@ -1,52 +1,72 @@
-# 02 — Frontend Summary: 이용약관 + 개인정보처리방침 정적 페이지 + 홈 푸터 링크
+# 02 — Frontend Summary: 요리 기록 피드 (ADR-021, 2026-06-03)
 
-작업: `/terms`·`/privacy` 정적 페이지 2개 신규 + 홈(`/`) 하단 푸터 진입 링크. 공개 화면(useTossUserId 미사용, 외부 호출 0건). pages/AGENTS.md SSOT 규약 준수.
+화면+문서(M3·M6~M11) 구현. 플러밍(M1·M2·M4·M5 — zod/타입/미디어 어댑터/api-client/훅/_app provider)은 선행 커밋.
 
-## 생성 파일 (2)
+## 추가/수정한 화면·컴포넌트
 
-| 파일 | 라우트 | 컴포넌트 | 책임 |
-|------|--------|----------|------|
-| `pages/terms.tsx` | `/terms` | `TermsPage` | 서비스 이용약관 정적 본문(제1조~제10조 + 시행일) ScrollView 렌더. PageNavbar.Title="서비스 이용약관" + BottomTabBar active="none". |
-| `pages/privacy.tsx` | `/privacy` | `PrivacyPage` | 개인정보처리방침 정적 본문(수집 항목~방침 변경 8절 + 시행일) ScrollView 렌더. PageNavbar.Title="개인정보처리방침" + BottomTabBar active="none". |
+### 페이지 (`pages/`)
+| 라우트 | 파일 | 상태 | 소비 훅 |
+|--------|------|------|---------|
+| `/` (피드) | `pages/index.tsx` | 재작성(홈→피드) | `useCookingFeed` |
+| `/recipe` (레시피 탭) | `pages/recipe/index.tsx` | 신규 | — (SearchForm 위임) |
+| `/cooking-log/new` | `pages/cooking-log/new.tsx` | 신규 | `useCreateCookingLog` |
+| `/cooking-log/:id` | `pages/cooking-log/[id].tsx` | 신규 | `useCookingLogDetail`, `useDeleteCookingLog` |
+| `/recipe/generate` | `pages/recipe/generate.tsx` | 수정(생성→기록 버튼 1개) | (기존) |
 
-## 수정 파일 (2)
+### 컴포넌트 (`src/components/`)
+| 컴포넌트 | 상태 | TDS 매핑 |
+|----------|------|----------|
+| `BottomTabBar.tsx` | 수정(2탭→3탭 feed/recipe/my) | `Pressable`+`Txt`+`colors` |
+| `PhotoPickerButton.tsx` | 신규 | `Button`+`Image`+`Txt` / `media` 어댑터 |
+| `StarRatingInput.tsx` | 신규 | `Rating readonly={false}` |
+| `RecipeSnapshotPicker.tsx` | 신규 | `Pressable`+`Txt` / `useMyRecipes` |
+| `CookingLogForm.tsx` | 신규 | `TextField`(line)+`Button`+위 3종 |
+| `CookingLogCard.tsx` | 신규 | `Image`+`Rating readonly`+`Txt` |
+| `FeedEmptyState.tsx` | 신규 | `EmptyState` 재사용 |
 
-| 파일 | 변경 |
-|------|------|
-| `pages/index.tsx` | (1) `Pressable` import 추가 (2) `handleOpenTerms`/`handleOpenPrivacy` useCallback 추가 (3) recommendCta View 다음에 푸터 `View`(약관·점·처리방침 가로 배치) 추가 (4) `footer` style 추가. 기존 SearchForm·recommend CTA·BottomTabBar 로직 무변경. |
-| `src/router.gen.ts` | `/terms`·`/privacy` 2개 라우트 수동 등록(import 라인 2 + RegisterScreenInput 2 + RegisterScreen 2). 알파벳 정렬(privacy는 my-recipes/recipe 사이, terms는 말미). Phase 6 `/recipe/recommend` 수동 등록 선례 동일. granite build 시 자동 재생성. |
+### 설정/라우터
+- `granite.config.ts` — photos(read)/camera(access) 권한.
+- `src/router.gen.ts` — 수동 등록 `/recipe`·`/cooking-log/new`·`/cooking-log/:id`.
 
-## 라우트 / navigate 시그니처
+## 라우트 표 (navigate ↔ createRoute 정합 grep 확인 완료)
+모든 `navigation.navigate` 타깃이 등록 `createRoute`와 1:1. 탭바는 `/`·`/recipe`·`/my-recipes`로 이동. `/cooking-log/:id`는 피드에서 `:id` 형식 호출(createRoute 경로와 동일).
 
-- `/terms` ← `navigation.navigate('/terms', {})` (홈 푸터 "서비스 이용약관" Pressable)
-- `/privacy` ← `navigation.navigate('/privacy', {})` (홈 푸터 "개인정보처리방침" Pressable)
-- 두 페이지 모두 params 없음(빈 객체). typecheck로 navigate 호출 ↔ router.gen.ts RegisterScreenInput 매칭 검증 PASS.
+## 소비 api-client 메서드 (모두 `../services` barrel, 직접 fetch 0건)
+`listCookingLogs`(useCookingFeed) / `createCookingLog`(useCreateCookingLog) / `getCookingLog`(useCookingLogDetail) / `deleteCookingLog`(useDeleteCookingLog) / `listRecipes`(useMyRecipes — RecipeSnapshotPicker 재사용).
 
-## 사용한 TDS 컴포넌트 (실재 확인)
+## 계획 대비 조정 (실제 시그니처 반영)
+1. **TDS 별점 (D79, 중대):** 계획의 `EditableRating`/`ReadOnlyRating` named import는 **실재하지 않음** — `@toss/tds-react-native`의 `rating/index.d.ts` barrel은 `Rating`만 public export(두 컴포넌트는 내부 타입, `.d.ts` 미노출, TS2305로 확인). → 단일 `Rating` 판별 유니온으로 정정: 입력 `<Rating readonly={false} size="large">`, 표시 `<Rating readonly variant size>`. 3파일(StarRatingInput/CookingLogCard/cooking-log[id]).
+2. **`useDeleteCookingLog`:** 계획 초안의 `remove(id)`가 아니라 `useDeleteCookingLog(id)`(훅 인자) + `remove()`(무인자) + `isPending`. 상세 페이지를 실 시그니처에 맞춤.
+3. **에러 텍스트 색:** `colors.red500`(실재) 대신 기존 화면 관례 `colors.red700`(generate/[id] 사용) 미러.
+4. **`GeneratedRecipe` 경로:** `../types/recipe`(계획의 `../types/api` 아님 — cooking-log 타입의 실 경로).
+5. **권한 타입:** `@apps-in-toss/plugins` `Permission` 유니온 = 객체 `{name,access}` 배열. photos.access='read', camera.access='access' — 계획 M3 형태 그대로 통과.
 
-- `PageNavbar` + `PageNavbar.Title` — @toss/tds-react-native. 기존 전 페이지 동일 사용.
-- `Txt` (typography t5/st9/st11, color grey300/grey500/grey700/grey900) — 동일 패키지. grey300·grey500 토큰 `Color.d.ts` 실재 확인 + typecheck 검증.
-- `colors` — TDS 토큰. hex 직접 사용 0건(ADR-015 D39).
-- `BottomTabBar` (`../src/components/BottomTabBar`, active="none" — ADR-017 D63 비-탭 화면).
-- RN 프리미티브: `ScrollView`(contentContainerStyle, paddingBottom 24)·`View`·`Pressable`(홈 푸터 링크, accessibilityRole="link").
+## TDS 실재성 확인
+- 실재 채택: `Rating`(판별 유니온), `PageNavbar`, `Button`, `TextField`(variant="line"/hasError), `EmptyState`, `RecipeDisplay`(GeneratedRecipe 수용), `NotFoundScreen`, `colors.{orange500,white,red700,grey*}`.
+- 정정: `EditableRating`/`ReadOnlyRating` → `Rating readonly` 분기(named export 부재).
 
-## 검증 결과
+## 최종 게이트 (실측)
+- `pnpm test` → 2 suites / **7 PASS**.
+- `pnpm typecheck` → **PASS**.
+- `pnpm lint` → **0 errors** (router.gen.ts warning 1, 허용).
+- hex grep(`src pages` excl router.gen) → **hex 0건**.
+- SDK 격리 grep → 코드 import는 `src/_app.tsx`(기존 registerApp 베이스라인)만, 신규 SDK 호출은 `media/adapter.appsintoss.ts` 1곳(grep 제외 대상). **격리 OK**.
 
-- `pnpm typecheck` — PASS (tsc --noEmit, 에러 0).
-- `pnpm lint` — 0 errors, 1 warning(`src/router.gen.ts` 누적 unused eslint-disable — 자동 생성 한계, 기존 무해 warning. 신규 error 0).
+## 커밋
+| 태스크 | 해시 |
+|--------|------|
+| M3 권한 | `62428d7` |
+| M8 업로드 폼 | `f8f139d` |
+| M9 카드/빈상태/상세 | `630f3e1` |
+| M6+M7 3탭/피드/레시피탭 | `bcf0c29` |
+| M10 라우트/생성→기록 | `25c3c6e` |
+| M11 문서 | `6157f4f` |
 
-## 본문 `[ ]` placeholder (출시 전 채울 항목)
+## PENDING (외부 작업 — 코드만, 미실행)
+- 디바이스 사진 선택 실증(`media.pickFromAlbum/pickFromCamera` 반환 형태 — `normalizePicked`가 양쪽 흡수하나 실증 필요).
+- 백엔드 배포(cooking_logs·RLS·R2·4 엔드포인트·CORS·R2 시크릿). 미배포 시 401/404 → 한국어 안내 자동.
+- 권한 콘솔 등록(photos/camera 최소권한 정당화).
+- R2 presigned TTL ↔ 피드 캐싱(백엔드 측).
 
-### terms.tsx
-- 제10조 (관할 법원): `[관할 법원 — 출시 전 사업자 소재지 기준 확정]`
-- JSDoc 주석: 회사 법인명·대표자·사업자등록번호(제2조 "회사" 식별) — 콘솔 등록값과 동기.
-
-### privacy.tsx
-- 제7조 개인정보 보호책임자: `[보호책임자 성명·직책 — 출시 전 확정]`
-- 제7조 문의(고객센터): `[고객센터 — 앱인토스 콘솔 고객센터 채널 연동, 출시 전 확정]`
-- JSDoc 주석: 사업자 법인명(개인정보처리자 식별) — 콘솔 등록값과 동기.
-
-## architect/qa 인계
-
-- **architect**: 07-ROUTING에 §7.3.7(`/terms`)·§7.3.8(`/privacy`) 절 신설 + 라우트 표/Navbar 분산 표 행 추가 필요. pages/AGENTS.md 파일 표에 2행 추가. 페이지 JSDoc은 "신규(architect 확정 예정)"로 표기해둠 — 절 번호 확정 시 갱신. 06-UI-MAPPING 정적 페이지 패턴 절 검토. 출시 점검: 새 라우트 2개 deep link prefix(`intoss://airecipe/terms`·`/privacy`) 영향. appsintoss-publish-checklist의 약관·처리방침 등록 항목과 본 페이지 연결 검토.
-- **qa**: (1) navigate 호출 ↔ router.gen.ts 라우트 매칭 (2) TDS 컴포넌트 실재성 (3) 공개 화면 정책(useTossUserId/fetch/hooks 0건) (4) BottomTabBar active="none" 마운트 (5) hex 0건 (6) 홈 기존 로직 무회귀 교차 검증 요청.
+## QA 인계 요청
+(1) 라우팅 정합(navigate↔createRoute↔router.gen.ts), (2) TDS 실재성(`Rating` 판별 유니온 정정 포함), (3) api-client 소비 shape(CookingLog↔cookingLogSchema↔화면), (4) 인증 헤더(보호 4종 tossUserId+401 재시도), (5) 검수 grep(hex 0·SDK 격리).
