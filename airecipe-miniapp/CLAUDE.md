@@ -85,7 +85,7 @@ AI 레시피 안내 — 앱인토스 미니앱 (React Native + Granite + TDS).
 
 산출: `pages/terms.tsx`·`pages/privacy.tsx`(신규)·`pages/index.tsx`(푸터)·`src/router.gen.ts`(수동 등록 2) + `docs/adr/ADR-020`(신규) + 07 §7.3.7/§7.3.8·§7.4·§7.8.1 + 06 §6.11 + pages/AGENTS.md 갱신.
 
-**외부 작업 PENDING(ADR-020 D74)**: 약관/처리방침 본문 사업자 정보 placeholder(`[관할 법원]`·`[보호책임자]`·`[고객센터]`·법인명) 출시 전 실제 값 확정(콘솔 등록값 동기) + 표준 보일러플레이트 법무 검토.
+**사업자 정보 확정 완료(ADR-020 D74, 2026-06-03)**: 약관/처리방침 placeholder를 실제 값으로 교체 — 서비스 제공자/개인정보처리자 **디지털공방**, 보호책임자 **이승헌**, 문의 **tmdgis19@gmail.com**, 관할 법원은 별도 합의관할 없이 **민사소송법 법정관할**. 인앱(`pages/terms.tsx`·`privacy.tsx`)·외부 정적(`legal/terms.html`·`privacy.html`) 양쪽 동기 교체 + ADR-020/`legal/README.md` 갱신. typecheck PASS·lint 0 errors·placeholder grep 0건. **잔여 PENDING**: 표준 보일러플레이트 법무 검토(권고, 미완) + 사업자등록번호·대표자 추후 필요 시 병기 + 시행일(현 2026-06-01)을 실제 출시일로 확정.
 
 ### Sentry 설정 검토·정렬 (ADR-019, 2026-06-01)
 
