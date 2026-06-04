@@ -3,8 +3,8 @@
   "private": true,
   "scripts": {
     "dev": "granite dev",
-    "dev:local": "APP_ENV=local API_BASE_URL=http://localhost:3000 granite dev",
-    "dev:staging": "APP_ENV=staging API_BASE_URL=https://aireceipe-staging.vercel.app granite dev",
+    "dev:local": "dotenv -e .env.local -- granite dev",
+    "dev:staging": "dotenv -e .env.staging -- granite dev",
     "build": "ait build",
     "build:staging": "dotenv -e .env.staging -- ait build",
     "build:prod": "dotenv -e .env.production -- ait build",
