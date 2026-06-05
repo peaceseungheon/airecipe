@@ -16,7 +16,7 @@
 | `cooking-log/new.tsx` | `/cooking-log/new` | **보호 화면(ADR-021)** — PageNavbar + CookingLogForm(사진·레시피·별점·소감) + `<BottomTabBar active="none" />`. `useCreateCookingLog` 결합 → 성공 시 피드(`/`) 복귀. 진입 2종: 피드 FAB / 생성 결과(initialRecipe params) | 07 §7.3.10, ADR-021 D77·D78 |
 | `cooking-log/[id].tsx` | `/cooking-log/[id]` | **보호 화면(ADR-021)** — `useCookingLogDetail(id)` + `useDeleteCookingLog(id)`. 로딩/404(단일 NotFoundScreen)/에러/정상 분기. 사진 + Rating(readonly) + 소감 + RecipeDisplay(스냅샷) + 삭제 Button(remove() 무인자). 성공·404 정규화 후 `/` 복귀 | 07 §7.3.11, ADR-005, ADR-021 D79·D82 |
 | `recipe/recommend.tsx` | `/recipe/recommend` | 보호 화면 — useTossUserId 가드 + useRecommendations 결합. 미선택/로딩/에러/정상 분기 + ThemePicker + RecommendationCard. 카드 탭 → `/recipe/generate` 재사용. AI 면책 1줄 | ADR-016 D44~D52 |
-| `my-recipes.tsx` | `/my-recipes` | 보호 화면 — useTossUserId 가드 + useMyRecipes 결합 + `<BottomTabBar active="my" />`(ADR-017). 상단 FilterTabs(전체/즐겨찾기) + RecipeCard.onToggleFavorite(낙관적 mutate). 빈+정상 양쪽 하단 `<AppInlineAd slot="my-recipes-bottom" />`(로딩/에러 미렌더). 단순 페이지네이션(이전/다음 + `meta.pageSize` 신뢰) | 07 §7.3.3, ADR-012 D14·D15·D18, ADR-013 D4·D9·D11, ADR-014 D30, ADR-017 D56 |
+| `my-recipes.tsx` | `/my-recipes` | 보호 화면 — useTossUserId 가드 + useMyRecipes 결합 + `<BottomTabBar active="my" />`(ADR-017). 상단 FilterTabs(전체/즐겨찾기) + RecipeCard.onToggleFavorite(낙관적 mutate). 광고는 상단 `<TopAdBanner>`로 통일(기존 하단 `my-recipes-bottom` 제거, ADR-022). 단순 페이지네이션(이전/다음 + `meta.pageSize` 신뢰) | 07 §7.3.3, ADR-012 D14·D15·D18, ADR-013 D4·D9·D11, ADR-022, ADR-017 D56 |
 | `recipe/[id].tsx` | `/recipe/[id]` | 보호 화면 — useTossUserId 가드 + useRecipeDetail 결합. 로딩/404/에러/정상 4-way 분기. 404 → `<NotFoundScreen onBack={...} />` 단일 컴포넌트. PageNavbar.AccessoryButtons에 FavoriteButton + 본문 하단 삭제 Button + DeleteConfirmDialog. 낙관적 mutate(D4) + 삭제 성공·404 정규화 후 handleBack(D8). handleBack은 `canGoBack?.()` + fallback `/my-recipes` | 07 §7.3.4, ADR-005, ADR-012 D14·D16, ADR-013 D5·D6·D7·D8·D9 |
 | `terms.tsx` | `/terms` | **공개 정적 화면** — 서비스 이용약관 본문(제1조~제10조 + 시행일)을 모듈 상수(`ARTICLES`)로 `ScrollView` 렌더. `PageNavbar.Title` + `<BottomTabBar active="none" />`. useTossUserId/fetch/hooks 0건. 진입은 홈 푸터 링크. 사업자 정보 placeholder는 출시 전 확정 | 07 §7.3.7, ADR-020, ADR-017 D63 |
 | `privacy.tsx` | `/privacy` | **공개 정적 화면** — 개인정보처리방침 본문(8절 + 시행일)을 모듈 상수(`SECTIONS`)로 `ScrollView` 렌더. 제4절에 AI Provider 제3자 전송 고지. 동일 컨벤션·진입점 | 07 §7.3.8, ADR-020, ADR-017 D63 |
@@ -39,6 +39,7 @@
 - **낙관적 UI는 호출 측 책임** — ADR-013 D19. 페이지가 (a) `mutate(next)` 즉시 적용 → (b) `await toggle(id, target)` → (c) `null` 시 `mutate(prev)` 롤백.
 - **`useToggleFavorite`는 단일 hook 인스턴스로 카드 목록 공유** — ADR-013 D24. 카드 map 안에서 hook 호출 금지(rules of hooks). 페이지 상단 1회 호출 후 `toggle(id, target)` + `pendingId === card.id` 패턴.
 - **`BottomTabBar`는 노출 화면이 직접 마운트** — ADR-017 D55·D63, ADR-021 D75. **3탭** `/`(피드)·`/recipe`·`/my-recipes`, props `{ active: 'feed'|'recipe'|'my'|'none' }`. 비-탭 화면은 `'none'`. 새 탭 라우트는 router.gen.ts 수동 등록 필요(`/recipe`·`/cooking-log/*`). `scrollContent`/listContent에 `paddingBottom` 확보.
+- **`TopAdBanner`는 화면이 `PageNavbar` 바로 아래 직접 마운트** — ADR-022 D84·D88. `<TopAdBanner slot="..." />` 1줄(스크롤 밖 상단 고정). ⚠ `_app.tsx` 루트 마운트 금지(rev.1 운영 크래시). 광고 비활성 시 `null`(공간 0). 신규 화면 추가 시 동일 패턴으로 상단 1줄. `_404`·전체화면 `NotFoundScreen` 분기는 제외.
 
 ## SSE 상태 결합 패턴 (`recipe/generate.tsx` 인용)
 

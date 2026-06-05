@@ -24,6 +24,7 @@ import { createRoute } from '@granite-js/react-native';
 import { PageNavbar, Txt, colors } from '@toss/tds-react-native';
 
 import { BottomTabBar } from '../src/components/BottomTabBar';
+import { TopAdBanner } from '../src/components/TopAdBanner';
 
 export const Route = createRoute('/terms', {
   component: TermsPage,
@@ -121,6 +122,8 @@ function TermsPage() {
       <PageNavbar>
         <PageNavbar.Title>서비스 이용약관</PageNavbar.Title>
       </PageNavbar>
+
+      <TopAdBanner slot="terms-top" />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {ARTICLES.map((article) => (

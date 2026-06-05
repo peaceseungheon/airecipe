@@ -22,6 +22,7 @@ import { createRoute, useNavigation } from '@granite-js/react-native';
 import { Button, PageNavbar, Txt, colors } from '@toss/tds-react-native';
 
 import { BottomTabBar } from '../../src/components/BottomTabBar';
+import { TopAdBanner } from '../../src/components/TopAdBanner';
 import { RecommendationCard } from '../../src/components/RecommendationCard';
 import { ThemePicker } from '../../src/components/ThemePicker';
 import { useRecommendations } from '../../src/hooks/useRecommendations';
@@ -68,6 +69,8 @@ function RecommendPage() {
       <PageNavbar>
         <PageNavbar.Title>오늘의 추천</PageNavbar.Title>
       </PageNavbar>
+
+      <TopAdBanner slot="recommend-top" />
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}

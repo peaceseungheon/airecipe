@@ -48,6 +48,10 @@ export function createTossAdsAdapter(config: TossAdsConfig): AdsAdapter {
       theme,
       tone,
       variant,
+      // 가이드(RN-BannerAd): InlineAd는 impression 측정 컨텍스트가 필수.
+      // IOScrollView로 감싸지 않는 고정 배너는 impressFallbackOnMount=true로 마운트 시 impression 처리.
+      // 누락 시 운영 빌드에서 렌더 실패·앱 크래시(검정 화면) 발생(ADR-022 rev.2).
+      impressFallbackOnMount: true,
       onAdRendered: (p: BannerSlotEventPayload) =>
         console.debug(`[ads:toss] rendered slot=${slot} creativeId=${p.adMetadata.creativeId}`),
       onAdImpression: (p: BannerSlotEventPayload) =>

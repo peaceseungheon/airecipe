@@ -386,7 +386,7 @@ Phase 6에서 추가되는 컴포넌트 2종. SegmentedControl·Pressable·Badge
 
 | 새 컴포넌트 | 책임 | TDS 매핑 | 실 구현 |
 |-------------|------|---------|---------|
-| `PhotoPickerButton` | 요리 사진 선택 + 미리보기 | `Button`(type="light" style="weak") + RN `Image` + `Txt` | `src/components/PhotoPickerButton.tsx`. `media.pickFromAlbum()`(이미지 어댑터, SDK 직접 import 0건) → `PickedImage` 미리보기. props `{ value: PickedImage\|null, onPick }` |
+| `PhotoPickerButton` | 요리 사진 선택(앨범/카메라) + 미리보기 | `Button` 2개(type="light" style="weak", row) + RN `Image` + `Txt` | `src/components/PhotoPickerButton.tsx`. `media.pickFromAlbum()`·`media.pickFromCamera()`(이미지 어댑터, SDK 직접 import 0건) → `PickedImage` 미리보기. 버튼 "앨범에서 선택/변경" + "카메라 촬영". props `{ value: PickedImage\|null, onPick }` |
 | `StarRatingInput` | 별점 입력(1..5) | `Rating readonly={false}` (size="large") | `src/components/StarRatingInput.tsx`. `onValueChange` 결과 `Math.round`. props `{ value, onChange }` |
 | `RecipeSnapshotPicker` | 기록에 첨부할 레시피 스냅샷 선택 | `Pressable` + `Txt` (목록) | `src/components/RecipeSnapshotPicker.tsx`. `useMyRecipes` 재사용(저장본) + 생성 결과 전달(미저장). `onSelect(recipe, sourceRecipeId)`. Recipe→GeneratedRecipe 추출은 폼이 수행 |
 | `CookingLogForm` | 업로드 폼 조립 + 검증 | `TextField`(variant="line") + 위 3종 + `Button`(primary/fill) | `src/components/CookingLogForm.tsx`. 사진·레시피·별점·소감 필수 검증(한국어 안내, AC2). 에러 텍스트 `colors.red700`(기존 화면 관례). `onSubmit(CreateCookingLogRequest)` |

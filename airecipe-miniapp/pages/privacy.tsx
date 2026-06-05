@@ -24,6 +24,7 @@ import { createRoute } from '@granite-js/react-native';
 import { PageNavbar, Txt, colors } from '@toss/tds-react-native';
 
 import { BottomTabBar } from '../src/components/BottomTabBar';
+import { TopAdBanner } from '../src/components/TopAdBanner';
 
 export const Route = createRoute('/privacy', {
   component: PrivacyPage,
@@ -102,6 +103,8 @@ function PrivacyPage() {
       <PageNavbar>
         <PageNavbar.Title>개인정보처리방침</PageNavbar.Title>
       </PageNavbar>
+
+      <TopAdBanner slot="privacy-top" />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {SECTIONS.map((section) => (

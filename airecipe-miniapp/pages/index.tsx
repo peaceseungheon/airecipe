@@ -18,6 +18,7 @@ import { createRoute, useNavigation } from '@granite-js/react-native';
 import { PageNavbar, Txt, colors } from '@toss/tds-react-native';
 
 import { BottomTabBar } from '../src/components/BottomTabBar';
+import { TopAdBanner } from '../src/components/TopAdBanner';
 import { CookingLogCard } from '../src/components/CookingLogCard';
 import { FeedEmptyState } from '../src/components/FeedEmptyState';
 import { useCookingFeed } from '../src/hooks/useCookingFeed';
@@ -52,6 +53,8 @@ function FeedPage() {
       <PageNavbar>
         <PageNavbar.Title>요리 피드</PageNavbar.Title>
       </PageNavbar>
+
+      <TopAdBanner slot="feed-top" />
 
       {tossUserId === undefined || isLoading ? (
         <View style={styles.center}>

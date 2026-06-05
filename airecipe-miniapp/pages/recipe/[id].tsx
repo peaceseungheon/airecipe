@@ -23,6 +23,7 @@ import { createRoute, useNavigation } from '@granite-js/react-native';
 import { Button, PageNavbar, Txt, colors } from '@toss/tds-react-native';
 
 import { BottomTabBar } from '../../src/components/BottomTabBar';
+import { TopAdBanner } from '../../src/components/TopAdBanner';
 import { DeleteConfirmDialog } from '../../src/components/DeleteConfirmDialog';
 import { FavoriteButton } from '../../src/components/FavoriteButton';
 import { NotFoundScreen } from '../../src/components/NotFoundScreen';
@@ -151,6 +152,8 @@ function RecipeDetailPage() {
           </PageNavbar.AccessoryButtons>
         ) : null}
       </PageNavbar>
+
+      <TopAdBanner slot="detail-top" />
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
