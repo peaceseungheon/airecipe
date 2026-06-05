@@ -70,7 +70,24 @@ AI 레시피 안내 — 앱인토스 미니앱 (React Native + Granite + TDS).
 
 ## 현재 단계
 
-**요리 기록 피드 — 홈→피드 전환 + 3탭 재편 + 사진 업로드(ADR-021) → 이용약관·개인정보 인앱 페이지(ADR-020) → Sentry 정렬(ADR-019) → 라우트 `pages/` 통합(ADR-018) + 하단 탭바(ADR-017) → 디바이스 사진 선택 실증 + 백엔드(cooking-logs·R2)/출시/권한 콘솔 외부 작업 PENDING** (2026-06-03).
+**전 화면 상단 고정 배너 광고(ADR-022 rev.2) → 요리 기록 피드 — 홈→피드 전환 + 3탭 재편 + 사진 업로드(ADR-021) → 이용약관·개인정보 인앱 페이지(ADR-020) → Sentry 정렬(ADR-019) → 라우트 `pages/` 통합(ADR-018) + 하단 탭바(ADR-017) → 디바이스 사진 선택 실증 + 백엔드(cooking-logs·R2)/출시/권한 콘솔 외부 작업 PENDING** (2026-06-05).
+
+### 전 화면 상단 고정 배너 광고 (ADR-022 rev.2, 2026-06-05)
+
+사용자 요청("배너 광고가 항상 보이도록")으로, 시범 1곳(`/my-recipes` 하단)뿐이던 배너를 **전 화면 상단 고정**으로 확대. 확인 질문 2결정: (1) 위치=모든 화면 상단 고정, (2) 노출 보장=환경변수 게이트 유지(테스트 id 폴백 미채택). **미니앱 단독·백엔드 무변경.** typecheck PASS, lint 0 errors(router.gen.ts 누적 warning 1건), test 7 PASS. SDK 직접 import는 `adapter.toss.tsx` 1곳 유지(G1)·하드코딩 adGroupId 0건(G2). **실기기 운영 빌드 상단 배너 노출 확인.**
+
+⚠ **rev.1 철회**: 최초 `_app.tsx` 네비게이터 위(앱 루트) 마운트(`GlobalAdLayout`)는 **운영 빌드 실기기에서 앱 전체 검정 화면 크래시**. 원인 — Granite가 `TDSProvider`·네비게이션을 `children` 안쪽에 주입하는데 InlineAd를 그 바깥(루트)에 렌더 → impression 컨텍스트 부재로 트리 붕괴. `GlobalAdLayout` 삭제·`_app.tsx` 원복.
+
+5결정(ADR-022 rev.2 D84~D88):
+- **D84** 화면-내 마운트 — 각 화면 `PageNavbar` 아래 `<TopAdBanner slot="..." />` 1줄(BottomTabBar와 동일 패턴). ⚠ `_app.tsx` 루트 마운트 금지.
+- **D85** `impressFallbackOnMount: true`(필수) — 공식 RN-BannerAd 가이드: InlineAd는 impression 컨텍스트 필수(IOScrollView 또는 impressFallbackOnMount). 고정 배너는 후자. 누락이 크래시 핵심 원인. `adapter.toss.tsx` 일괄.
+- **D86** 에러 바운더리 — `AppInlineAd`를 `AdErrorBoundary`로 감싸 미지원 환경(Toss앱 < 5.241.0 등) throw 시 배너만 숨기고 앱 정상 유지.
+- **D87** 환경 게이트 유지 + 비활성 시 `null`(회귀 0). live group id는 `.env.<env>` 주입.
+- **D88** 적용 범위 = 10개 라우트 화면 상단. `/my-recipes` 하단 배너 2곳 제거(상단 통일). `_404`·전체화면 NotFoundScreen·전이 분기 제외.
+
+산출: `src/components/TopAdBanner.tsx`(신규)·`AppInlineAd.tsx`(에러 바운더리)·`adapter.toss.tsx`(impressFallbackOnMount) + 10개 `pages/*.tsx`(상단 마운트, my-recipes 하단 제거) + `docs/adr/ADR-022`(rev.2) + 11-ADS §11.5.1·§11.10 + AGENTS.md 2종(components·pages). `GlobalAdLayout.tsx` 삭제·`_app.tsx` 원복.
+
+**PENDING(ADR-022)**: live group id 인벤토리/승인에 따른 노출률(onNoFill 시 숨김) + Toss앱 < 5.241.0 사용자 배너 미노출(앱은 정상).
 
 ### 요리 기록 피드 (ADR-021, 2026-06-03)
 
@@ -446,6 +463,7 @@ Phase별 수용 기준은 `docs/appsintoss-port/10-SPRINT-PLAN.md`. 결정 트�
 | 2026-05-30 | BottomTabBar 전 화면 노출 (ADR-017 D63 — D56 대체) — "현재 단계" 하단 탭바 절에 D63 서브절 추가 + D56 노출 범위 정정(취소선). `active` 센티넬 `'none'` 도입(D63a, 로직 무변경·타입만 확장), early-return 분기 마운트(D63b), 404/_404 View 래퍼 패턴(D63c), D55 재포커스 불변(D63d), generate/recommend/[id] paddingBottom 24(D63e). 6개 페이지 전 분기 마운트. 산출: `BottomTabBar.tsx`·`pages/recipe/{generate,recommend,[id]}.tsx`·`pages/_404.tsx` + ADR-017 §2.1 D63 + `_workspace/01_architect_baseline.md` + 07 §7.8.1 + `src/components/AGENTS.md`. **백엔드 무변경.** 07 §7.8.1 본문 활성색 문구를 `colors.orange500`로 정합(QA 비차단 지적 반영). | 사용자 요청("모든 화면 노출"). QA 7/7 GO(FAIL 0), typecheck/lint PASS. |
 | 2026-06-01 | 이용약관·개인정보처리방침 인앱 정적 페이지 추가 (ADR-020) — "현재 단계" 절에 ADR-020 서브절 추가 + 변경 이력 1행. 신규 라우트 2개(`/terms`·`/privacy`, 공개 정적 화면) + 홈 푸터 진입 링크. 산출: `pages/terms.tsx`·`pages/privacy.tsx`(신규)·`pages/index.tsx`(푸터 surgical)·`src/router.gen.ts`(수동 등록 2) + `docs/adr/ADR-020`(신규 D70~D74) + 07 §7.3.7/§7.3.8·§7.4 행6·7·§7.8.1 2행 + 06 §6.11(정적 페이지 패턴) + pages/AGENTS.md 파일 표 2행·등록 라우트·정적 화면 규약. 본문 표준 한국어 보일러플레이트 생성(이용약관 제6조 AI 면책·개인정보 제4절 AI Provider 제3자 전송 고지). **미니앱 단독·백엔드 무변경.** 검수 영향: 외부 도메인 0건(화이트리스트 무변경)·딥링크 기존 메커니즘. 메인 세션이 frontend 위임 + architect/qa 역할 통합 수행(사용자가 추가 에이전트 스폰 거부, 직접 마무리). | 사용자 요청("서비스 이용약관 페이지"). typecheck PASS·lint 0 errors. 사업자 정보 placeholder 출시 전 확정 PENDING(D74). |
 | 2026-06-03 | 요리 기록 피드 — 홈→피드 전환 + 3탭 재편 + 사진 업로드 (ADR-021) — "현재 단계" 절에 ADR-021 서브절 추가 + 변경 이력 1행. **cross-cutting**(백엔드 cooking-logs·R2 별 계약 + 미니앱). 본 차는 미니앱 화면+문서(M3·M6~M11), 플러밍(M1·M2·M4·M5)은 선행 커밋. 산출: `granite.config.ts`(권한)·`BottomTabBar.tsx`(3탭)·`pages/index.tsx`(피드)·`pages/recipe/index.tsx`(신규)·`src/components/{PhotoPickerButton,StarRatingInput,RecipeSnapshotPicker,CookingLogForm,CookingLogCard,FeedEmptyState}.tsx`(신규)·`pages/cooking-log/{new,[id]}.tsx`(신규)·`src/router.gen.ts`(수동 등록 3)·`pages/recipe/generate.tsx`(생성→기록) + `docs/adr/ADR-021`(신규 D75~D83) + 06 §6.12·07 §7.3.9~§7.3.11·§7.4·§7.8.1·09 §9.2.5 + `pages/privacy.tsx` 사진 고지 + AGENTS.md 4종. ⚠ **TDS 별점 정정(D79)**: `EditableRating`/`ReadOnlyRating` named export 부재 → 단일 `Rating` 판별 유니온 채택. | 요리 기록 피드 단계(설계 스펙·계획 2026-06-03). typecheck PASS·lint 0 errors·test 7 PASS·hex 0건·SDK 격리 OK. 디바이스 사진 선택·백엔드 배포·권한 콘솔 PENDING. |
+| 2026-06-05 | 전 화면 상단 고정 배너 광고 (ADR-022) — "현재 단계" 절 ADR-022 서브절 + 변경 이력 1행. 시범 1곳(`/my-recipes` 하단)뿐이던 배너를 전 화면 상단 고정으로 확대. 확인 질문 2결정(위치=상단 고정 / 노출=환경 게이트 유지). **rev.1(`_app.tsx` 루트 마운트 `GlobalAdLayout`)는 운영 빌드 실기기 검정 화면 크래시로 철회** — InlineAd가 TDSProvider·네비게이션 컨텍스트(Granite가 children 안쪽 주입) 바깥에서 렌더돼 트리 붕괴. **rev.2**: 화면-내 마운트(`TopAdBanner`, 각 화면 PageNavbar 아래) + `impressFallbackOnMount: true`(공식 RN-BannerAd 가이드 — impression 컨텍스트 필수) + `AppInlineAd` 에러 바운더리(앱 크래시 방지). 산출: `src/components/TopAdBanner.tsx`(신규)·`AppInlineAd.tsx`(바운더리)·`adapter.toss.tsx`(impressFallbackOnMount) + 10개 `pages/*.tsx`(상단 마운트; my-recipes 하단 2곳 제거·상단 통일) + `docs/adr/ADR-022`(rev.2 D84~D88) + 11-ADS §11.5.1·§11.10 + AGENTS.md 2종. `GlobalAdLayout.tsx` 삭제·`_app.tsx` 원복. **미니앱 단독·백엔드 무변경.** | 사용자 요청("배너 광고가 항상 보이도록") + 공식 가이드 반영. typecheck PASS·lint 0 errors·test 7 PASS·SDK 격리(G1)·하드코딩 adGroupId 0건(G2). 실기기 운영 빌드 노출 확인. live group id 인벤토리/승인·구버전 Toss앱 미노출 PENDING. |
 
 ---
 

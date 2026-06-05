@@ -20,8 +20,9 @@
  * - RecipeCard.onToggleFavorite 활성화 — 낙관적 mutate + 호출 측 rollback(D4).
  * - PATCH 404 시 카드는 invalidate로 자동 사라짐(D9). 토스트 노출 없음.
  *
- * Phase 4.5 (ADR-014 D30): 빈 상태와 정상 목록 양쪽 하단에 `<AppInlineAd slot="my-recipes-bottom" />`.
- * 로딩/에러 분기에는 미렌더 — 사용자 컨텍스트 부적합 (G8). 광고 활성/비활성은 환경변수 게이트.
+ * 광고 (ADR-022 rev.2): 전 화면 상단 고정 정책으로 통일 — 본 화면도 PageNavbar 아래
+ *   `<TopAdBanner slot="my-top" />` 1곳만 사용한다(기존 하단 `my-recipes-bottom` 2곳 제거).
+ *   광고 활성/비활성은 환경변수 게이트(ADR-014 D27).
  */
 
 import React, { useCallback, useMemo, useState } from 'react';
@@ -29,8 +30,8 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import { createRoute, useNavigation } from '@granite-js/react-native';
 import { Button, PageNavbar, Txt, colors } from '@toss/tds-react-native';
 
-import { AppInlineAd } from '../src/components/AppInlineAd';
 import { BottomTabBar } from '../src/components/BottomTabBar';
+import { TopAdBanner } from '../src/components/TopAdBanner';
 import { EmptyState } from '../src/components/EmptyState';
 import { FilterTabs, type FilterValue } from '../src/components/FilterTabs';
 import { RecipeCard } from '../src/components/RecipeCard';
@@ -140,6 +141,8 @@ function MyRecipesPage() {
         <PageNavbar.Title>마이 레시피</PageNavbar.Title>
       </PageNavbar>
 
+      <TopAdBanner slot="my-top" />
+
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
@@ -198,9 +201,6 @@ function MyRecipesPage() {
                 onAction={handleGoGenerate}
               />
             )}
-            <View style={styles.adSlot}>
-              <AppInlineAd slot="my-recipes-bottom" />
-            </View>
           </>
         ) : (
           <View style={styles.list}>
@@ -241,10 +241,6 @@ function MyRecipesPage() {
             <Txt typography="st9" color={colors.grey500} style={styles.pageInfo}>
               {`${page} / ${lastPage} 페이지 · 총 ${total}개`}
             </Txt>
-
-            <View style={styles.adSlot}>
-              <AppInlineAd slot="my-recipes-bottom" />
-            </View>
           </View>
         )}
       </ScrollView>
@@ -292,9 +288,6 @@ const styles = StyleSheet.create({
   pageInfo: {
     textAlign: 'center',
     marginTop: 4,
-  },
-  adSlot: {
-    marginTop: 16,
   },
   toastBox: {
     padding: 12,

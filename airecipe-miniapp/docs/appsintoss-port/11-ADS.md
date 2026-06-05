@@ -119,9 +119,13 @@ else                              → toss(config)
 
 ### 11.5.1 배너 위치
 
-- 컨텐츠와 충돌하지 않는 하단·빈 상태에 배치.
-- 로딩·에러 분기에는 미렌더(사용자가 콘텐츠를 기다리는 상황).
-- TDS Padding 토큰과 일치(16dp 전후 마진).
+**전 화면 상단 고정 배너 (ADR-022 rev.2 — `TopAdBanner`).**
+
+- 각 라우트 화면이 `PageNavbar` **바로 아래**(스크롤 영역 밖, 상단 고정)에 `<TopAdBanner slot="..." />`를 1줄 마운트한다 — `BottomTabBar`와 동일한 **화면-내 마운트 패턴**(ADR-017 D53). ⚠ `_app.tsx` 앱 루트에 마운트 금지(ADR-022 rev.1 — 루트 마운트는 TDSProvider·네비게이션 컨텍스트 바깥이라 운영 빌드에서 앱 전체 크래시했다).
+- `InlineAd`는 impression 측정 컨텍스트가 필수 → 고정 배너는 `impressFallbackOnMount: true`로 마운트(어댑터에서 일괄, ADR-022 D85). `IOScrollView` 사용 시엔 그 안에 배치.
+- 광고 렌더 실패가 앱을 죽이지 않도록 `AppInlineAd`는 에러 바운더리로 감쌈(ADR-022 D86). 미지원 환경(Toss앱 < 5.241.0 등)은 배너만 숨김.
+- `ads.isEnabled()`(D27 게이트) false면 `null` 렌더(공간 0·회귀 0). live group id는 `.env.<env>` `ADS_INLINE_GROUP_ID` + `ADS_ENABLED=true`로 주입.
+- 적용 범위: 10개 라우트 화면 메인 콘텐츠(상단). `/my-recipes`는 상단으로 통일(기존 하단 `my-recipes-bottom` 제거). `_404`·`NotFoundScreen`(전체화면)·전이 분기는 제외.
 
 ### 11.5.2 전면 광고 트리거
 
@@ -188,3 +192,5 @@ QA가 본 챕터 검증 시 다음 9건을 확인:
 | 날짜 | 변경 | 사유 |
 |------|------|------|
 | 2026-05-25 | 초기 작성 (Phase 4.5) | 토스 광고 SDK 도입 기반 작업 — 어댑터 격리, 환경 분리, 시범 적용 1곳(`/my-recipes` 하단). ADR-014 D25~D38 13 결정 동결과 동시 발행. |
+| 2026-06-04 | 전역 상단 고정 배너 추가 (ADR-022 rev.1, **철회**) — `_app.tsx` 루트 마운트 방식. | 운영 빌드 실기기에서 앱 전체 검정 화면 크래시(InlineAd가 TDSProvider·네비게이션 컨텍스트 바깥에서 렌더). |
+| 2026-06-05 | 전 화면 상단 고정 배너 (ADR-022 rev.2) — §11.5.1을 `TopAdBanner` 화면-내 마운트로 정정. 각 화면 `PageNavbar` 아래 마운트 + `impressFallbackOnMount: true`(impression 컨텍스트) + `AppInlineAd` 에러 바운더리(앱 크래시 방지) + 환경 게이트 유지. `/my-recipes` 하단 배너 제거(상단 통일). | rev.1 크래시 정정 + 공식 RN-BannerAd 가이드 반영. 실기기 운영 빌드 노출 확인. |

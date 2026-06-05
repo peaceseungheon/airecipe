@@ -19,6 +19,7 @@ import { createRoute, useNavigation } from '@granite-js/react-native';
 import { PageNavbar } from '@toss/tds-react-native';
 
 import { BottomTabBar } from '../../src/components/BottomTabBar';
+import { TopAdBanner } from '../../src/components/TopAdBanner';
 import {
   CookingLogForm,
   type CookingLogFormProps,
@@ -67,6 +68,7 @@ function NewCookingLogPage() {
       <PageNavbar>
         <PageNavbar.Title>요리 기록 올리기</PageNavbar.Title>
       </PageNavbar>
+      <TopAdBanner slot="cooking-new-top" />
       <CookingLogForm
         initialRecipe={initialRecipe}
         pending={isSaving}

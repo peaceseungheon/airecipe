@@ -17,6 +17,7 @@ import { createRoute, useNavigation } from '@granite-js/react-native';
 import { Button, PageNavbar, Txt, colors } from '@toss/tds-react-native';
 
 import { BottomTabBar } from '../../src/components/BottomTabBar';
+import { TopAdBanner } from '../../src/components/TopAdBanner';
 import { SearchForm } from '../../src/components/SearchForm';
 
 export const Route = createRoute('/recipe', {
@@ -50,6 +51,8 @@ function RecipeHomePage() {
       <PageNavbar>
         <PageNavbar.Title>레시피</PageNavbar.Title>
       </PageNavbar>
+
+      <TopAdBanner slot="recipe-top" />
 
       <ScrollView
         style={styles.scroll}

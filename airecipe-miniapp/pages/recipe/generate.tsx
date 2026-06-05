@@ -32,6 +32,7 @@ import {
 import { createRoute, useNavigation } from '@granite-js/react-native';
 
 import { BottomTabBar } from '../../src/components/BottomTabBar';
+import { TopAdBanner } from '../../src/components/TopAdBanner';
 import { NutritionPanel } from '../../src/components/NutritionPanel';
 import { RecipeDisplay } from '../../src/components/RecipeDisplay';
 import { SearchForm } from '../../src/components/SearchForm';
@@ -134,6 +135,8 @@ function GeneratePage() {
       <PageNavbar>
         <PageNavbar.Title>레시피 생성</PageNavbar.Title>
       </PageNavbar>
+
+      <TopAdBanner slot="generate-top" />
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}

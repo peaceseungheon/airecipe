@@ -26,6 +26,7 @@ import {
 } from '@toss/tds-react-native';
 
 import { BottomTabBar } from '../../src/components/BottomTabBar';
+import { TopAdBanner } from '../../src/components/TopAdBanner';
 import { NotFoundScreen } from '../../src/components/NotFoundScreen';
 import { RecipeDisplay } from '../../src/components/RecipeDisplay';
 import { useCookingLogDetail } from '../../src/hooks/useCookingLogDetail';
@@ -109,6 +110,8 @@ function CookingLogDetailPage() {
       <PageNavbar>
         <PageNavbar.Title>{data.recipe.dishName}</PageNavbar.Title>
       </PageNavbar>
+
+      <TopAdBanner slot="cooking-detail-top" />
 
       <ScrollView contentContainerStyle={styles.content}>
         <Image
